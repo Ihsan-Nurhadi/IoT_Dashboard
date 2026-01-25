@@ -1,0 +1,5 @@
+mqttvenv/      # Jangan masukkan virtual environment lokal ke Docker
+__pycache__/
+*.pyc
+.git
+.env

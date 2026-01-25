@@ -1,0 +1,37 @@
+services:
+  backend:
+    build: ./NMS_Backend
+    container_name: django_backend
+    volumes:
+      - ./NMS_Backend:/app
+      - ./NMS_Backend/data:/app/data
+      - ./NMS_Backend/static:/app/static
+      - ./NMS_Backend/media:/app/media
+      - ./NMS_Backend/weights:/app/weights
+      - ./NMS_Backend/staticfiles:/app/staticfiles
+    environment:
+      - DEBUG=False
+      # Pastikan di settings.py database point ke /app/data/db.sqlite3
+      - DATABASE_URL=sqlite:////app/data/db.sqlite3 
+    expose:
+      - "8000"
+    restart: always
+
+  frontend:
+    build: ./NMS_IoT
+    container_name: react_frontend
+    # Kita tidak perlu ports di sini karena traffic masuk lewat Nginx
+
+  nginx:
+    build: ./nginx
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+    volumes:
+      # Nginx mengambil file statis yang dikumpulkan oleh Django
+      - ./NMS_Backend/staticfiles:/app/static
+      - ./NMS_Backend/media:/app/media
+    depends_on:
+      - backend
+      - frontend
+    restart: always

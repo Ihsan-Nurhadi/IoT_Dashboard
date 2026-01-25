@@ -1,0 +1,132 @@
+.rotary-control-card .card-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.rotary-control-card .rotary-indicator.motor-on {
+  background-color: #fff7ed;
+  border-color: #fed7aa;
+  border-top-color: var(--accent-color-orange);
+  box-shadow: 0 0 20px 5px rgba(251, 146, 60, 0.5);
+  animation-play-state: running;
+}
+
+.rotary-control-card .icon-container.rotary {
+  background-color: var(--accent-color-orange);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 1.5rem;
+  color: #fff;
+}
+
+.rotary-control-card .card-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.rotary-control-card .card-subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  color: var(--secondary-text-color);
+}
+
+.rotary-control-card .rotary-status-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 3rem 0;
+}
+
+.rotary-control-card .rotary-indicator {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background-color: #f3f4f6;
+  border: 10px solid #e5e7eb;
+  border-top-color: #d1d5db;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  animation: spin 2s linear infinite;
+  animation-play-state: paused;
+}
+
+
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.rotary-control-card .motor-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem;
+  background-color: #f9fafb;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  font-size: 1rem;
+}
+
+.rotary-control-card .motor-status-icon {
+  color: var(--secondary-text-color);
+}
+
+.rotary-control-card .motor-status-badge {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.rotary-control-card .motor-status-badge.on {
+  color: var(--accent-color-orange);
+}
+
+.rotary-control-card .control-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.rotary-control-card .control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background-color: #f9fafb;
+  color: var(--secondary-text-color);
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rotary-control-card .control-button:hover {
+  background-color: #f3f4f6;
+}
+
+.rotary-control-card .control-button.on.active {
+  background: linear-gradient(to right, #fb923c, #f97316);
+  color: #fff;
+  border-color: transparent;
+}
+
+.rotary-control-card .control-button.off.active {
+  background-color: #e5e7eb;
+  color: var(--text-color);
+}

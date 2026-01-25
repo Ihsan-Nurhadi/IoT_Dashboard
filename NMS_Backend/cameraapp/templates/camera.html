@@ -1,0 +1,86 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <title>Tapo C500 Control</title>
+    <style>
+        .controls button { padding: 10px 25px; margin: 10px; font-size: 16px; }
+        #screenshot-img {
+            margin-top: 20px;
+            max-width: 400px;
+            border: 2px solid #333;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Tapo C500 Live Stream</h2>
+<h3>Connect Camera</h3>
+
+<input id="ip" placeholder="IP Camera"><br>
+<input id="username" placeholder="Username"><br>
+<input id="password" type="password" placeholder="Password"><br>
+
+<button onclick="connectCamera()">🔌 Connect</button>
+
+<p id="status"></p>
+
+<img src ='/stream/' width="640" height="480" />
+
+
+<h3>PTZ Controls</h3>
+
+<div class="controls">
+    <button onclick="sendPTZ('up')">⬆ UP</button><br>
+    <button onclick="sendPTZ('left')">⬅ LEFT</button>
+    <button onclick="sendPTZ('right')">RIGHT ➡</button><br>
+    <button onclick="sendPTZ('down')">⬇ DOWN</button>
+</div>
+<h3>Camera Screenshot</h3>
+<button onclick="takeScreenshot()">📸 Screenshot Kamera</button>
+
+<img id="shot" width="400" />
+
+<script>
+function connectCamera() {
+    fetch("/camera/connect/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            ip: ip.value,
+            username: username.value,
+            password: password.value
+        })
+    })
+    .then(r => r.json())
+    .then(d => status.innerText = d.message)
+}
+function sendPTZ(direction) {
+    fetch("/ptz/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction })
+    })
+    .then(r => r.json())
+    .then(d => console.log("PTZ:", d))
+}
+function takeScreenshot() {
+    fetch("/camera/screenshot/")
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                document.getElementById("shot").src = data.file;
+            } else {
+                alert("Gagal screenshot");
+            }
+        });
+}
+</script>
+
+</body>
+</html> -->

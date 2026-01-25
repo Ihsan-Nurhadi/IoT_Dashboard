@@ -1,0 +1,71 @@
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  padding: 20px;
+  /* Tambahkan ini agar grid menyesuaikan lebar layar */
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Pastikan grid menjadi 1 kolom di HP */
+@media (max-width: 600px) {
+  .grid-container {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.section-icon {
+  font-size: 2rem;
+  color: var(--secondary-text-color);
+}
+
+.section-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.section-subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  color: var(--secondary-text-color);
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 3rem;
+  margin-bottom: 4rem;
+}
+
+.device-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 3rem;
+  margin-bottom: 4rem;
+}
+
+.device-control-grid .floodlight-control-card {
+  grid-column: 1 / -1;
+}
+.grid-container-big {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(700px, 1fr));
+  gap: 3rem;
+  margin-bottom: 4rem;
+}

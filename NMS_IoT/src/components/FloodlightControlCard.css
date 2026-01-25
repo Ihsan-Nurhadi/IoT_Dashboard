@@ -1,0 +1,113 @@
+    .floodlight-control-card .card-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .floodlight-control-card .icon-container {
+    background-color: var(--accent-color-orange);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1.5rem;
+    color: #fff;
+  }
+  
+  .floodlight-control-card .card-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .floodlight-control-card .card-subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 1rem;
+    color: var(--secondary-text-color);
+  }
+  
+  .floodlight-control-card .status-indicator-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 0;
+  }
+  
+  .floodlight-control-card .status-indicator {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2rem;
+    color: #bdbdbd;
+  }
+  
+  .floodlight-control-card .status-indicator.on {
+    background-color: #fffbeb;
+    color: #f59e0b;
+    box-shadow: 0 0 20px 10px rgba(253, 242, 209, 0.8);
+  }
+  
+  .floodlight-control-card .light-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background-color: #f5f5f5;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .floodlight-control-card .light-status-icon {
+    color: #757575;
+  }
+  
+  .floodlight-control-card .light-status-badge {
+    background-color: #e0e0e0;
+    color: #757575;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+  }
+  
+  .floodlight-control-card .light-status-badge.on {
+    background-color: #fef3c7;
+    color: #f59e0b;
+  }
+  
+  .floodlight-control-card .control-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  
+  .floodlight-control-card .control-button {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+  }
+  
+  .floodlight-control-card .control-button.on.active {
+    background: linear-gradient(to right, #ffb74d, #ff9800);
+    color: white;
+  }
+  
+  .floodlight-control-card .control-button.off.active {
+    background-color: #374151;
+    color: white;
+  }
+  
+  .floodlight-control-card .control-button:not(.active) {
+    background-color: #f3f4f6;
+    color: #6b7280;
+  }

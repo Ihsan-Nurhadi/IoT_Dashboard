@@ -1,0 +1,73 @@
+.device-status-card .card-content {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.device-status-card .icon-container {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 2rem;
+  color: #fff;
+}
+
+.device-status-card .icon-container.pln {
+  background-color: var(--accent-color-green);
+}
+
+.device-status-card .icon-container.door-panel {
+  background-color: var(--accent-color-blue);
+}
+
+.device-status-card .device-info {
+  flex-grow: 1;
+}
+
+.device-status-card .device-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.device-status-card .device-type,
+.device-status-card .timestamp {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  color: var(--secondary-text-color);
+}
+
+.device-status-card .status-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.device-status-card .status-badge.status-active {
+  background-color: #e6f9f2;
+  color: #0e9f6e;
+}
+
+.device-status-card .status-badge.status-inactive {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+.device-status-card .operational-status {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1rem;
+  color: var(--secondary-text-color);
+}
+
+.device-status-card .operational-status .status-indicator-dot.operational {
+  background-color: var(--accent-color-green);
+}
