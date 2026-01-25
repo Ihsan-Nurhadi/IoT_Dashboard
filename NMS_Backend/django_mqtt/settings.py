@@ -44,7 +44,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'speakerapp',
     'corsheaders',
-    'cameraapp',
     'rest_framework',
     'dorlockapp',
     'floodlightapp',
