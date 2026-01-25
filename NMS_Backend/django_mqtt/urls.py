@@ -5,9 +5,9 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('', include('speakerapp.urls')),
-    path('', include('dorlockapp.urls')),
-    path('', include('rotaryapp.urls')),
-    path('', include('floodlightapp.urls')),
+    path('api/', include('dorlockapp.urls')),
+    path('api/', include('rotaryapp.urls')),
+    path('api/', include('floodlightapp.urls')),
     # path('', include('gps_tracer.urls')),
 ]
 if settings.DEBUG:

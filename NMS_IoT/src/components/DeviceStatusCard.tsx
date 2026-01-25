@@ -25,9 +25,9 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
     // Tentukan URL API berdasarkan nama device
     let apiUrl = "";
     if (isDoorPanel) {
-      apiUrl = "http://127.0.0.1:8000/api/get-door-status/";
+      apiUrl = "/api/get-door-status/";
     } else if (isPLN) {
-      apiUrl = "http://127.0.0.1:8000/api/get-pln-status/";
+      apiUrl = "/api/get-pln-status/";
     } else {
       return; // Jika bukan device live, tidak perlu polling
     }

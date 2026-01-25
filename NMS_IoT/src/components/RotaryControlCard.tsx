@@ -3,7 +3,8 @@ import Card from './Card';
 import './RotaryControlCard.css';
 import { FaSync, FaPlay, FaStop } from 'react-icons/fa';
 
-const API_URL = "http://localhost:8000/send-rotary/"; // sesuaikan
+
+const API_URL = "/api/dorlock/send-rotary/";; // sesuaikan
 
 const RotaryControlCard: React.FC = () => {
   const [isMotorOn, setIsMotorOn] = useState(false);

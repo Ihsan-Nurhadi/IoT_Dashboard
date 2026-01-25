@@ -3,7 +3,7 @@ import Card from './Card';
 import './FloodlightControlCard.css';
 import { FaLightbulb, FaPowerOff } from 'react-icons/fa';
 
-const API_URL = "http://localhost:8000/send-floodlight/"; // sesuaikan
+const API_URL = "/api/floodlight/send-floodlight/"; // sesuaikan
 
 const FloodlightControlCard: React.FC = () => {
   const [isMotorOn, setIsMotorOn] = useState(false);
