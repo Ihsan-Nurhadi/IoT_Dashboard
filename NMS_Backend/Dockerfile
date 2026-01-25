@@ -27,4 +27,4 @@ COPY . /app/
 EXPOSE 8000
 
 # Command default
-CMD ["gunicorn", "NMS_Backend.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "django_mqtt.wsgi:application", "--bind", "0.0.0.0:8000"]
