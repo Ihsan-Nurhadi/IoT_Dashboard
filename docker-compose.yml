@@ -1,37 +1,61 @@
 services:
+  # 1. Backend API (Django)
   backend:
     build: ./NMS_Backend
-    container_name: django_backend
+    container_name: nms_backend
+    restart: always
     volumes:
       - ./NMS_Backend:/app
-      - ./NMS_Backend/data:/app/data
-      - ./NMS_Backend/static:/app/static
-      - ./NMS_Backend/media:/app/media
-      - ./NMS_Backend/weights:/app/weights
-      - ./NMS_Backend/staticfiles:/app/staticfiles
-    environment:
-      - DEBUG=False
-      # Pastikan di settings.py database point ke /app/data/db.sqlite3
-      - DATABASE_URL=sqlite:////app/data/db.sqlite3 
-    expose:
-      - "8000"
-    restart: always
+      - static_volume:/app/static
+      - media_volume:/app/media
+    env_file: .env
+    networks:
+      - nms_network
 
+  # 2. MQTT Listener (Worker Background)
+  mqtt_listener:
+    build: ./NMS_Backend
+    container_name: nms_mqtt_worker
+    restart: always
+    # Menjalankan command custom management file Anda
+    command: python manage.py mqtt_listener 
+    env_file: .env
+    depends_on:
+      - backend
+    networks:
+      - nms_network
+
+  # 3. Frontend (React)
   frontend:
     build: ./NMS_IoT
-    container_name: react_frontend
-    # Kita tidak perlu ports di sini karena traffic masuk lewat Nginx
+    container_name: nms_frontend
+    restart: always
+    networks:
+      - nms_network
 
+  # 4. Nginx (Gateway Utama)
   nginx:
-    build: ./nginx
-    container_name: nginx_proxy
+    image: nginx:alpine
+    container_name: nms_nginx
+    restart: always
     ports:
-      - "80:80"
+      # Format: "PORT_VPS:PORT_CONTAINER"
+      # Ini akan membuka port sesuai settingan di .env
+      - "${APP_PORT}:80"
     volumes:
-      # Nginx mengambil file statis yang dikumpulkan oleh Django
-      - ./NMS_Backend/staticfiles:/app/static
-      - ./NMS_Backend/media:/app/media
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/app/static
+      - media_volume:/app/media
     depends_on:
       - backend
       - frontend
-    restart: always
+    networks:
+      - nms_network
+
+volumes:
+  static_volume:
+  media_volume:
+
+networks:
+  nms_network:
+    driver: bridge

@@ -1,17 +1,21 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
-# Install pustaka sistem minimal untuk pengolahan gambar dan Glib
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
 WORKDIR /app
 
-# Sisanya tetap sama
-COPY requirements.txt .
-RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt
+# Install dependencies sistem
+RUN apt-get update && apt-get install -y netcat-openbsd
 
-COPY . .
+# Install python dependencies
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "django_mqtt.wsgi:application"]
+COPY . /app/
+
+EXPOSE 8000
+
+# Command default untuk Web Server
+CMD ["gunicorn", "NMS_Backend.wsgi:application", "--bind", "0.0.0.0:8000"]
