@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route} from 'react-router-dom';
 import './App.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -20,8 +20,8 @@ const Dashboard = () => (
       </div>
     </div>
     <div className="grid-container">
-      <DeviceStatusCard deviceName="PLN" deviceType="Power Supply" timestamp="Jan 15, 2024" status="Active" isOperational={true} />
-      <DeviceStatusCard deviceName="Door Panel" deviceType="Access Control" timestamp="Jan 15, 2024" status="Closed" />
+      <DeviceStatusCard deviceName="PLN" deviceType="Power Supply" />
+      <DeviceStatusCard deviceName="Door Panel" deviceType="Access Control" />
     </div>
 
     <div className="section-header">
@@ -33,6 +33,8 @@ const Dashboard = () => (
     </div>
     <div className="device-control-grid">
       <FloodlightControlCard />
+    </div>
+    <div className="side-by-side-grid">
       <AudioControlCard />
       <RotaryControlCard />
     </div>    

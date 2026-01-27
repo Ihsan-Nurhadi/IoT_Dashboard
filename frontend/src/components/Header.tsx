@@ -1,15 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import './Header.css';
-import { FaSatelliteDish, FaHome } from 'react-icons/fa';
+import {FaHome } from 'react-icons/fa';
 
 const Header: React.FC = () => {
   return (
     <header className="app-header">
       <div className="logo-container">
-        <FaSatelliteDish className="logo-icon" />
+        <img src="/logo.svg" alt="logo" className="logo-icon" />
         <div>
-          <h1 className="app-title">IoT Control Panel</h1>
+          <h1 className="app-title">NMS Control Panel</h1>
+          <p className="app-subtitle">Real-time device management</p>
         </div>
       </div>
 
@@ -26,3 +27,4 @@ const Header: React.FC = () => {
 };
 
 export default Header;
+
