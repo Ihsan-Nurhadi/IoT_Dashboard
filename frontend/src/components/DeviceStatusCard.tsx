@@ -39,9 +39,9 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
     // 1. Tentukan URL API (Sesuaikan dengan urls.py di backend baru)
     let apiUrl = "";
     if (isDoorPanel) {
-      apiUrl = "/api/devicestatus/get-door-status/";
+      apiUrl = "/api/get-door-status/";
     } else if (isPLN) {
-      apiUrl = "/api/devicestatus/get-pln-status/";
+      apiUrl = "/api/get-pln-status/";
     } else {
       return; 
     }
