@@ -8,6 +8,8 @@ services:
       - ./backend:/app
       - static_volume:/app/static
       - media_volume:/app/media
+    environment:
+      - TZ=Asia/Jakarta  # Tambahkan ini
     env_file: .env
     networks:
       - nms_network
@@ -19,6 +21,8 @@ services:
     restart: always
     # Menjalankan command custom management file Anda
     command: python manage.py mqtt_listener 
+    environment:
+      - TZ=Asia/Jakarta  # Tambahkan ini
     env_file: .env
     depends_on:
       - backend
