@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'speakerapp',
     'corsheaders',
     'rest_framework',
-    'dorlockapp',
+    'devicestatusapp',
     'floodlightapp',
     # 'gps_tracer',
 ]

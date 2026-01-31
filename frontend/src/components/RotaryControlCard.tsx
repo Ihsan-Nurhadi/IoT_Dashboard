@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import Card from './Card';
 import './RotaryControlCard.css';
-import { FaSync, FaPlay, FaStop } from 'react-icons/fa';
+import { PiSiren } from "react-icons/pi";
+import { FaPlay, FaStop } from 'react-icons/fa';
 
 
-const API_URL = "/api/send-rotary/";; // sesuaikan
+const API_URL = "/api/send-rotary/"; // sesuaikan
 
 const RotaryControlCard: React.FC = () => {
   const [isMotorOn, setIsMotorOn] = useState(false);
@@ -32,7 +33,7 @@ const RotaryControlCard: React.FC = () => {
     <Card className="rotary-control-card">
       <div className="card-header">
         <div className="icon-container rotary">
-          <FaSync />
+          <PiSiren />
         </div>
         <div className="header-text">
           <h3 className="card-title">Rotary Control</h3>
@@ -74,3 +75,4 @@ const RotaryControlCard: React.FC = () => {
 };
 
 export default RotaryControlCard;
+

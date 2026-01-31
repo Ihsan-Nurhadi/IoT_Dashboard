@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class DorlockappConfig(AppConfig):
+class DevicestatusappConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'dorlockapp'
+    name = 'devicestatusapp'

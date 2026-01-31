@@ -5,20 +5,11 @@
 }
 
 .main-content {
-  flex: 1;
-  padding: 20px;
-  /* Tambahkan ini agar grid menyesuaikan lebar layar */
-  width: 100%;
-  max-width: 1200px;
+  flex-grow: 1;
+  padding: 3rem 1rem;
+  max-width: 1400px;
   margin: 0 auto;
-  box-sizing: border-box;
-}
-
-/* Pastikan grid menjadi 1 kolom di HP */
-@media (max-width: 600px) {
-  .grid-container {
-    grid-template-columns: 1fr !important;
-  }
+  width: 100%;
 }
 
 .section-header {
@@ -54,18 +45,14 @@
 
 .device-control-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-columns: 1fr;
   gap: 3rem;
   margin-bottom: 4rem;
 }
 
-.device-control-grid .floodlight-control-card {
-  grid-column: 1 / -1;
-}
-.grid-container-big {
+.side-by-side-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(700px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 3rem;
   margin-bottom: 4rem;
 }

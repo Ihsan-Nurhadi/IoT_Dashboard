@@ -1,11 +1,11 @@
 services:
   # 1. Backend API (Django)
   backend:
-    build: ./NMS_Backend
+    build: ./backend
     container_name: nms_backend
     restart: always
     volumes:
-      - ./NMS_Backend:/app
+      - ./backend:/app
       - static_volume:/app/static
       - media_volume:/app/media
     env_file: .env
@@ -14,7 +14,7 @@ services:
 
   # 2. MQTT Listener (Worker Background)
   mqtt_listener:
-    build: ./NMS_Backend
+    build: ./backend
     container_name: nms_mqtt_worker
     restart: always
     # Menjalankan command custom management file Anda
@@ -27,7 +27,7 @@ services:
 
   # 3. Frontend (React)
   frontend:
-    build: ./NMS_IoT
+    build: ./frontend
     container_name: nms_frontend
     restart: always
     networks:

@@ -3,7 +3,7 @@ import json
 import paho.mqtt.client as mqtt
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from dorlockapp.models import DeviceState # Sesuaikan nama app
+from devicestatusapp.models import DeviceState # Sesuaikan nama app
 
 class Command(BaseCommand):
     help = 'Listens for MQTT messages for Door and PLN'
