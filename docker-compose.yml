@@ -19,13 +19,18 @@ services:
     build: ./backend
     container_name: nms_mqtt_worker
     restart: always
-    # Menjalankan command custom management file Anda
-    command: python manage.py mqtt_listener 
+    command: python manage.py mqtt_listener
     environment:
-      - TZ=Asia/Jakarta  # Tambahkan ini
+      - TZ=Asia/Jakarta
     env_file: .env
     depends_on:
       - backend
+    # --- BAGIAN INI WAJIB ADA ---
+    volumes:
+      - ./backend:/app  # <-- KUNCI RAHASIANYA (Mapping file DB agar sharing)
+      - static_volume:/app/static
+      - media_volume:/app/media
+    # ----------------------------
     networks:
       - nms_network
 

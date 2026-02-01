@@ -1,10 +1,11 @@
 # models.py
 from django.db import models
+from django.utils import timezone
 
 class DeviceState(models.Model):
     device_name = models.CharField(max_length=100, unique=True)
     status = models.CharField(max_length=50) # e.g., "Open", "Closed"
-    last_updated = models.DateTimeField(auto_now=True)
+    last_updated = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"{self.device_name}: {self.status}"
