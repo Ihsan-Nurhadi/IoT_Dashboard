@@ -1,31 +1,26 @@
 import json
-import paho.mqtt.client as mqtt
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.conf import settings
-from django.utils import timezone  # <--- PENTING: Tambahkan import ini
+from django.utils import timezone
 from .models import DeviceState
 
 # --- View untuk Get Status Pintu (Door Panel) ---
 def get_door_status(request):
     if request.method == "GET":
         try:
-            device = DeviceState.objects.filter(device_name="Door Panel").first()
+            # PERBAIKAN: Gunakan .order_by('-last_updated')
+            # Tanda minus (-) artinya DESCENDING (dari baru ke lama)
+            device = DeviceState.objects.filter(device_name="Door Panel").order_by('-last_updated').first()
             
             if device:
-                # Konversi waktu server ke Waktu Lokal (Asia/Jakarta)
                 local_time = timezone.localtime(device.last_updated)
-                
                 return JsonResponse({
                     "device": device.device_name,
                     "status": device.status, 
-                    "last_updated": local_time.strftime("%Y-%m-%d %H:%M:%S") # Format jam lokal
+                    "last_updated": local_time.strftime("%Y-%m-%d %H:%M:%S")
                 })
             else:
                 return JsonResponse({
-                    "device": "Door Panel", 
-                    "status": "Closed",
-                    "last_updated": "-"
+                    "device": "Door Panel", "status": "Closed", "last_updated": "-"
                 })
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
@@ -35,22 +30,19 @@ def get_door_status(request):
 def get_pln_status(request):
     if request.method == "GET":
         try:
-            device = DeviceState.objects.filter(device_name="PLN").first()
+            # PERBAIKAN SAMA DISINI
+            device = DeviceState.objects.filter(device_name="PLN").order_by('-last_updated').first()
             
             if device:
-                # Konversi waktu server ke Waktu Lokal (Asia/Jakarta)
                 local_time = timezone.localtime(device.last_updated)
-
                 return JsonResponse({
                     "device": "PLN",
                     "status": device.status, 
-                    "last_updated": local_time.strftime("%Y-%m-%d %H:%M:%S") # Format jam lokal
+                    "last_updated": local_time.strftime("%Y-%m-%d %H:%M:%S")
                 })
             else:
                 return JsonResponse({
-                    "device": "PLN", 
-                    "status": "Inactive",
-                    "last_updated": "-"
+                    "device": "PLN", "status": "Inactive", "last_updated": "-"
                 })
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
