@@ -3,18 +3,22 @@ import paho.mqtt.client as mqtt
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from devicestatusapp.models import DeviceState
-from django.utils import timezone  # [PENTING] Untuk waktu realtime
-from django.db import close_old_connections # [PENTING] Untuk mencegah DB disconnect
+from django.utils import timezone
+from django.db import close_old_connections
+import pytz # Import library timezone
 
 class Command(BaseCommand):
-    help = 'Listens for MQTT messages for Door and PLN'
+    help = 'Listens for MQTT messages'
 
     def handle(self, *args, **kwargs):
         BROKER = settings.MQTT_SERVER
-        PORT = int(settings.MQTT_PORT) # Pastikan jadi integer
+        PORT = int(settings.MQTT_PORT)
         USER = settings.MQTT_USER
         PASSWORD = settings.MQTT_PASSWORD
         TOPIC = settings.MQTT_TOPIC_DATA 
+
+        # Setup Timezone Jakarta
+        jkt_tz = pytz.timezone('Asia/Jakarta')
 
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
@@ -24,52 +28,51 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"Connection failed: {rc}"))
 
         def on_message(client, userdata, msg):
-            # [FIX 1] Reset koneksi DB setiap kali terima pesan
-            # Ini wajib untuk script long-running agar tidak kena error "MySQL server has gone away"
             close_old_connections()
-
             try:
                 payload_str = msg.payload.decode()
                 payload = json.loads(payload_str)
                 data_obj = payload.get("data", {})
                 
-                # [FIX 2] Ambil waktu sekarang untuk paksa update
-                current_now = timezone.now()
+                # Ambil waktu sekarang (Aware Timezone)
+                now_utc = timezone.now()
+                # Konversi ke Jakarta untuk Log
+                now_jkt = now_utc.astimezone(jkt_tz)
 
                 # --- 1. PROSES STATUS PINTU ---
                 door_status = data_obj.get("door")
                 if door_status:
-                    DeviceState.objects.update_or_create(
+                    # RAHASIA AGAR JAM BERUBAH:
+                    # Masukkan field timestamp/updated_at ke dalam 'defaults'
+                    # Ini memaksa Django meng-update kolom waktu meskipun statusnya sama
+                    obj, created = DeviceState.objects.update_or_create(
                         device_name="Door Panel",
                         defaults={
                             'status': door_status,
-                            # [FIX 3] Masukkan field timestamp ke defaults
-                            # Pastikan nama field ini sesuai models.py Anda (misal: updated_at, timestamp, atau last_updated)
-                            'updated_at': current_now 
+                            'updated_at': now_utc # Pastikan nama field ini sesuai di models.py
                         }
                     )
-                    self.stdout.write(f"Updated Door: {door_status} at {current_now}")
+                    # Print log dengan jam Jakarta
+                    self.stdout.write(f"Updated Door: {door_status} at {now_jkt.strftime('%Y-%m-%d %H:%M:%S')}")
 
                 # --- 2. PROSES STATUS PLN ---
                 pln_status = data_obj.get("pln")
                 if pln_status:
                     final_pln = "Active" if pln_status == "ON" else "Inactive"
                     
-                    DeviceState.objects.update_or_create(
+                    obj, created = DeviceState.objects.update_or_create(
                         device_name="PLN",
                         defaults={
                             'status': final_pln,
-                            # [FIX 3] Masukkan field timestamp disini juga
-                            'updated_at': current_now
+                            'updated_at': now_utc # Paksa update waktu
                         }
                     )
-                    self.stdout.write(f"Updated PLN: {final_pln} at {current_now}")
+                    self.stdout.write(f"Updated PLN: {final_pln} at {now_jkt.strftime('%Y-%m-%d %H:%M:%S')}")
 
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"Error processing message: {e}"))
+                self.stdout.write(self.style.ERROR(f"Error: {e}"))
 
         client = mqtt.Client()
-        # Set username password hanya jika ada di settings
         if USER and PASSWORD:
             client.username_pw_set(USER, PASSWORD)
             
@@ -77,7 +80,7 @@ class Command(BaseCommand):
         client.on_message = on_message
 
         try:
-            self.stdout.write(f"Connecting to {BROKER}:{PORT}...")
+            self.stdout.write(f"Connecting to {BROKER}...")
             client.connect(BROKER, PORT, 60)
             client.loop_forever()
         except Exception as e:
