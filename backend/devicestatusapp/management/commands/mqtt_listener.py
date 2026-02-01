@@ -49,7 +49,7 @@ class Command(BaseCommand):
                         device_name="Door Panel",
                         defaults={
                             'status': door_status,
-                            'updated_at': now_utc # Pastikan nama field ini sesuai di models.py
+                            'last_updated': now_utc # Pastikan nama field ini sesuai di models.py
                         }
                     )
                     # Print log dengan jam Jakarta
@@ -64,7 +64,7 @@ class Command(BaseCommand):
                         device_name="PLN",
                         defaults={
                             'status': final_pln,
-                            'updated_at': now_utc # Paksa update waktu
+                            'last_updated': now_utc # Paksa update waktu
                         }
                     )
                     self.stdout.write(f"Updated PLN: {final_pln} at {now_jkt.strftime('%Y-%m-%d %H:%M:%S')}")
