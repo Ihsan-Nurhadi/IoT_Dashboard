@@ -4,7 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('', include('speakerapp.urls')),
+    path('api/', include('speakerapp.urls')),
     path('api/', include('devicestatusapp.urls')),
     path('api/', include('rotaryapp.urls')),
     path('api/', include('floodlightapp.urls')),

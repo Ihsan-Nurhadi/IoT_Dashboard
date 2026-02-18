@@ -9,7 +9,10 @@ import {
 import "./AudioControlCard.css";
 import Card from "./Card";
 
+const API_URL = "/api/send/"; // sesuaikan dengan backend Anda
+
 const audioChannels = [1, 2, 3, 4, 5, 6];
+
 
 const AudioControlCard: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<number | null>(null);
@@ -32,7 +35,7 @@ const AudioControlCard: React.FC = () => {
     console.log("Sending:", payload);
 
     try {
-      const res = await fetch("http://localhost:8000/send/", {
+      const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
