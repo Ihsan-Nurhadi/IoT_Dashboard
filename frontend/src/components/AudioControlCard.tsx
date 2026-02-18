@@ -9,17 +9,10 @@ import {
 import "./AudioControlCard.css";
 import Card from "./Card";
 
-const audioChannels = [
-  "Audio_1",
-  "Audio_2",
-  "Audio_3",
-  "Audio_4",
-  "Audio_5",
-  "Audio_6",
-];
+const audioChannels = [1, 2, 3, 4, 5, 6];
 
 const AudioControlCard: React.FC = () => {
-  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<number | null>(null);
   const [volume, setVolume] = useState(50);
   const [showVolume, setShowVolume] = useState(false);
 
@@ -29,11 +22,10 @@ const AudioControlCard: React.FC = () => {
     useState<number | null>(null);
 
   // === SEND TO SERVER ===
-  const sendToServer = async (speaker: string) => {
+  const sendToServer = async (playlist: number) => {
     const payload = {
-      device: "sitejakarta",
-      client: "dmt",
-      speaker: speaker,
+      device: "site_1",
+      playlist: playlist, // Akan dikirim sebagai angka
       volume: volume,
     };
 
@@ -54,15 +46,13 @@ const AudioControlCard: React.FC = () => {
   };
 
   // === HANDLE SPEAKER CLICK ===
-  const handleChannelClick = (channel: string) => {
+  const handleChannelClick = (channel: number) => {
     setSelectedChannel(channel);
-
     if (clickTimeout) clearTimeout(clickTimeout);
-
+    
     const timeout = window.setTimeout(() => {
       sendToServer(channel);
     }, 1000);
-
     setClickTimeout(timeout);
   };
 
@@ -134,7 +124,7 @@ const AudioControlCard: React.FC = () => {
           <button
             key={channel}
             className={`channel-button ${
-              selectedChannel === channel ? "active" : ""
+              selectedChannel === channel ? "active" :""
             }`}
             onClick={() => handleChannelClick(channel)}
           >
