@@ -29,7 +29,7 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    "103.176.45.14",  # Masukkan IP VPS Anda di sini (tanpa http://)
+    "110.232.92.134",  # Masukkan IP VPS Anda di sini (tanpa http://)
 ]
 
 
@@ -74,7 +74,7 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False  # DEV
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000","http://103.176.45.14",
+    "http://localhost:3000","http://110.232.92.134",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
