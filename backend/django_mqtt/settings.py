@@ -29,7 +29,7 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    "103.176.45.14",  # Masukkan IP VPS Anda di sini (tanpa http://)
+    "110.232.92.134",
 ]
 
 
