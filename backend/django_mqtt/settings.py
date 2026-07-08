@@ -29,7 +29,7 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    "110.232.92.134",  # Masukkan IP VPS Anda di sini (tanpa http://)
+    "103.176.45.14",  # Masukkan IP VPS Anda di sini (tanpa http://)
 ]
 
 
@@ -74,7 +74,7 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False  # DEV
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000","http://110.232.92.134",
+    "http://localhost:3000","http://103.176.45.14",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -96,12 +96,16 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'django_mqtt.wsgi.application'
-MQTT_SERVER = "202.155.90.125"
-MQTT_PORT = 1883
-MQTT_USER = "sensor"
-MQTT_PASSWORD = "Naya@client123"
-MQTT_TOPIC_DATA = "ny/data/tower/nms"     # Untuk Subscribe (Dengar status)
-MQTT_TOPIC_COMMAND = "ny/command/tower/nms" #
+
+
+# MQTT Settings
+MQTT_SERVER = os.environ.get("MQTT_SERVER", "broker.emqx.io")
+MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
+MQTT_USER = os.environ.get("MQTT_USER", "userdev")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "RiseDEV1989")
+MQTT_TOPIC_SUB = os.environ.get("MQTT_TOPIC_SUB", "/matalite-test/in/094")
+MQTT_TOPIC_PUB = os.environ.get("MQTT_TOPIC_PUB", "/matalite-test/reply/")
+MQTT_TOPIC_PUB2 = os.environ.get("MQTT_TOPIC_PUB2", "/matalite-test/sensor/094")
 
 # client = mqtt.Client()
 # client.username_pw_set(settings.MQTT_USER, settings.MQTT_PASSWORD)

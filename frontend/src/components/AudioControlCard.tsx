@@ -9,69 +9,46 @@ import {
 import "./AudioControlCard.css";
 import Card from "./Card";
 
-const API_URL = "/api/send/"; // sesuaikan dengan backend Anda
-
-const audioChannels = [1, 2, 3, 4, 5, 6];
-
+const audioChannels = [
+  "Audio 1",
+  "Audio 2",
+  "Audio 3",
+  "Audio 4",
+  "Audio 5",
+  "Audio 6",
+];
 
 const AudioControlCard: React.FC = () => {
-  const [selectedChannel, setSelectedChannel] = useState<number | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [volume, setVolume] = useState(50);
   const [showVolume, setShowVolume] = useState(false);
 
-  // debounce timers
-  const [clickTimeout, setClickTimeout] = useState<number | null>(null);
-  const [volumeTimeout, setVolumeTimeout] =
-    useState<number | null>(null);
-
-  // === SEND TO SERVER ===
-  const sendToServer = async (playlist: number) => {
-    const payload = {
-      device: "site_1",
-      playlist: playlist, // Akan dikirim sebagai angka
-      volume: volume,
-    };
-
-    console.log("Sending:", payload);
-
+  const sendMqttCommand = async (command: string) => {
     try {
-      const res = await fetch(API_URL, {
+      await fetch("/api/send/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ command }),
       });
-
-      const data = await res.json();
-      console.log("Response:", data);
     } catch (err) {
-      console.error("Error:", err);
+      console.error("Failed to send siren command:", err);
     }
   };
 
-  // === HANDLE SPEAKER CLICK ===
-  const handleChannelClick = (channel: number) => {
-    setSelectedChannel(channel);
-    if (clickTimeout) clearTimeout(clickTimeout);
-    
-    const timeout = window.setTimeout(() => {
-      sendToServer(channel);
-    }, 1000);
-    setClickTimeout(timeout);
-  };
+  const handleChannelClick = async (channel: string) => {
+    const isDeactivating = selectedChannel === channel;
+    const nextChannel = isDeactivating ? null : channel;
+    setSelectedChannel(nextChannel);
 
-  // === HANDLE VOLUME SLIDE ===
-  const handleVolumeChange = (value: number) => {
-    setVolume(value);
-
-    if (volumeTimeout) clearTimeout(volumeTimeout);
-
-    const timeout = setTimeout(() => {
-      if (selectedChannel) {
-        sendToServer(selectedChannel);
-      }
-    }, 1000); // debounce 400ms
-
-    setVolumeTimeout(timeout);
+    if (nextChannel) {
+      const numMatch = nextChannel.match(/\d+/);
+      const sirenNum = numMatch ? numMatch[0] : "1";
+      await sendMqttCommand(`SIREN${sirenNum}ON`);
+    } else {
+      await sendMqttCommand("SIREN#OFF");
+    }
   };
 
   return (
@@ -84,24 +61,20 @@ const AudioControlCard: React.FC = () => {
           <h3 className="card-title">Audio Control</h3>
           <p className="card-subtitle">Select audio channel</p>
         </div>
-
-        {/* Volume Button */}
         <div className="volume-control">
-          <span className="adjust-volume-text">Adjust Volume</span>
           <button
             className="volume-button"
             onClick={() => setShowVolume(!showVolume)}
           >
+            <span>Adjust Volume</span>
             <FaVolumeUp />
           </button>
-
           {showVolume && (
             <div className="volume-slider-popup">
               <div className="volume-slider-header">
                 <span>Volume</span>
                 <span>{volume}%</span>
               </div>
-
               <div className="volume-slider-container">
                 <FaVolumeDown />
                 <input
@@ -110,9 +83,7 @@ const AudioControlCard: React.FC = () => {
                   max="100"
                   value={volume}
                   className="volume-slider"
-                  onChange={(e) =>
-                    handleVolumeChange(Number(e.target.value))
-                  }
+                  onChange={(e) => setVolume(Number(e.target.value))}
                 />
                 <FaVolumeUp />
               </div>
@@ -120,14 +91,12 @@ const AudioControlCard: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Speaker Buttons */}
       <div className="audio-channels">
         {audioChannels.map((channel) => (
           <button
             key={channel}
             className={`channel-button ${
-              selectedChannel === channel ? "active" :""
+              selectedChannel === channel ? "active" : ""
             }`}
             onClick={() => handleChannelClick(channel)}
           >
@@ -136,8 +105,6 @@ const AudioControlCard: React.FC = () => {
           </button>
         ))}
       </div>
-
-      {/* Active Channel */}
       {selectedChannel && (
         <div className="active-channel-display">
           <div className="active-channel-info">

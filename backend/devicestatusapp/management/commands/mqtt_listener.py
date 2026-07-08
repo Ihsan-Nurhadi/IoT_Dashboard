@@ -1,73 +1,82 @@
+# your_app/management/commands/mqtt_listener.py
 import json
 import paho.mqtt.client as mqtt
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from devicestatusapp.models import DeviceState
-from django.utils import timezone
-from django.db import close_old_connections
-import pytz # Import library timezone
 
 class Command(BaseCommand):
-    help = 'Listens for MQTT messages'
+    help = 'Listens for MQTT messages for Door, PLN, and Motion Sensors'
 
     def handle(self, *args, **kwargs):
         BROKER = settings.MQTT_SERVER
-        PORT = int(settings.MQTT_PORT)
+        PORT = settings.MQTT_PORT
         USER = settings.MQTT_USER
         PASSWORD = settings.MQTT_PASSWORD
-        TOPIC = settings.MQTT_TOPIC_DATA 
-
-        # Setup Timezone Jakarta
-        jkt_tz = pytz.timezone('Asia/Jakarta')
+        TOPIC = settings.MQTT_TOPIC_PUB2 
 
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
-                self.stdout.write(self.style.SUCCESS(f"Connected! Subscribing to {TOPIC}"))
+                self.stdout.write(self.style.SUCCESS(f"Connected! Subscribing to {TOPIC} and /matalite-test/sensor/#"))
                 client.subscribe(TOPIC)
+                client.subscribe("/matalite-test/sensor/#")
             else:
                 self.stdout.write(self.style.ERROR(f"Connection failed: {rc}"))
 
         def on_message(client, userdata, msg):
-            close_old_connections()
             try:
-                payload_str = msg.payload.decode()
-                payload = json.loads(payload_str)
-                data_obj = payload.get("data", {})
-                
-                # Ambil waktu sekarang (Aware Timezone)
-                now_utc = timezone.now()
-                # Konversi ke Jakarta untuk Log
-                now_jkt = now_utc.astimezone(jkt_tz)
+                payload_str = msg.payload.decode().strip()
+                self.stdout.write(f"Received message: {payload_str}")
 
-                # --- 1. PROSES STATUS PINTU ---
-                door_status = data_obj.get("door")
-                if door_status:
-                    # RAHASIA AGAR JAM BERUBAH:
-                    # Masukkan field timestamp/updated_at ke dalam 'defaults'
-                    # Ini memaksa Django meng-update kolom waktu meskipun statusnya sama
-                    obj, created = DeviceState.objects.update_or_create(
-                        device_name="Door Panel",
-                        defaults={
-                            'status': door_status,
-                            'last_updated': now_utc # Pastikan nama field ini sesuai di models.py
-                        }
+                # 1. Cek apakah ini command string langsung dari migration.md
+                if payload_str == "MOTION1DETECTED":
+                    DeviceState.objects.update_or_create(
+                        device_name="Motion Sensor 1",
+                        defaults={'status': 'Detected'}
                     )
-                    # Print log dengan jam Jakarta
-                    self.stdout.write(f"Updated Door: {door_status} at {now_jkt.strftime('%Y-%m-%d %H:%M:%S')}")
+                    self.stdout.write("Updated Motion Sensor 1: Detected")
+                elif payload_str == "MOTION2DETECTED":
+                    DeviceState.objects.update_or_create(
+                        device_name="Motion Sensor 2",
+                        defaults={'status': 'Detected'}
+                    )
+                    self.stdout.write("Updated Motion Sensor 2: Detected")
+                elif payload_str == "MOTIONSTANDBY":
+                    DeviceState.objects.update_or_create(
+                        device_name="Motion Sensor 1",
+                        defaults={'status': 'Standby'}
+                    )
+                    DeviceState.objects.update_or_create(
+                        device_name="Motion Sensor 2",
+                        defaults={'status': 'Standby'}
+                    )
+                    self.stdout.write("Updated Motion Sensor 1 & 2: Standby")
+                else:
+                    # 2. Cek apakah format JSON (backward compatibility)
+                    try:
+                        payload = json.loads(payload_str)
+                        data_obj = payload.get("data", {})
 
-                # --- 2. PROSES STATUS PLN ---
-                pln_status = data_obj.get("pln")
-                if pln_status:
-                    final_pln = "Active" if pln_status == "ON" else "Inactive"
-                    
-                    obj, created = DeviceState.objects.update_or_create(
-                        device_name="PLN",
-                        defaults={
-                            'status': final_pln,
-                            'last_updated': now_utc # Paksa update waktu
-                        }
-                    )
-                    self.stdout.write(f"Updated PLN: {final_pln} at {now_jkt.strftime('%Y-%m-%d %H:%M:%S')}")
+                        # --- PROSES STATUS PINTU ---
+                        door_status = data_obj.get("door")
+                        if door_status:
+                            DeviceState.objects.update_or_create(
+                                device_name="Door Panel",
+                                defaults={'status': door_status}
+                            )
+                            self.stdout.write(f"Updated Door: {door_status}")
+
+                        # --- PROSES STATUS PLN ---
+                        pln_status = data_obj.get("pln")
+                        if pln_status:
+                            final_pln = "Active" if pln_status == "ON" else "Inactive"
+                            DeviceState.objects.update_or_create(
+                                device_name="PLN",
+                                defaults={'status': final_pln}
+                            )
+                            self.stdout.write(f"Updated PLN: {final_pln}")
+                    except json.JSONDecodeError:
+                        self.stdout.write(f"Unknown payload format: {payload_str}")
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"Error: {e}"))
@@ -75,12 +84,10 @@ class Command(BaseCommand):
         client = mqtt.Client()
         if USER and PASSWORD:
             client.username_pw_set(USER, PASSWORD)
-            
         client.on_connect = on_connect
         client.on_message = on_message
 
         try:
-            self.stdout.write(f"Connecting to {BROKER}...")
             client.connect(BROKER, PORT, 60)
             client.loop_forever()
         except Exception as e:
