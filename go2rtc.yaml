@@ -1,2 +1,4 @@
 streams:
-  cctv: rtsp://admin:BWIJZS@10.10.4.89:554/h264/ch1/main/av_stream
+  cctv:
+    - rtsp://admin:BWIJZS@10.10.4.89:554/h264/ch1/main/av_stream
+    - "ffmpeg:cctv#audio=opus"
