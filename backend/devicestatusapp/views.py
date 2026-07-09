@@ -106,6 +106,10 @@ import time
 from django.http import StreamingHttpResponse
 
 def gen_cctv():
+    import os
+    # Paksa RTSP menggunakan TCP (bukan UDP) agar tidak ada packet loss di jalur VPN
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+    
     rtsp_url = "rtsp://admin:BWIJZS@10.10.4.89:554/h264/ch1/main/av_stream"
     cap = cv2.VideoCapture(rtsp_url)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
