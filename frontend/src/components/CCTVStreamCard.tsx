@@ -43,16 +43,18 @@ const CCTVStreamCard: React.FC = () => {
       <div className="cctv-monitor-container">
         {streamActive ? (
           <div className="image-wrapper">
-            <img
-              src="/api/cctv-stream/"
-              alt="Live CCTV stream"
+            <iframe
+              src="/go2rtc/stream.html?src=cctv&mode=webrtc"
+              title="Live CCTV Stream"
               className="cctv-image"
+              style={{ border: 'none', width: '100%', height: '100%' }}
+              allow="autoplay; fullscreen"
             />
             {/* HUD Overlay */}
             <div className="cctv-hud">
               <div className="hud-top">
                 <span className="hud-badge live">🔴 LIVE</span>
-                <span className="hud-badge mode">MJPEG</span>
+                <span className="hud-badge mode">WebRTC/MSE</span>
               </div>
               <div className="hud-bottom">
                 <span className="hud-info">CAM 01 - MAIN CH</span>
