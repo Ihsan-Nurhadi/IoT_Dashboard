@@ -61,7 +61,7 @@ const AudioControlCard: React.FC = () => {
           <h3 className="card-title">Audio Control</h3>
           <p className="card-subtitle">Select audio channel</p>
         </div>
-        <div className="volume-control">
+        {/* <div className="volume-control">
           <button
             className="volume-button"
             onClick={() => setShowVolume(!showVolume)}
@@ -89,7 +89,7 @@ const AudioControlCard: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
+        </div> */}
       </div>
       <div className="audio-channels">
         {audioChannels.map((channel) => (

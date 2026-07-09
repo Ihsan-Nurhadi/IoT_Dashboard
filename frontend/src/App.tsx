@@ -7,7 +7,8 @@ import DeviceStatusCard from './components/DeviceStatusCard';
 import AudioControlCard from './components/AudioControlCard';
 import RotaryControlCard from './components/RotaryControlCard';
 import FloodlightControlCard from './components/FloodlightControlCard';
-import { FaCog, FaServer } from 'react-icons/fa';
+import CCTVStreamCard from './components/CCTVStreamCard';
+import { FaCog, FaServer, FaVideo } from 'react-icons/fa';
 
 // Komponen untuk Halaman Dashboard Utama
 const Dashboard = () => (
@@ -40,6 +41,17 @@ const Dashboard = () => (
       <AudioControlCard />
       <RotaryControlCard />
     </div>    
+
+    <div className="section-header">
+      <FaVideo className="section-icon" />
+      <div>
+        <h2 className="section-title">Live CCTV Monitoring</h2>
+        <p className="section-subtitle">Real-time surveillance feeds</p>
+      </div>
+    </div>
+    <div className="device-control-grid">
+      <CCTVStreamCard />
+    </div>
   </main>
 );
 

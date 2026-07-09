@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/get-motion2-status/', dorlock_views.get_motion2_status, name='get_motion2_status'),
     path('api/send-rotary/', rotary_views.send_mqtt, name='send_mqtt'),
     path('api/send-floodlight/', floodlight_views.floodlight_mqtt, name='floodlight_mqtt'),
+    path('api/cctv-stream/', dorlock_views.cctv_stream, name='cctv_stream'),
     # path('', include('gps_tracer.urls')),
 ]
 if settings.DEBUG:
