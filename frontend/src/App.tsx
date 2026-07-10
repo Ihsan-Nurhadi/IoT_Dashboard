@@ -49,8 +49,17 @@ const Dashboard = () => (
         <p className="section-subtitle">Real-time surveillance feeds</p>
       </div>
     </div>
-    <div className="device-control-grid">
-      <CCTVStreamCard />
+    <div className="cctv-grid">
+      <CCTVStreamCard 
+        streamId="cctv" 
+        cameraName="CCTV CAM 01" 
+        subTitle="RTSP stream 1 via VPN" 
+      />
+      <CCTVStreamCard 
+        streamId="cctv2" 
+        cameraName="CCTV CAM 02" 
+        subTitle="RTSP stream 2 via VPN" 
+      />
     </div>
   </main>
 );

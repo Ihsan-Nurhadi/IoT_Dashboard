@@ -56,3 +56,17 @@
   gap: 3rem;
   margin-bottom: 4rem;
 }
+
+.cctv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3rem;
+  margin-bottom: 4rem;
+}
+
+@media (max-width: 1024px) {
+  .side-by-side-grid,
+  .cctv-grid {
+    grid-template-columns: 1fr;
+  }
+}

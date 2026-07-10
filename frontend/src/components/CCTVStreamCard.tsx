@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
-import { FaVideo, FaVideoSlash, FaPlay, FaPause, FaInfoCircle } from 'react-icons/fa';
+import { FaVideo, FaVideoSlash, FaPlay, FaPause } from 'react-icons/fa';
 import './CCTVStreamCard.css';
 
-const CCTVStreamCard: React.FC = () => {
+interface CCTVStreamCardProps {
+  streamId?: string;
+  cameraName?: string;
+  subTitle?: string;
+}
+
+const CCTVStreamCard: React.FC<CCTVStreamCardProps> = ({
+  streamId = 'cctv',
+  cameraName = 'CAM 01 - MAIN CH',
+  subTitle = 'Local RTSP camera feed via Django'
+}) => {
   const [streamActive, setStreamActive] = useState(false);
   const [timestamp, setTimestamp] = useState('');
-  const [showInfo, setShowInfo] = useState(false);
 
   // Update CCTV HUD clock
   useEffect(() => {
@@ -24,10 +33,10 @@ const CCTVStreamCard: React.FC = () => {
       <div className="card-header">
         <div className="header-text">
           <div className="icon-container cctv">
-          <FaVideo />
+            <FaVideo />
           </div>
-          <h3 className="card-title">CCTV Monitoring</h3>
-          <p className="card-subtitle">Local RTSP camera feed via Django</p>
+          <h3 className="card-title">{cameraName}</h3>
+          <p className="card-subtitle">{subTitle}</p>
         </div>
         <div className="header-actions">
           <button 
@@ -44,8 +53,8 @@ const CCTVStreamCard: React.FC = () => {
         {streamActive ? (
           <div className="image-wrapper">
             <iframe
-              src="/go2rtc/stream.html?src=cctv&mode=webrtc"
-              title="Live CCTV Stream"
+              src={`/go2rtc/stream.html?src=${streamId}&mode=webrtc`}
+              title={`Live CCTV Stream - ${cameraName}`}
               className="cctv-image"
               style={{ border: 'none', width: '100%', height: '100%' }}
               allow="autoplay; fullscreen"
@@ -57,7 +66,7 @@ const CCTVStreamCard: React.FC = () => {
                 <span className="hud-badge mode">WebRTC/MSE</span>
               </div>
               <div className="hud-bottom">
-                <span className="hud-info">CAM 01 - MAIN CH</span>
+                <span className="hud-info">{cameraName}</span>
                 <span className="hud-timestamp">{timestamp}</span>
               </div>
             </div>
