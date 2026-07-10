@@ -19,15 +19,20 @@ def floodlight_mqtt(request):
         if state_value not in [1, 0]:
             return JsonResponse({"error": "Invalid state. Use 1 (ON) or 0 (OFF)"}, status=400)
 
-        # Susun command string sesuai migration.md
-        payload_str = "LAMP#ON" if state_value == 1 else "LAMP#OFF"
+        # Susun command payload JSON sesuai kebutuhan node esp32-blackbox
+        payload = {
+            "relay": {
+                "state": True if state_value == 1 else False
+            }
+        }
+        payload_str = json.dumps(payload)
 
         client = mqtt.Client()
-        if settings.MQTT_USER and settings.MQTT_PASSWORD:
-            client.username_pw_set(settings.MQTT_USER, settings.MQTT_PASSWORD)
+        if settings.NEW_MQTT_USER and settings.NEW_MQTT_PASSWORD:
+            client.username_pw_set(settings.NEW_MQTT_USER, settings.NEW_MQTT_PASSWORD)
 
-        client.connect(settings.MQTT_SERVER, settings.MQTT_PORT, 60)
-        client.publish(settings.MQTT_TOPIC_SUB, payload_str, qos=1)
+        client.connect(settings.NEW_MQTT_SERVER, settings.NEW_MQTT_PORT, 60)
+        client.publish(settings.NEW_MQTT_TOPIC_SUB, payload_str, qos=1)
         client.disconnect()
 
         return JsonResponse({

@@ -1,0 +1,25 @@
+# Environment variables
+.env
+
+# Python/Django cache and databases
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+db.sqlite3
+/media/
+
+# Virtual environments
+venv/
+.venv/
+iotvenv/
+
+# Node/React dependencies and builds
+node_modules/
+/frontend/dist/
+/frontend/build/
+.eslintcache
+
+# OS files
+.DS_Store
+Thumbs.db

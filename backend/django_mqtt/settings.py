@@ -107,6 +107,14 @@ MQTT_TOPIC_SUB = os.environ.get("MQTT_TOPIC_SUB", "/matalite-test/in/094")
 MQTT_TOPIC_PUB = os.environ.get("MQTT_TOPIC_PUB", "/matalite-test/reply/")
 MQTT_TOPIC_PUB2 = os.environ.get("MQTT_TOPIC_PUB2", "/matalite-test/sensor/094")
 
+# New MQTT Settings (for Lamp/Relay)
+NEW_MQTT_SERVER = os.environ.get("NEW_MQTT_SERVER", "emqx.nayakanms.com")
+NEW_MQTT_PORT = int(os.environ.get("NEW_MQTT_PORT", 1884))
+NEW_MQTT_USER = os.environ.get("NEW_MQTT_USER", "tbg_jabo_outer")
+NEW_MQTT_PASSWORD = os.environ.get("NEW_MQTT_PASSWORD", "tbg_jabo_outer@123")
+NEW_MQTT_TOPIC_SUB = os.environ.get("NEW_MQTT_TOPIC_SUB", "nms/raspi_FOKLENDER/blackbox/config")
+
+
 # client = mqtt.Client()
 # client.username_pw_set(settings.MQTT_USER, settings.MQTT_PASSWORD)
 # client.connect(
