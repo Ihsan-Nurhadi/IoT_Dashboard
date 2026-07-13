@@ -153,34 +153,20 @@ class Command(BaseCommand):
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"[Broker Baru] Error: {e}"))
 
-        # Setup Client 1 (Broker Lama)
-        client_old = mqtt.Client("django_subscriber_old")
-        if USER and PASSWORD:
-            client_old.username_pw_set(USER, PASSWORD)
-        client_old.on_connect = on_connect_old
-        client_old.on_message = on_message_old
-
-        # Setup Client 2 (Broker Baru)
+        # Setup Client (Unified Broker)
         client_new = mqtt.Client("django_subscriber_new")
         if NEW_USER and NEW_PASSWORD:
             client_new.username_pw_set(NEW_USER, NEW_PASSWORD)
         client_new.on_connect = on_connect_new
         client_new.on_message = on_message_new
 
-        # Connect and Start loop_start (non-blocking in background threads)
+        # Connect and Start loop_start
         try:
-            self.stdout.write(f"Connecting to Broker Lama: {BROKER}:{PORT}")
-            client_old.connect(BROKER, PORT, 60)
-            client_old.loop_start()
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Connection Error (Broker Lama): {e}"))
-
-        try:
-            self.stdout.write(f"Connecting to Broker Baru: {NEW_BROKER}:{NEW_PORT}")
+            self.stdout.write(f"Connecting to Broker: {NEW_BROKER}:{NEW_PORT}")
             client_new.connect(NEW_BROKER, NEW_PORT, 60)
             client_new.loop_start()
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Connection Error (Broker Baru): {e}"))
+            self.stdout.write(self.style.ERROR(f"Connection Error (Broker): {e}"))
 
         # Keep main thread alive
         import time
@@ -189,5 +175,4 @@ class Command(BaseCommand):
                 time.sleep(1)
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING("Stopping listener..."))
-            client_old.loop_stop()
             client_new.loop_stop()

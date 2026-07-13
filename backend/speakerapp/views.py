@@ -25,16 +25,30 @@ def send_mqtt(request):
                 else:
                     command = "SIREN#OFF"
 
-            # Publish ke MQTT broker baru di topic settings.MQTT_TOPIC_SUB (/matalite-test/in/)
+            # Map command string to JSON format: {"track": "voiceX"}
+            cmd_to_track = {
+                "SIREN1ON": "voice1",
+                "SIREN2ON": "voice2",
+                "SIREN3ON": "voice3",
+                "SIREN4ON": "voice4",
+                "SIREN5ON": "voice5",
+                "SIREN6ON": "voice6",
+                "SIREN#OFF": "stop",
+            }
+            track_name = cmd_to_track.get(command, "stop")
+            payload = {"track": track_name}
+            payload_str = json.dumps(payload)
+
+            # Publish ke MQTT broker baru di topic settings.MQTT_TOPIC_SUB (nms/raspi_FOKLENDER/blackbox/config)
             client_mqtt = mqtt.Client()
             if settings.MQTT_USER and settings.MQTT_PASSWORD:
                 client_mqtt.username_pw_set(settings.MQTT_USER, settings.MQTT_PASSWORD)
 
             client_mqtt.connect(settings.MQTT_SERVER, settings.MQTT_PORT, 60)
-            client_mqtt.publish(settings.MQTT_TOPIC_SUB, command, qos=1)
+            client_mqtt.publish(settings.MQTT_TOPIC_SUB, payload_str, qos=1)
             client_mqtt.disconnect()
 
-            return JsonResponse({"status": "success", "sent": command})
+            return JsonResponse({"status": "success", "sent": payload})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
 

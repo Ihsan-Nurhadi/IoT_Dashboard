@@ -16,8 +16,13 @@ def send_mqtt(request):
         if state_value not in [1, 0]:
             return JsonResponse({"error": "Invalid state. Use 1 (ON) or 0 (OFF)"}, status=400)
 
-        # Susun command string
-        payload_str = "ROTATOR#ON" if state_value == 1 else "ROTATOR#OFF"
+        # Susun command payload JSON sesuai kebutuhan node esp32-blackbox / bridge
+        payload = {
+            "relay": {
+                "state": True if state_value == 1 else False
+            }
+        }
+        payload_str = json.dumps(payload)
 
         client = mqtt.Client()
         if settings.MQTT_USER and settings.MQTT_PASSWORD:
