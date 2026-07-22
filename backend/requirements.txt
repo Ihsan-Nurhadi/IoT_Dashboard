@@ -25,3 +25,4 @@ opencv-python-headless>=4.5.0
 ultralytics
 imageio
 imageio-ffmpeg
+onvif-zeep
