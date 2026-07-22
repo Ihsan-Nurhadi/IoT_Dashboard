@@ -3,119 +3,57 @@ import json
 import paho.mqtt.client as mqtt
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from devicestatusapp.models import DeviceState
+from devicestatusapp.models import DeviceState, DoorStatusLog
 
 class Command(BaseCommand):
     help = 'Listens for MQTT messages for Door, PLN, and Motion Sensors'
 
     def handle(self, *args, **kwargs):
-        # Broker 1 settings (Old Broker)
         BROKER = settings.MQTT_SERVER
         PORT = settings.MQTT_PORT
         USER = settings.MQTT_USER
         PASSWORD = settings.MQTT_PASSWORD
-        TOPIC = settings.MQTT_TOPIC_PUB2
 
-        # Broker 2 settings (New Broker)
-        NEW_BROKER = settings.NEW_MQTT_SERVER
-        NEW_PORT = settings.NEW_MQTT_PORT
-        NEW_USER = settings.NEW_MQTT_USER
-        NEW_PASSWORD = settings.NEW_MQTT_PASSWORD
-        NEW_TOPIC = "nms/raspi_FOKLENDER/blackbox/#"
+        TOPIC_BLACKBOX = "nms/E32_WB_WS/whitebox/#"
+        TOPIC_SPEAKER = "nms/esp32-speaker-003734fe8ce0/speaker/#"
 
-        def on_connect_old(client, userdata, flags, rc):
+        def on_connect(client, userdata, flags, rc):
             if rc == 0:
-                self.stdout.write(self.style.SUCCESS(f"[Broker Lama] Connected! Subscribing to {TOPIC} and /matalite-test/sensor/#"))
-                client.subscribe(TOPIC)
-                client.subscribe("/matalite-test/sensor/#")
+                self.stdout.write(self.style.SUCCESS(f"[MQTT] Connected! Subscribing to {TOPIC_BLACKBOX} and {TOPIC_SPEAKER}"))
+                client.subscribe(TOPIC_BLACKBOX)
+                client.subscribe(TOPIC_SPEAKER)
             else:
-                self.stdout.write(self.style.ERROR(f"[Broker Lama] Connection failed: {rc}"))
+                self.stdout.write(self.style.ERROR(f"[MQTT] Connection failed with code {rc}"))
 
-        def on_message_old(client, userdata, msg):
+        def on_message(client, userdata, msg):
             try:
                 payload_str = msg.payload.decode().strip()
-                self.stdout.write(f"[Broker Lama] Received message on {msg.topic}: {payload_str}")
-
-                # 1. Cek apakah ini command string langsung dari migration.md
-                if payload_str == "MOTION1DETECTED":
-                    DeviceState.objects.update_or_create(
-                        device_name="Motion Sensor 1",
-                        defaults={'status': 'Detected'}
-                    )
-                    self.stdout.write("Updated Motion Sensor 1: Detected")
-                elif payload_str == "MOTION2DETECTED":
-                    DeviceState.objects.update_or_create(
-                        device_name="Motion Sensor 2",
-                        defaults={'status': 'Detected'}
-                    )
-                    self.stdout.write("Updated Motion Sensor 2: Detected")
-                elif payload_str == "MOTIONSTANDBY":
-                    DeviceState.objects.update_or_create(
-                        device_name="Motion Sensor 1",
-                        defaults={'status': 'Standby'}
-                    )
-                    DeviceState.objects.update_or_create(
-                        device_name="Motion Sensor 2",
-                        defaults={'status': 'Standby'}
-                    )
-                    self.stdout.write("Updated Motion Sensor 1 & 2: Standby")
-                else:
-                    # 2. Cek apakah format JSON (backward compatibility)
-                    try:
-                        payload = json.loads(payload_str)
-                        data_obj = payload.get("data", {})
-
-                        # --- PROSES STATUS PINTU ---
-                        door_status = data_obj.get("door")
-                        if door_status:
-                            DeviceState.objects.update_or_create(
-                                device_name="Door Panel",
-                                defaults={'status': door_status}
-                            )
-                            self.stdout.write(f"Updated Door: {door_status}")
-
-                        # --- PROSES STATUS PLN ---
-                        pln_status = data_obj.get("pln")
-                        if pln_status:
-                            final_pln = "Active" if pln_status == "ON" else "Inactive"
-                            DeviceState.objects.update_or_create(
-                                device_name="PLN",
-                                defaults={'status': final_pln}
-                            )
-                            self.stdout.write(f"Updated PLN: {final_pln}")
-                    except json.JSONDecodeError:
-                        self.stdout.write(f"Unknown payload format: {payload_str}")
-
-            except Exception as e:
-                self.stdout.write(self.style.ERROR(f"[Broker Lama] Error: {e}"))
-
-        def on_connect_new(client, userdata, flags, rc):
-            if rc == 0:
-                self.stdout.write(self.style.SUCCESS(f"[Broker Baru] Connected! Subscribing to {NEW_TOPIC}"))
-                client.subscribe(NEW_TOPIC)
-            else:
-                self.stdout.write(self.style.ERROR(f"[Broker Baru] Connection failed: {rc}"))
-
-        def on_message_new(client, userdata, msg):
-            try:
-                payload_str = msg.payload.decode().strip()
-                self.stdout.write(f"[Broker Baru] Received message on {msg.topic}: {payload_str}")
+                self.stdout.write(f"[MQTT] Received message on {msg.topic}: {payload_str}")
 
                 try:
                     payload = json.loads(payload_str)
                     
-                    # 1. Door status -> nms/raspi_FOKLENDER/blackbox/door
+                    # 1. Door status -> nms/E32_WB_WS/whitebox/door
                     if msg.topic.endswith("/door"):
                         is_open = payload.get("open")
                         if is_open is not None:
                             status_val = "Open" if is_open else "Closed"
-                            DeviceState.objects.update_or_create(
+                            log_status = "OPEN" if is_open else "CLOSE"
+
+                            dev, created = DeviceState.objects.get_or_create(
                                 device_name="Door Panel",
                                 defaults={'status': status_val}
                             )
-                            self.stdout.write(f"Updated Door Panel: {status_val}")
+                            if created or dev.status != status_val:
+                                dev.status = status_val
+                                dev.save()
+                                DoorStatusLog.objects.create(status=log_status)
+                                self.stdout.write(f"Updated Door Panel & Logged Event: {log_status}")
+                            else:
+                                dev.save() # update last_updated timestamp
+                                self.stdout.write(f"Door Panel status unchanged: {status_val}")
                             
-                    # 2. Power (PLN) status -> nms/raspi_FOKLENDER/blackbox/device_power
+                    # 2. Power (PLN) status -> nms/E32_WB_WS/whitebox/device_power
                     elif msg.topic.endswith("/device_power"):
                         mains_present = payload.get("mains")
                         if mains_present is not None:
@@ -126,7 +64,7 @@ class Command(BaseCommand):
                             )
                             self.stdout.write(f"Updated PLN: {status_val}")
                             
-                    # 3. Motion (PIR) status -> nms/raspi_FOKLENDER/blackbox/motion_pir
+                    # 3. Motion (PIR) status -> nms/E32_WB_WS/whitebox/motion_pir
                     elif msg.topic.endswith("/motion_pir"):
                         s_arr = payload.get("s")
                         if isinstance(s_arr, list) and len(s_arr) >= 2:
@@ -147,24 +85,29 @@ class Command(BaseCommand):
                                 )
                                 self.stdout.write(f"Updated Motion Sensor 2: {s2_val}")
                                 
+                    # 4. Speaker status -> nms/esp32-speaker-003734fe8ce0/speaker/speaker
+                    elif "/speaker/speaker" in msg.topic:
+                        playing = payload.get("playing")
+                        track = payload.get("track")
+                        volume = payload.get("volume")
+                        self.stdout.write(f"Speaker State: playing={playing}, track={track}, volume={volume}")
+
                 except json.JSONDecodeError:
-                    self.stdout.write(f"[Broker Baru] JSON Decode Error on payload: {payload_str}")
+                    self.stdout.write(f"[MQTT] JSON Decode Error on payload: {payload_str}")
 
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"[Broker Baru] Error: {e}"))
+                self.stdout.write(self.style.ERROR(f"[MQTT] Error: {e}"))
 
-        # Setup Client (Unified Broker)
-        client_new = mqtt.Client("django_subscriber_new")
-        if NEW_USER and NEW_PASSWORD:
-            client_new.username_pw_set(NEW_USER, NEW_PASSWORD)
-        client_new.on_connect = on_connect_new
-        client_new.on_message = on_message_new
+        client = mqtt.Client("django_subscriber_unified")
+        if USER and PASSWORD:
+            client.username_pw_set(USER, PASSWORD)
+        client.on_connect = on_connect
+        client.on_message = on_message
 
-        # Connect and Start loop_start
         try:
-            self.stdout.write(f"Connecting to Broker: {NEW_BROKER}:{NEW_PORT}")
-            client_new.connect(NEW_BROKER, NEW_PORT, 60)
-            client_new.loop_start()
+            self.stdout.write(f"Connecting to Broker: {BROKER}:{PORT}")
+            client.connect(BROKER, PORT, 60)
+            client.loop_start()
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"Connection Error (Broker): {e}"))
 
@@ -175,4 +118,4 @@ class Command(BaseCommand):
                 time.sleep(1)
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING("Stopping listener..."))
-            client_new.loop_stop()
+            client.loop_stop()

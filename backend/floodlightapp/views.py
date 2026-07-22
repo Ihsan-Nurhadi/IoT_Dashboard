@@ -28,11 +28,11 @@ def floodlight_mqtt(request):
         payload_str = json.dumps(payload)
 
         client = mqtt.Client()
-        if settings.NEW_MQTT_USER and settings.NEW_MQTT_PASSWORD:
-            client.username_pw_set(settings.NEW_MQTT_USER, settings.NEW_MQTT_PASSWORD)
+        if settings.MQTT_USER and settings.MQTT_PASSWORD:
+            client.username_pw_set(settings.MQTT_USER, settings.MQTT_PASSWORD)
 
-        client.connect(settings.NEW_MQTT_SERVER, settings.NEW_MQTT_PORT, 60)
-        client.publish(settings.NEW_MQTT_TOPIC_SUB, payload_str, qos=1)
+        client.connect(settings.MQTT_SERVER, settings.MQTT_PORT, 60)
+        client.publish(settings.MQTT_TOPIC_SUB, payload_str, qos=1)
         client.disconnect()
 
         return JsonResponse({

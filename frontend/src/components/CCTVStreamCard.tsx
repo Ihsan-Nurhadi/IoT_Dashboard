@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Card from './Card';
-import { FaVideo, FaVideoSlash, FaPlay, FaPause } from 'react-icons/fa';
+import { FaCamera, FaPlay, FaRegFileVideo, FaSpinner } from 'react-icons/fa';
 import './CCTVStreamCard.css';
 
 interface CCTVStreamCardProps {
@@ -11,77 +10,231 @@ interface CCTVStreamCardProps {
 
 const CCTVStreamCard: React.FC<CCTVStreamCardProps> = ({
   streamId = 'cctv',
-  cameraName = 'CAM 01 - MAIN CH',
-  subTitle = 'Local RTSP camera feed via Django'
+  cameraName = 'Kamera #1',
+  subTitle = ''
 }) => {
-  const [streamActive, setStreamActive] = useState(false);
-  const [timestamp, setTimestamp] = useState('');
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [timestamp, setTimestamp] = useState<string>('-');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingType, setLoadingType] = useState<'photo' | 'video' | null>(null);
+  const [progress, setProgress] = useState<number>(0);
+  const [showVideoModal, setShowVideoModal] = useState<boolean>(false);
+  const [showPhotoModal, setShowPhotoModal] = useState<boolean>(false);
 
-  // Update CCTV HUD clock
+  // Fetch the latest captured photo/video on mount
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimestamp(now.toLocaleString('id-ID', { hour12: false }));
+    const fetchLatest = async () => {
+      try {
+        const res = await fetch('/api/cctv/latest/');
+        if (res.ok) {
+          const data = await res.json();
+          const camData = data[streamId];
+          if (camData) {
+            setPhotoUrl(camData.photo_url);
+            setVideoUrl(camData.video_url);
+            setTimestamp(camData.formatted_time || '-');
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch latest cctv metadata:", err);
+      }
     };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchLatest();
+  }, [streamId]);
+
+  const handleCapturePhoto = async () => {
+    if (loading) return;
+    setLoading(true);
+    setLoadingType('photo');
+    setProgress(0);
+
+    const duration = 1500;
+    const intervalTime = 100;
+    const steps = duration / intervalTime;
+    let currentStep = 0;
+
+    const progInterval = setInterval(() => {
+      currentStep++;
+      const percent = Math.min((currentStep / steps) * 100, 95);
+      setProgress(Math.round(percent));
+    }, intervalTime);
+
+    try {
+      const res = await fetch(`/api/cctv/capture-photo/?src=${streamId}`, {
+        method: 'POST'
+      });
+      clearInterval(progInterval);
+      if (res.ok) {
+        const data = await res.json();
+        setProgress(100);
+        setTimeout(() => {
+          setPhotoUrl(data.url);
+          setVideoUrl(null); // Clear previous video since photo is now the latest capture
+          setTimestamp(data.formatted_time);
+          setLoading(false);
+          setLoadingType(null);
+        }, 300);
+      } else {
+        alert("Failed to capture photo");
+        setLoading(false);
+        setLoadingType(null);
+      }
+    } catch (err) {
+      clearInterval(progInterval);
+      console.error(err);
+      alert("Error capturing photo");
+      setLoading(false);
+      setLoadingType(null);
+    }
+  };
+
+  const handleCaptureVideo = async () => {
+    if (loading) return;
+    setLoading(true);
+    setLoadingType('video');
+    setProgress(0);
+
+    const duration = 10000;
+    const intervalTime = 100;
+    const steps = duration / intervalTime;
+    let currentStep = 0;
+
+    const progInterval = setInterval(() => {
+      currentStep++;
+      const percent = Math.min((currentStep / steps) * 100, 98);
+      setProgress(Math.round(percent));
+    }, intervalTime);
+
+    try {
+      const res = await fetch(`/api/cctv/capture-video/?src=${streamId}`, {
+        method: 'POST'
+      });
+      clearInterval(progInterval);
+      if (res.ok) {
+        const data = await res.json();
+        setProgress(100);
+        setTimeout(() => {
+          setVideoUrl(data.url);
+          if (data.photo_url) {
+            setPhotoUrl(data.photo_url); // Update thumbnail to the video's companion photo
+          }
+          setTimestamp(data.formatted_time);
+          setLoading(false);
+          setLoadingType(null);
+        }, 300);
+      } else {
+        alert("Failed to capture video");
+        setLoading(false);
+        setLoadingType(null);
+      }
+    } catch (err) {
+      clearInterval(progInterval);
+      console.error(err);
+      alert("Error capturing video");
+      setLoading(false);
+      setLoadingType(null);
+    }
+  };
 
   return (
-    <Card className="cctv-stream-card">
-      <div className="card-header">
-        <div className="header-text">
-          <div className="icon-container cctv">
-            <FaVideo />
+    <div className="cctv-panel">
+      <div className="cctv-monitor-container">
+        {/* Bounding Box Image or Video placeholder */}
+        {photoUrl && !loading ? (
+          <div className="image-wrapper">
+            <img 
+              src={`${photoUrl}?t=${new Date().getTime()}`} 
+              alt={cameraName} 
+              className="cctv-image clickable"
+              onClick={() => setShowPhotoModal(true)}
+              style={{ cursor: 'pointer' }}
+              title="Click to view fullscreen"
+            />
+            {videoUrl && (
+              <button 
+                className="play-overlay-btn" 
+                onClick={() => setShowVideoModal(true)}
+                title="Play latest recorded video"
+              >
+                <FaPlay />
+              </button>
+            )}
           </div>
-          <h3 className="card-title">{cameraName}</h3>
-          <p className="card-subtitle">{subTitle}</p>
-        </div>
-        <div className="header-actions">
+        ) : (
+          !loading && (
+            <div className="cctv-placeholder">
+              <FaRegFileVideo className="placeholder-icon" />
+              <p>Belum ada rekaman/foto</p>
+            </div>
+          )
+        )}
+
+        {/* Loading Overlay */}
+        {loading && (
+          <div className="cctv-loading-overlay">
+            <FaSpinner className="spinner-icon spinning" />
+            <span className="loading-text">{loadingType === 'photo' ? 'Foto...' : 'Video...'}</span>
+            <div className="progress-bar-container">
+              <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Action Buttons */}
+        <div className="cctv-floating-actions">
           <button 
-            className={`icon-btn play-pause-btn ${streamActive ? 'active' : ''}`} 
-            onClick={() => setStreamActive(!streamActive)} 
-            title={streamActive ? "Stop Stream" : "Start Stream"}
+            className="floating-btn" 
+            onClick={handleCapturePhoto} 
+            disabled={loading}
+            title="Ambil Foto"
           >
-            {streamActive ? <FaPause /> : <FaPlay />}
+            <FaCamera />
           </button>
+          <button 
+            className="floating-btn" 
+            onClick={handleCaptureVideo} 
+            disabled={loading}
+            title="Ambil Video (10 Detik)"
+          >
+            <FaPlay />
+          </button>
+        </div>
+
+        {/* Bottom HUD */}
+        <div className="cctv-hud-bottom">
+          <div className="hud-left">
+            <span className="status-dot online"></span>
+            <span className="camera-label">{cameraName}</span>
+          </div>
+          <div className="hud-right">
+            <span className="timestamp-label">{timestamp}</span>
+          </div>
         </div>
       </div>
 
-      <div className="cctv-monitor-container">
-        {streamActive ? (
-          <div className="image-wrapper">
-            <iframe
-              src={`/go2rtc/stream.html?src=${streamId}&mode=webrtc`}
-              title={`Live CCTV Stream - ${cameraName}`}
-              className="cctv-image"
-              style={{ border: 'none', width: '100%', height: '100%' }}
-              allow="autoplay; fullscreen"
-            />
-            {/* HUD Overlay */}
-            <div className="cctv-hud">
-              <div className="hud-top">
-                <span className="hud-badge live">🔴 LIVE</span>
-                <span className="hud-badge mode">WebRTC/MSE</span>
-              </div>
-              <div className="hud-bottom">
-                <span className="hud-info">{cameraName}</span>
-                <span className="hud-timestamp">{timestamp}</span>
-              </div>
-            </div>
+      {/* Video Modal Player */}
+      {showVideoModal && videoUrl && (
+        <div className="video-modal-overlay" onClick={() => setShowVideoModal(false)}>
+          <div className="video-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="close-modal-btn" onClick={() => setShowVideoModal(false)}>×</button>
+            <h3 className="modal-title">Live Video - {cameraName}</h3>
+            <video src={`${videoUrl}?t=${new Date().getTime()}`} controls autoPlay className="modal-video" />
           </div>
-        ) : (
-          <div className="cctv-placeholder">
-            <FaVideoSlash className="placeholder-icon" />
-            <p>Stream is Stopped</p>
-            <button className="start-btn" onClick={() => setStreamActive(true)}>
-              <FaPlay style={{ marginRight: '8px' }} /> Start Stream
-            </button>
+        </div>
+      )}
+
+      {/* Fullscreen Photo Modal */}
+      {showPhotoModal && photoUrl && (
+        <div className="video-modal-overlay" onClick={() => setShowPhotoModal(false)}>
+          <div className="video-modal-content image-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="close-modal-btn" onClick={() => setShowPhotoModal(false)}>×</button>
+            <h3 className="modal-title">{cameraName} - Fullscreen View</h3>
+            <img src={photoUrl} alt={cameraName} className="modal-image-fullscreen" />
           </div>
-        )}
-      </div>
-    </Card>
+        </div>
+      )}
+    </div>
   );
 };
 

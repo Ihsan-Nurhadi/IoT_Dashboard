@@ -23,17 +23,35 @@ const AudioControlCard: React.FC = () => {
   const [volume, setVolume] = useState(50);
   const [showVolume, setShowVolume] = useState(false);
 
-  const sendMqttCommand = async (command: string) => {
+  const sendMqttCommand = async (command: string, vol?: number) => {
+    try {
+      const payload: any = { command };
+      if (vol !== undefined) {
+        payload.volume = vol;
+      }
+      await fetch("/api/send/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error("Failed to send siren command:", err);
+    }
+  };
+
+  const commitVolume = async (vol: number) => {
     try {
       await fetch("/api/send/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ command }),
+        body: JSON.stringify({ volume: vol }),
       });
     } catch (err) {
-      console.error("Failed to send siren command:", err);
+      console.error("Failed to send volume:", err);
     }
   };
 
@@ -45,7 +63,7 @@ const AudioControlCard: React.FC = () => {
     if (nextChannel) {
       const numMatch = nextChannel.match(/\d+/);
       const sirenNum = numMatch ? numMatch[0] : "1";
-      await sendMqttCommand(`SIREN${sirenNum}ON`);
+      await sendMqttCommand(`SIREN${sirenNum}ON`, volume);
     } else {
       await sendMqttCommand("SIREN#OFF");
     }
@@ -61,7 +79,7 @@ const AudioControlCard: React.FC = () => {
           <h3 className="card-title">Audio Control</h3>
           <p className="card-subtitle">Select audio channel</p>
         </div>
-        {/* <div className="volume-control">
+        <div className="volume-control">
           <button
             className="volume-button"
             onClick={() => setShowVolume(!showVolume)}
@@ -84,12 +102,14 @@ const AudioControlCard: React.FC = () => {
                   value={volume}
                   className="volume-slider"
                   onChange={(e) => setVolume(Number(e.target.value))}
+                  onMouseUp={() => commitVolume(volume)}
+                  onTouchEnd={() => commitVolume(volume)}
                 />
                 <FaVolumeUp />
               </div>
             </div>
           )}
-        </div> */}
+        </div>
       </div>
       <div className="audio-channels">
         {audioChannels.map((channel) => (

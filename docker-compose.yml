@@ -73,6 +73,24 @@ services:
     networks:
       - nms_network
 
+  # 6. Person Detector (YOLO Background Worker)
+  person_detector:
+    build: ./backend
+    container_name: nms_person_detector
+    restart: always
+    command: python manage.py person_detector
+    environment:
+      - TZ=Asia/Jakarta
+    env_file: .env
+    depends_on:
+      - backend
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    networks:
+      - nms_network
+
 volumes:
   static_volume:
   media_volume:

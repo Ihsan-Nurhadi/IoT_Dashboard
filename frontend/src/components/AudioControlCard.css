@@ -119,14 +119,27 @@
 .volume-button {
   background-color: #f9fafb;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.5rem 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--secondary-text-color);
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.volume-button:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.volume-button svg {
   color: var(--accent-color-purple);
+  font-size: 1.1rem;
 }
 
 .volume-slider-popup {

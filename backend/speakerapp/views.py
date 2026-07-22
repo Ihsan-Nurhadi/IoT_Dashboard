@@ -12,40 +12,57 @@ def send_mqtt(request):
         try:
             data = json.loads(request.body)
             command = data.get("command")
+            volume = data.get("volume")
             
-            if not command:
-                # Fallback untuk format payload lama
+            speaker_payload = {}
+            
+            # 1. Parse volume if provided
+            if volume is not None:
+                try:
+                    vol_int = int(volume)
+                    if 0 <= vol_int <= 100:
+                        speaker_payload["volume"] = vol_int
+                except ValueError:
+                    pass
+            
+            is_stop = False
+            
+            # 2. Parse command if provided
+            if command:
+                if command == "SIREN#OFF":
+                    is_stop = True
+                else:
+                    match = re.match(r'SIREN([1-6])ON', command)
+                    if match:
+                        track_index = int(match.group(1))
+                        speaker_payload["play"] = track_index
+            
+            # Fallback if neither command nor volume was found, but old speaker_val exists
+            if not command and volume is None:
                 speaker_val = data.get("speaker")
                 if speaker_val:
                     match = re.search(r'\d+', str(speaker_val))
                     if match:
-                        command = f"SIREN{match.group(0)}ON"
+                        speaker_payload["play"] = int(match.group(0))
                     else:
-                        command = "SIREN#OFF"
-                else:
-                    command = "SIREN#OFF"
+                        is_stop = True
 
-            # Map command string to JSON format: {"track": "voiceX"}
-            cmd_to_track = {
-                "SIREN1ON": "voice1",
-                "SIREN2ON": "voice2",
-                "SIREN3ON": "voice3",
-                "SIREN4ON": "voice4",
-                "SIREN5ON": "voice5",
-                "SIREN6ON": "voice6",
-                "SIREN#OFF": "stop",
-            }
-            track_name = cmd_to_track.get(command, "stop")
-            payload = {"track": track_name}
+            if is_stop:
+                payload = {"reset": {"action": True}}
+            elif not speaker_payload:
+                return JsonResponse({"error": "Invalid request. Provide command or volume."}, status=400)
+            else:
+                payload = {"speaker": speaker_payload}
+                
             payload_str = json.dumps(payload)
 
-            # Publish ke MQTT broker baru di topic settings.MQTT_TOPIC_SUB (nms/raspi_FOKLENDER/blackbox/config)
+            # Publish ke MQTT broker di topic settings.MQTT_TOPIC_SPEAKER_CONFIG
             client_mqtt = mqtt.Client()
             if settings.MQTT_USER and settings.MQTT_PASSWORD:
                 client_mqtt.username_pw_set(settings.MQTT_USER, settings.MQTT_PASSWORD)
 
             client_mqtt.connect(settings.MQTT_SERVER, settings.MQTT_PORT, 60)
-            client_mqtt.publish(settings.MQTT_TOPIC_SUB, payload_str, qos=1)
+            client_mqtt.publish(settings.MQTT_TOPIC_SPEAKER_CONFIG, payload_str, qos=1)
             client_mqtt.disconnect()
 
             return JsonResponse({"status": "success", "sent": payload})

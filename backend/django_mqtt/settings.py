@@ -26,11 +26,15 @@ SECRET_KEY = 'django-insecure-uv@(()w_3ngn$lu_2jspyy7mbp)+x4dk!760o5a^a7wt4z8&@(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "110.232.92.134",
-]
+allowed_hosts_env = os.environ.get("ALLOWED_HOSTS")
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",")]
+else:
+    ALLOWED_HOSTS = [
+        "localhost",
+        "127.0.0.1",
+        "110.232.92.134",
+    ]
 
 
 # Application definition
@@ -101,11 +105,12 @@ WSGI_APPLICATION = 'django_mqtt.wsgi.application'
 # MQTT Settings
 MQTT_SERVER = os.environ.get("MQTT_SERVER", "emqx.nayakanms.com")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", 1884))
-MQTT_USER = os.environ.get("MQTT_USER", "tbg_jabo_outer")
-MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "tbg_jabo_outer@123")
-MQTT_TOPIC_SUB = os.environ.get("MQTT_TOPIC_SUB", "nms/raspi_FOKLENDER/blackbox/config")
+MQTT_USER = os.environ.get("MQTT_USER", "nyk_ws")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "ws")
+MQTT_TOPIC_SUB = os.environ.get("MQTT_TOPIC_SUB", "nms/E32_WB_WS/whitebox/config")
 MQTT_TOPIC_PUB = os.environ.get("MQTT_TOPIC_PUB", "/matalite-test/reply/")
-MQTT_TOPIC_PUB2 = os.environ.get("MQTT_TOPIC_PUB2", "nms/raspi_FOKLENDER/blackbox/#")
+MQTT_TOPIC_PUB2 = os.environ.get("MQTT_TOPIC_PUB2", "nms/E32_WB_WS/whitebox/#")
+MQTT_TOPIC_SPEAKER_CONFIG = os.environ.get("MQTT_TOPIC_SPEAKER_CONFIG", "nms/esp32-speaker-003734fe8ce0/speaker/config")
 
 # New MQTT Settings (for Lamp/Relay) - Unified with primary settings
 NEW_MQTT_SERVER = MQTT_SERVER

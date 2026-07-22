@@ -14,6 +14,12 @@ urlpatterns = [
     path('api/send-rotary/', rotary_views.send_mqtt, name='send_mqtt'),
     path('api/send-floodlight/', floodlight_views.floodlight_mqtt, name='floodlight_mqtt'),
     path('api/cctv-stream/', dorlock_views.cctv_stream, name='cctv_stream'),
+    path('api/cctv/capture-photo/', dorlock_views.capture_photo, name='capture_photo'),
+    path('api/cctv/capture-video/', dorlock_views.capture_video, name='capture_video'),
+    path('api/cctv/latest/', dorlock_views.cctv_latest, name='cctv_latest'),
+    path('api/cctv/history/', dorlock_views.cctv_history, name='cctv_history'),
+    path('api/cctv/alerts/', dorlock_views.cctv_alerts, name='cctv_alerts'),
+    path('api/door-logs/', dorlock_views.get_door_logs, name='get_door_logs'),
     # path('', include('gps_tracer.urls')),
 ]
 if settings.DEBUG:
