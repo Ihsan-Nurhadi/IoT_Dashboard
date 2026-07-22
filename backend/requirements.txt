@@ -23,3 +23,5 @@ tzdata==2025.2
 urllib3==2.6.1
 opencv-python-headless>=4.5.0
 ultralytics
+imageio
+imageio-ffmpeg
