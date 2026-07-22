@@ -3,8 +3,8 @@ api:
 
 streams:
   cctv:
-    - rtsp://nayakaws:nayakaws@192.168.18.178:554/stream1
+    - rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1
     - "ffmpeg:cctv#audio=opus"
   cctv2:
-    - rtsp://nayakaws2:nayakaws2@192.168.18.179:554/stream1
+    - rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1
     - "ffmpeg:cctv2#audio=opus"
