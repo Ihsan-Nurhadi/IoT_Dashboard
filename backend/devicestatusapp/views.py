@@ -411,20 +411,17 @@ def cctv_latest(request):
         directory = os.path.join(settings.MEDIA_ROOT, "cctv", folder)
         if not os.path.exists(directory):
             return None, "-", None
-        files = [f for f in os.listdir(directory) if f.startswith(src) and f.endswith(extension) and "_latest" not in f and "_auto_" not in f]
+        files = [f for f in os.listdir(directory) if f.startswith(src) and f.endswith(extension) and "_latest" not in f]
         if not files:
             return None, "-", None
-        # Sort lexicographically so newest timestamp is last
-        files.sort()
+        # Sort by mtime so newest timestamp is last
+        files.sort(key=lambda x: os.path.getmtime(os.path.join(directory, x)))
         latest_file = files[-1]
         
-        # Extract timestamp string from filename e.g. "cctv_20260721_092800.mp4" -> "20260721_092800"
-        ts_str = ""
+        # Extract numeric timestamp segments dynamically (e.g. ['20260721', '092800'])
         parts = os.path.splitext(latest_file)[0].split('_')
-        if len(parts) >= 3:
-            ts_str = parts[1] + "_" + parts[2]
-        elif len(parts) >= 2:
-            ts_str = parts[1]
+        numeric_parts = [p for p in parts if p.isdigit()]
+        ts_str = "_".join(numeric_parts)
             
         filepath = os.path.join(directory, latest_file)
         mtime = os.path.getmtime(filepath)

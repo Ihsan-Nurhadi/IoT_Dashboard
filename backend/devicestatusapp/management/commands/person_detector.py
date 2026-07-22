@@ -21,96 +21,100 @@ class CameraMonitorThread(threading.Thread):
         self.last_capture_time = 0.0
         self.cooldown = 30.0  # 30 seconds cooldown between auto-screenshots
 
+    def log_message(self, text, style_fn=None, level="info"):
+        # Format text
+        formatted_text = f"[{self.camera_id}] {text}"
+        
+        # Write to console
+        if style_fn:
+            self.stdout.write(style_fn(formatted_text))
+        else:
+            self.stdout.write(formatted_text)
+        
+        # Write to file
+        log_file = os.path.join(settings.BASE_DIR, "person_detector.log")
+        try:
+            timestamp = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} [{self.camera_id}] [{level.upper()}] {text}\n")
+        except Exception:
+            pass
+
     def run(self):
-        self.stdout.write(self.style.WARNING(f"Initializing YOLO model for {self.camera_id}..."))
+        self.log_message(f"Initializing YOLO model for {self.camera_id}...", self.style.WARNING)
         try:
             from ultralytics import YOLO
             # Load yolov8n model locally for this thread
             model = YOLO("yolov8n.pt")
-            self.stdout.write(self.style.SUCCESS(f"YOLO model loaded successfully for {self.camera_id}"))
+            self.log_message(f"YOLO model loaded successfully for {self.camera_id}", self.style.SUCCESS)
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"[{self.camera_id}] Failed to load YOLO: {e}"))
+            self.log_message(f"Failed to load YOLO: {e}", self.style.ERROR)
             return
 
         # Ensure output directory exists
         output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
         os.makedirs(output_dir, exist_ok=True)
 
-        # Attempt ONVIF event subscription
-        onvif_active = False
-        pullpoint = None
+        self.run_onvif_loop(model, output_dir)
+
+    def init_onvif(self):
+        from onvif import ONVIFCamera
+        from urllib.parse import urlparse
         
-        try:
-            from onvif import ONVIFCamera
-            from urllib.parse import urlparse
-            
-            def rewrite_url_to_target(url_str, target_ip, target_port):
-                if not url_str:
-                    return url_str
-                try:
-                    parsed = urlparse(str(url_str))
-                    path_and_query = parsed.path
-                    if parsed.query:
-                        path_and_query += f"?{parsed.query}"
-                    return f"http://{target_ip}:{target_port}{path_and_query}"
-                except Exception:
-                    return url_str
-
-            self.stdout.write(f"[{self.camera_id}] Connecting to ONVIF on {self.onvif_ip}:{self.onvif_port}...")
-            
-            # WSDL dir path
-            wsdl_dir = os.path.join(settings.BASE_DIR, "wsdl")
-            
-            mycam = ONVIFCamera(
-                self.onvif_ip, 
-                self.onvif_port, 
-                self.onvif_user, 
-                self.onvif_password, 
-                wsdl_dir=wsdl_dir
-            )
-            
-            # Rewrite all service XAddrs returned by camera to match external NAT/tunnel IP & port
-            for ns, addr in list(mycam.xaddrs.items()):
-                if addr:
-                    mycam.xaddrs[ns] = rewrite_url_to_target(addr, self.onvif_ip, self.onvif_port)
-            
-            # Create Event Service
-            event_service = mycam.create_events_service()
-            if hasattr(event_service, 'ws_client') and hasattr(event_service.ws_client, 'service'):
-                cur_addr = getattr(event_service.ws_client.service, '_binding_options', {}).get('address')
-                if cur_addr:
-                    event_service.ws_client.service._binding_options['address'] = rewrite_url_to_target(cur_addr, self.onvif_ip, self.onvif_port)
-            
-            # Create PullPoint subscription
-            subscription_ref = event_service.CreatePullPointSubscription()
+        def rewrite_url_to_target(url_str, target_ip, target_port):
+            if not url_str:
+                return url_str
             try:
-                sub_addr = subscription_ref.SubscriptionReference.Address._value_1
-                fixed_sub_addr = rewrite_url_to_target(sub_addr, self.onvif_ip, self.onvif_port)
-                subscription_ref.SubscriptionReference.Address._value_1 = fixed_sub_addr
+                parsed = urlparse(str(url_str))
+                path_and_query = parsed.path
+                if parsed.query:
+                    path_and_query += f"?{parsed.query}"
+                return f"http://{target_ip}:{target_port}{path_and_query}"
             except Exception:
-                pass
-            
-            # Initialize PullPoint service with rewritten subscription reference
-            pullpoint = mycam.pullpoint(subscription_ref)
-            if hasattr(pullpoint, 'ws_client') and hasattr(pullpoint.ws_client, 'service'):
-                cur_addr = getattr(pullpoint.ws_client.service, '_binding_options', {}).get('address')
-                if cur_addr:
-                    pullpoint.ws_client.service._binding_options['address'] = rewrite_url_to_target(cur_addr, self.onvif_ip, self.onvif_port)
-            
-            onvif_active = True
-            
-            self.stdout.write(self.style.SUCCESS(
-                f"[{self.camera_id}] ONVIF PullPoint active on port {self.onvif_port}!"
-            ))
-        except Exception as onvif_err:
-            self.stdout.write(self.style.ERROR(
-                f"[{self.camera_id}] ONVIF init failed ({onvif_err}). Falling back to 1.5s POLLING mode..."
-            ))
+                return url_str
 
-        if onvif_active and pullpoint:
-            self.run_onvif_loop(model, pullpoint, output_dir)
-        else:
-            self.run_polling_loop(model, output_dir)
+        self.log_message(f"Connecting to ONVIF on {self.onvif_ip}:{self.onvif_port}...")
+        
+        # WSDL dir path
+        wsdl_dir = os.path.join(settings.BASE_DIR, "wsdl")
+        
+        mycam = ONVIFCamera(
+            self.onvif_ip, 
+            self.onvif_port, 
+            self.onvif_user, 
+            self.onvif_password, 
+            wsdl_dir=wsdl_dir
+        )
+        
+        # Rewrite all service XAddrs returned by camera to match external NAT/tunnel IP & port
+        for ns, addr in list(mycam.xaddrs.items()):
+            if addr:
+                mycam.xaddrs[ns] = rewrite_url_to_target(addr, self.onvif_ip, self.onvif_port)
+        
+        # Create Event Service
+        event_service = mycam.create_events_service()
+        if hasattr(event_service, 'ws_client') and hasattr(event_service.ws_client, 'service'):
+            cur_addr = getattr(event_service.ws_client.service, '_binding_options', {}).get('address')
+            if cur_addr:
+                event_service.ws_client.service._binding_options['address'] = rewrite_url_to_target(cur_addr, self.onvif_ip, self.onvif_port)
+        
+        # Create PullPoint subscription
+        subscription_ref = event_service.CreatePullPointSubscription()
+        try:
+            sub_addr = subscription_ref.SubscriptionReference.Address._value_1
+            fixed_sub_addr = rewrite_url_to_target(sub_addr, self.onvif_ip, self.onvif_port)
+        except Exception:
+            fixed_sub_addr = f"http://{self.onvif_ip}:{self.onvif_port}/onvif/service"
+        
+        # Set xaddr for PullPointSubscription in mycam.xaddrs
+        mycam.xaddrs['http://www.onvif.org/ver10/events/wsdl/PullPointSubscription'] = fixed_sub_addr
+
+        # Create pullpoint service client using ONVIFCamera's native method
+        pullpoint = mycam.create_pullpoint_service()
+        if hasattr(pullpoint, 'ws_client') and hasattr(pullpoint.ws_client, 'service'):
+            pullpoint.ws_client.service._binding_options['address'] = fixed_sub_addr
+            
+        return pullpoint
 
     def check_for_motion(self, n):
         try:
@@ -121,37 +125,83 @@ class CameraMonitorThread(threading.Thread):
                 else:
                     topic = str(n.Topic)
 
-            # Check if it is a motion related event topic
-            if "Motion" not in topic and "MotionAlarm" not in topic:
+            # Check if it is an event/motion related topic
+            topic_lower = topic.lower()
+            topic_triggers = ["motion", "alarm", "people", "tamper", "linecross", "detector"]
+            if not any(t in topic_lower for t in topic_triggers):
                 return False
+
+            self.log_message(f"Processing event topic '{topic}'. Notification data: {n}")
 
             # Extract message details
             if hasattr(n, 'Message') and n.Message:
                 message = n.Message
-                if hasattr(message, 'Data') and message.Data:
-                    data = message.Data
-                    items = []
-                    if hasattr(data, 'SimpleItem'):
-                        items = data.SimpleItem
-                        if not isinstance(items, list):
-                            items = [items]
-                    
-                    for item in items:
-                        name = getattr(item, '_attr_Name', '') or getattr(item, 'Name', '')
-                        val = getattr(item, '_attr_Value', '') or getattr(item, 'Value', '')
-                        if name == "State" and str(val).lower() in ["true", "1"]:
-                            return True
-        except Exception:
-            pass
+                
+                # Check for raw XML Element (often returned as {'_value_1': Element} in zeep)
+                element = None
+                if isinstance(message, dict):
+                    element = message.get('_value_1')
+                elif hasattr(message, '_value_1'):
+                    element = message._value_1
+                
+                if element is not None and hasattr(element, 'iter'):
+                    self.log_message(f"XML Element root tag: {element.tag}")
+                    for item in element.iter():
+                        self.log_message(f"  Tag: {item.tag}, Attrib: {item.attrib}")
+                        if item.tag.endswith('SimpleItem'):
+                            name = item.attrib.get('Name') or item.attrib.get('name', '')
+                            val = item.attrib.get('Value') or item.attrib.get('value', '')
+                            self.log_message(f"Parsed XML SimpleItem - Name: '{name}', Value: '{val}'")
+                            if name in ["State", "IsMotion", "IsPeople", "IsLineCross", "IsTamper", "Active"] and str(val).lower() in ["true", "1"]:
+                                return True
+                else:
+                    # Fallback to Python object attribute parsing
+                    if hasattr(message, 'Data') and message.Data:
+                        data = message.Data
+                        items = []
+                        if hasattr(data, 'SimpleItem'):
+                            items = data.SimpleItem
+                            if not isinstance(items, list):
+                                items = [items]
+                        
+                        for item in items:
+                            name = getattr(item, '_attr_Name', '') or getattr(item, 'Name', '')
+                            val = getattr(item, '_attr_Value', '') or getattr(item, 'Value', '')
+                            self.log_message(f"Parsed Obj SimpleItem - Name: '{name}', Value: '{val}' (type: {type(val)})")
+                            if name in ["State", "IsMotion", "IsPeople", "IsLineCross", "IsTamper", "Active"] and str(val).lower() in ["true", "1"]:
+                                return True
+        except Exception as e:
+            self.log_message(f"Error in check_for_motion: {e}", level="error")
         return False
 
-    def run_onvif_loop(self, model, pullpoint, output_dir):
-        self.stdout.write(self.style.SUCCESS(f"[{self.camera_id}] Running in EVENT-DRIVEN ONVIF mode..."))
+    def run_onvif_loop(self, model, output_dir):
+        self.log_message("Running in EVENT-DRIVEN ONVIF mode...", self.style.SUCCESS)
+        
+        pullpoint = None
+        consecutive_failures = 0
         
         while self.running:
+            if pullpoint is None:
+                try:
+                    pullpoint = self.init_onvif()
+                    self.log_message(f"ONVIF PullPoint active on port {self.onvif_port}!", self.style.SUCCESS)
+                    consecutive_failures = 0
+                except Exception as onvif_err:
+                    self.log_message(f"ONVIF subscription attempt failed ({onvif_err}).", self.style.ERROR)
+                    pullpoint = None
+                    consecutive_failures += 1
+                    
+                    if consecutive_failures >= 3:
+                        self.log_message("ONVIF connection repeatedly failed. Falling back to 1.5s POLLING mode...", self.style.WARNING)
+                        self.run_polling_loop(model, output_dir)
+                        return
+                    
+                    time.sleep(5)
+                    continue
+
             try:
                 # Poll message with 5s timeout
-                msgs = pullpoint.PullMessages(Timeout="PT5S", MessageLimit=10)
+                msgs = pullpoint.PullMessages({'Timeout': 'PT5S', 'MessageLimit': 10})
                 notifications = getattr(msgs, "NotificationMessage", None)
                 
                 if notifications:
@@ -160,79 +210,96 @@ class CameraMonitorThread(threading.Thread):
                         
                     motion_detected = False
                     for n in notifications:
+                        topic = getattr(n, 'Topic', None)
+                        topic_val = getattr(topic, '_value_1', None) or str(topic)
+                        self.log_message(f"Notification received (Topic: {topic_val})")
                         if self.check_for_motion(n):
                             motion_detected = True
-                            break
                             
                     if motion_detected:
-                        self.stdout.write(self.style.WARNING(
-                            f"[{self.camera_id}] ONVIF Motion detected! Analyzing via YOLO..."
-                        ))
+                        self.log_message("ONVIF Motion detected! Analyzing via YOLO...", self.style.WARNING)
                         self.trigger_yolo_check(model, output_dir)
                         
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"[{self.camera_id}] ONVIF Event Loop Error: {e}"))
-                time.sleep(2)
+                self.log_message(f"ONVIF Event Loop Error: {e}", self.style.ERROR)
+                pullpoint = None  # Reset pullpoint to trigger reconnection
+                time.sleep(3)
 
     def trigger_yolo_check(self, model, output_dir):
+        cap = None
         try:
+            self.log_message("Starting YOLO trigger check (checking frames over 2.5s)...")
             os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
             cap = cv2.VideoCapture(self.rtsp_url)
             if not cap.isOpened():
-                self.stdout.write(self.style.ERROR(f"[{self.camera_id}] Failed to open RTSP stream for trigger."))
+                self.log_message("Failed to open RTSP stream for trigger.", self.style.ERROR)
                 return
 
-            for _ in range(5):
-                cap.grab()
-            ret, frame = cap.retrieve()
-            cap.release()
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-            if not ret:
-                self.stdout.write(self.style.ERROR(f"[{self.camera_id}] Failed to retrieve frame for trigger."))
-                return
-
-            # Run person detection
-            results = model(frame, classes=[0], conf=0.5, verbose=False)
+            # We will check multiple times over a 2.5-second window
+            check_interval = 0.5  # seconds
+            num_checks = 5
             
-            detected_person = False
-            boxes = []
-            for r in results:
-                for box in r.boxes:
-                    detected_person = True
-                    x1, y1, x2, y2 = box.xyxy[0]
-                    conf = float(box.conf[0])
-                    boxes.append((int(x1), int(y1), int(x2), int(y2), conf))
+            for check_idx in range(num_checks):
+                # Flush buffer
+                for _ in range(15):
+                    cap.grab()
+                ret, frame = cap.retrieve()
+                if not ret or frame is None:
+                    self.log_message(f"Failed to retrieve frame at check {check_idx+1}/{num_checks}", self.style.ERROR)
+                    time.sleep(check_interval)
+                    continue
 
-            if detected_person:
-                now_time = time.time()
-                if now_time - self.last_capture_time >= self.cooldown:
-                    self.last_capture_time = now_time
+                # Run person detection with confidence >= 0.35
+                results = model(frame, classes=[0], conf=0.35, verbose=False)
+                
+                detected_person = False
+                boxes = []
+                for r in results:
+                    for box in r.boxes:
+                        detected_person = True
+                        x1, y1, x2, y2 = box.xyxy[0]
+                        conf = float(box.conf[0])
+                        boxes.append((int(x1), int(y1), int(x2), int(y2), conf))
 
-                    # Draw bounding boxes
-                    for (x1, y1, x2, y2, conf) in boxes:
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        label = f"Person {conf:.2f}"
-                        cv2.putText(frame, label, (x1, y1 - 10), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                if detected_person:
+                    self.log_message(f"YOLO confirmed PERSON at check {check_idx+1}/{num_checks} (conf >= 0.35)", self.style.SUCCESS)
+                    
+                    now_time = time.time()
+                    if now_time - self.last_capture_time >= self.cooldown:
+                        self.last_capture_time = now_time
 
-                    # Save proof
-                    now = timezone.now()
-                    filename = f"{self.camera_id}_auto_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
-                    filepath = os.path.join(output_dir, filename)
-                    cv2.imwrite(filepath, frame)
+                        # Draw bounding boxes
+                        for (x1, y1, x2, y2, conf) in boxes:
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            label = f"Person {conf:.2f}"
+                            cv2.putText(frame, label, (x1, y1 - 10), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                    self.stdout.write(self.style.SUCCESS(
-                        f"[{self.camera_id}] YOLO confirmed PERSON. Screenshot saved: {filename}"
-                    ))
-                else:
-                    self.stdout.write(f"[{self.camera_id}] Person detected but cooldown active. Skipping screenshot.")
-            else:
-                self.stdout.write(f"[{self.camera_id}] ONVIF Motion event was not a person. Discarded frame.")
+                        # Save proof
+                        now = timezone.now()
+                        filename = f"{self.camera_id}_auto_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+                        filepath = os.path.join(output_dir, filename)
+                        cv2.imwrite(filepath, frame)
+
+                        self.log_message(f"Screenshot saved: {filename}", self.style.SUCCESS)
+                    else:
+                        self.log_message("Person detected but cooldown active. Skipping screenshot.")
+                    
+                    return  # Stop checking since we already found a person
+
+                time.sleep(check_interval)
+
+            self.log_message("YOLO check complete: No person detected in any checked frame.")
         except Exception as err:
-            self.stdout.write(self.style.ERROR(f"[{self.camera_id}] trigger_yolo_check error: {err}"))
+            self.log_message(f"trigger_yolo_check error: {err}", self.style.ERROR)
+        finally:
+            if cap is not None:
+                cap.release()
 
     def run_polling_loop(self, model, output_dir):
-        self.stdout.write(self.style.SUCCESS(f"[{self.camera_id}] Running in 1.5s POLLING mode..."))
+        self.log_message("Running in 1.5s POLLING mode...", self.style.SUCCESS)
         
         while self.running:
             try:
@@ -278,11 +345,9 @@ class CameraMonitorThread(threading.Thread):
                         filepath = os.path.join(output_dir, filename)
                         cv2.imwrite(filepath, frame)
 
-                        self.stdout.write(self.style.SUCCESS(
-                            f"[{self.camera_id}] Person detected! Saved auto-screenshot: {filename}"
-                        ))
+                        self.log_message(f"Person detected! Saved auto-screenshot: {filename}", self.style.SUCCESS)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"[{self.camera_id}] Polling error: {e}"))
+                self.log_message(f"Polling error: {e}", self.style.ERROR)
 
             time.sleep(1.5)
 
