@@ -13,6 +13,7 @@
   border-radius: 12px;
   font-size: 2rem;
   color: #fff;
+  flex-shrink: 0;
 }
 
 .device-status-card .icon-container.pln {
@@ -25,6 +26,7 @@
 
 .device-status-card .device-info {
   flex-grow: 1;
+  min-width: 0;
 }
 
 .device-status-card .device-name {
@@ -45,6 +47,7 @@
   border-radius: 9999px;
   font-size: 0.875rem;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .device-status-card .status-badge.status-active {

@@ -7,3 +7,10 @@
   box-sizing: border-box;
   height: 100%;
 }
+
+@media (max-width: 768px) {
+  .card {
+    padding: 1.25rem;
+    border-radius: 16px;
+  }
+}

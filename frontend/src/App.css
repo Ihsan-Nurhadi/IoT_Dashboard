@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
 }
 
 .main-content {
@@ -10,6 +11,7 @@
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .section-header {
@@ -22,6 +24,7 @@
 .section-icon {
   font-size: 2rem;
   color: var(--secondary-text-color);
+  flex-shrink: 0;
 }
 
 .section-title {
@@ -65,8 +68,42 @@
 }
 
 @media (max-width: 1024px) {
+  .grid-container {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2rem;
+  }
   .side-by-side-grid,
   .cctv-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1.25rem 0.85rem;
+  }
+  .grid-container {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+  }
+  .side-by-side-grid,
+  .cctv-grid,
+  .device-control-grid {
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+  }
+  .section-header {
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+  }
+  .section-icon {
+    font-size: 1.5rem;
+  }
+  .section-title {
+    font-size: 1.2rem;
+  }
+  .section-subtitle {
+    font-size: 0.85rem;
   }
 }

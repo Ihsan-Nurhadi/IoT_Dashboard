@@ -112,9 +112,6 @@
   cursor: pointer;
   transition: all 0.2s ease;
 }
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
 
 .rotary-control-card .control-button:hover {
   background-color: #f3f4f6;
