@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import './Header.css';
-import { FaHome, FaBell, FaCheckDouble, FaSun, FaMoon } from 'react-icons/fa';
+import { FaHome, FaBell, FaCheckDouble, FaSun, FaMoon, FaCamera } from 'react-icons/fa';
+import { PiSiren } from 'react-icons/pi';
 
 interface AlertItem {
   id: string;
+  type?: 'camera' | 'pir';
   camera: string;
+  title?: string;
   url: string;
   timestamp: string;
   raw_time: string;
@@ -13,11 +16,13 @@ interface AlertItem {
 
 const Header: React.FC = () => {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [alertCategory, setAlertCategory] = useState<'all' | 'camera' | 'pir'>('all');
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
   const [fullscreenPhotoUrl, setFullscreenPhotoUrl] = useState<string | null>(null);
   const [fullscreenPhotoTitle, setFullscreenPhotoTitle] = useState<string>("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const lastKnownAlertIdRef = useRef<string | null>(null);
 
   // Dark/Light Mode state
   const [theme, setTheme] = useState<string>(() => {
@@ -36,12 +41,34 @@ const Header: React.FC = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('/notification.wav');
+      audio.volume = 0.7;
+      audio.play().catch(err => {
+        console.log("Audio autoplay waiting for user interaction:", err);
+      });
+    } catch (err) {
+      console.error("Error playing notification sound:", err);
+    }
+  };
+
   // Fetch alerts
   const fetchAlerts = async () => {
     try {
-      const res = await fetch('/api/cctv/alerts/');
+      const res = await fetch(`/api/cctv/alerts/?category=${alertCategory}`);
       if (res.ok) {
-        const data = await res.json();
+        const data: AlertItem[] = await res.json();
+        
+        // Trigger ringtone sound if a new alert arrives
+        if (data.length > 0) {
+          const latestAlertId = data[0].id;
+          if (lastKnownAlertIdRef.current !== null && lastKnownAlertIdRef.current !== latestAlertId) {
+            playNotificationSound();
+          }
+          lastKnownAlertIdRef.current = latestAlertId;
+        }
+
         setAlerts(data);
         
         // Calculate unread count
@@ -50,7 +77,6 @@ const Header: React.FC = () => {
           const unread = data.filter((item: AlertItem) => item.raw_time > lastReadTime).length;
           setUnreadCount(unread);
         } else if (data.length > 0) {
-          // If never read, default to showing unread alerts count
           setUnreadCount(data.length);
         }
       }
@@ -64,7 +90,7 @@ const Header: React.FC = () => {
     // Poll every 5 seconds
     const interval = setInterval(fetchAlerts, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [alertCategory]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -132,6 +158,28 @@ const Header: React.FC = () => {
                 )}
               </div>
               
+              {/* Notification Category Tabs */}
+              <div className="alert-category-tabs">
+                <button 
+                  className={`alert-tab-btn ${alertCategory === 'all' ? 'active' : ''}`}
+                  onClick={() => setAlertCategory('all')}
+                >
+                  Semua
+                </button>
+                <button 
+                  className={`alert-tab-btn ${alertCategory === 'camera' ? 'active' : ''}`}
+                  onClick={() => setAlertCategory('camera')}
+                >
+                  <FaCamera className="tab-icon" /> Kamera
+                </button>
+                <button 
+                  className={`alert-tab-btn ${alertCategory === 'pir' ? 'active' : ''}`}
+                  onClick={() => setAlertCategory('pir')}
+                >
+                  <PiSiren className="tab-icon" /> PIR
+                </button>
+              </div>
+
               <div className="dropdown-list">
                 {alerts.length === 0 ? (
                   <div className="dropdown-empty">Tidak ada notifikasi</div>
@@ -142,7 +190,7 @@ const Header: React.FC = () => {
                       className="dropdown-item"
                       onClick={() => {
                         setFullscreenPhotoUrl(item.url);
-                        setFullscreenPhotoTitle(`${item.camera} - ${item.timestamp}`);
+                        setFullscreenPhotoTitle(`${item.title || item.camera} - ${item.timestamp}`);
                         setShowDropdown(false);
                       }}
                     >
@@ -150,7 +198,7 @@ const Header: React.FC = () => {
                         <img src={item.url} alt="thumbnail" />
                       </div>
                       <div className="dropdown-item-details">
-                        <span className="item-text">Orang terdeteksi di {item.camera}</span>
+                        <span className="item-text">{item.title || `Orang terdeteksi di ${item.camera}`}</span>
                         <span className="item-time">{item.timestamp}</span>
                       </div>
                     </div>

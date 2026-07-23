@@ -28,6 +28,8 @@ const Dashboard = () => {
         <DeviceStatusCard deviceName="Door Panel" deviceType="Access Control" />
         <DeviceStatusCard deviceName="Motion Sensor 1" deviceType="Motion Detection" />
         <DeviceStatusCard deviceName="Motion Sensor 2" deviceType="Motion Detection" />
+        <DeviceStatusCard deviceName="Motion Sensor 3" deviceType="Motion Detection" />
+        <DeviceStatusCard deviceName="Motion Sensor 4" deviceType="Motion Detection" />
       </div>
 
       <div className="section-header">

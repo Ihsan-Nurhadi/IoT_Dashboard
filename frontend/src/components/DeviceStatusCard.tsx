@@ -23,6 +23,8 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
   const isPLN = deviceName === "PLN";
   const isMotion1 = deviceName === "Motion Sensor 1";
   const isMotion2 = deviceName === "Motion Sensor 2";
+  const isMotion3 = deviceName === "Motion Sensor 3";
+  const isMotion4 = deviceName === "Motion Sensor 4";
 
   useEffect(() => {
     // Tentukan URL API berdasarkan nama device
@@ -35,6 +37,10 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
       apiUrl = "/api/get-motion1-status/";
     } else if (isMotion2) {
       apiUrl = "/api/get-motion2-status/";
+    } else if (isMotion3) {
+      apiUrl = "/api/get-motion3-status/";
+    } else if (isMotion4) {
+      apiUrl = "/api/get-motion4-status/";
     } else {
       return; // Jika bukan device live, tidak perlu polling
     }
@@ -58,7 +64,7 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
     fetchStatus();
     const interval = setInterval(fetchStatus, 2000);
     return () => clearInterval(interval);
-  }, [deviceName, isDoorPanel, isPLN]);
+  }, [deviceName, isDoorPanel, isPLN, isMotion1, isMotion2, isMotion3, isMotion4]);
 
   // --- LOGIC ICON ---
   const getIcon = () => {
@@ -73,7 +79,7 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
     if (isPLN) {
       return <FaBolt />;
     }
-    if (isMotion1 || isMotion2) {
+    if (isMotion1 || isMotion2 || isMotion3 || isMotion4) {
       return <PiSiren />;
     }
     return <FaBolt />;
@@ -103,7 +109,7 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
           <h3 className="device-name">{deviceName}</h3>
           <p className="device-type">{deviceType}</p>
           <p className="timestamp">
-            {isDoorPanel || isPLN ? lastUpdated : "Static"}
+            {lastUpdated}
           </p>
         </div>
         <div className={`status-badge ${statusClass}`}>{currentStatus}</div>

@@ -103,6 +103,50 @@ def get_motion2_status(request):
             return JsonResponse({"error": str(e)}, status=500)
     return JsonResponse({"error": "GET only"}, status=405)
 
+# --- View untuk Get Status Motion Sensor 3 ---
+def get_motion3_status(request):
+    if request.method == "GET":
+        try:
+            device = DeviceState.objects.filter(device_name="Motion Sensor 3").first()
+            if device:
+                local_time = timezone.localtime(device.last_updated)
+                return JsonResponse({
+                    "device": device.device_name,
+                    "status": device.status, 
+                    "last_updated": local_time.strftime("%Y-%m-%d %H:%M:%S")
+                })
+            else:
+                return JsonResponse({
+                    "device": "Motion Sensor 3", 
+                    "status": "Standby",
+                    "last_updated": "-"
+                })
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+    return JsonResponse({"error": "GET only"}, status=405)
+
+# --- View untuk Get Status Motion Sensor 4 ---
+def get_motion4_status(request):
+    if request.method == "GET":
+        try:
+            device = DeviceState.objects.filter(device_name="Motion Sensor 4").first()
+            if device:
+                local_time = timezone.localtime(device.last_updated)
+                return JsonResponse({
+                    "device": device.device_name,
+                    "status": device.status, 
+                    "last_updated": local_time.strftime("%Y-%m-%d %H:%M:%S")
+                })
+            else:
+                return JsonResponse({
+                    "device": "Motion Sensor 4", 
+                    "status": "Standby",
+                    "last_updated": "-"
+                })
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+    return JsonResponse({"error": "GET only"}, status=405)
+
 # --- View untuk Streaming CCTV RTSP (Integrasi Lokal) ---
 import cv2
 import time
@@ -453,6 +497,7 @@ def cctv_history(request):
         return JsonResponse({"error": "GET only"}, status=405)
         
     media_type = request.GET.get("type", "photos") # "photos" or "videos"
+    category = request.GET.get("category", "camera") # "camera" or "sensor"
     page = int(request.GET.get("page", 1))
     limit = int(request.GET.get("limit", 10))
 
@@ -469,7 +514,13 @@ def cctv_history(request):
         })
 
     # List all files matching filter
-    files = [f for f in os.listdir(directory) if f.endswith(extension) and "_latest" not in f]
+    if media_type == "photos":
+        if category == "sensor":
+            files = [f for f in os.listdir(directory) if f.endswith(extension) and "_latest" not in f and "_pir_" in f]
+        else:
+            files = [f for f in os.listdir(directory) if f.endswith(extension) and "_latest" not in f and "_pir_" not in f]
+    else:
+        files = [f for f in os.listdir(directory) if f.endswith(extension) and "_latest" not in f]
     
     # Compile metadata for each file
     items = []
@@ -523,32 +574,71 @@ def cctv_alerts(request):
     if request.method != "GET":
         return JsonResponse({"error": "GET only"}, status=405)
         
+    category = request.GET.get("category", "all")
     directory = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
     if not os.path.exists(directory):
         return JsonResponse([], safe=False)
         
-    # List files ending in .jpg and containing _auto_ in filename
-    files = [f for f in os.listdir(directory) if f.endswith(".jpg") and "_auto_" in f]
+    all_files = os.listdir(directory)
     
     alerts = []
-    for f in files:
-        filepath = os.path.join(directory, f)
-        mtime = os.path.getmtime(filepath)
-        dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
-        
-        cam_label = "Kamera #1"
-        if f.startswith("cctv2"):
-            cam_label = "Kamera #2"
+    
+    # 1. Camera YOLO Alerts (_auto_)
+    if category in ["all", "camera"]:
+        auto_files = [f for f in all_files if f.endswith(".jpg") and "_auto_" in f]
+        for f in auto_files:
+            filepath = os.path.join(directory, f)
+            mtime = os.path.getmtime(filepath)
+            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
             
-        formatted_time = dt.strftime("%d %b %I:%M %p")
-        
-        alerts.append({
-            "id": f,
-            "camera": cam_label,
-            "url": f"/media/cctv/photos/{f}",
-            "timestamp": formatted_time,
-            "raw_time": dt.isoformat()
-        })
+            cam_label = "Kamera #1"
+            if f.startswith("cctv2"):
+                cam_label = "Kamera #2"
+                
+            formatted_time = dt.strftime("%d %b %I:%M %p")
+            
+            alerts.append({
+                "id": f,
+                "type": "camera",
+                "camera": cam_label,
+                "title": f"Orang terdeteksi di {cam_label}",
+                "url": f"/media/cctv/photos/{f}",
+                "timestamp": formatted_time,
+                "raw_time": dt.isoformat()
+            })
+
+    # 2. PIR Motion Sensor Alerts (_pir_) - Grouped by timestamp so 2 camera snapshots produce ONLY 1 alert
+    if category in ["all", "pir"]:
+        pir_files = [f for f in all_files if f.endswith(".jpg") and "_pir_" in f]
+        pir_groups = {}
+        for f in pir_files:
+            filepath = os.path.join(directory, f)
+            mtime = os.path.getmtime(filepath)
+            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+            
+            parts = os.path.splitext(f)[0].split('_pir_')
+            ts_key = parts[1] if len(parts) > 1 else str(int(mtime))
+            
+            if ts_key not in pir_groups:
+                pir_groups[ts_key] = {
+                    "file": f,
+                    "mtime": mtime,
+                    "dt": dt
+                }
+                
+        for ts_key, data in pir_groups.items():
+            f = data["file"]
+            dt = data["dt"]
+            formatted_time = dt.strftime("%d %b %I:%M %p")
+            alerts.append({
+                "id": f"pir_{ts_key}",
+                "type": "pir",
+                "camera": "Sensor PIR",
+                "title": "Gerakan terdeteksi Sensor PIR",
+                "url": f"/media/cctv/photos/{f}",
+                "timestamp": formatted_time,
+                "raw_time": dt.isoformat()
+            })
         
     # Sort descending by timestamp (newest first)
     alerts.sort(key=lambda x: x["raw_time"], reverse=True)

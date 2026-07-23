@@ -14,6 +14,7 @@ import {
   FaBolt,
   FaMinusCircle
 } from 'react-icons/fa';
+import { PiSiren } from 'react-icons/pi';
 import './SiteDetail.css';
 
 interface MediaItem {
@@ -60,6 +61,7 @@ const SiteDetail: React.FC = () => {
   const [doorLogsLoading, setDoorLogsLoading] = useState(false);
 
   // Photos State
+  const [photoCategory, setPhotoCategory] = useState<'camera' | 'sensor'>('camera');
   const [photosData, setPhotosData] = useState<PaginatedResponse>({
     items: [],
     total_count: 0,
@@ -79,13 +81,11 @@ const SiteDetail: React.FC = () => {
   const [videosPage, setVideosPage] = useState(1);
   const [videosLoading, setVideosLoading] = useState(false);
 
-  // Video Modal State
+  // Modal State
+  const [activePhotoUrl, setActivePhotoUrl] = useState<string | null>(null);
+  const [activePhotoTitle, setActivePhotoTitle] = useState<string>('');
   const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
   const [activeVideoTitle, setActiveVideoTitle] = useState("");
-
-  // Photo Modal State (for fullscreen viewing)
-  const [activePhotoUrl, setActivePhotoUrl] = useState<string | null>(null);
-  const [activePhotoTitle, setActivePhotoTitle] = useState("");
 
   // Fetch Door Logs
   useEffect(() => {
@@ -111,7 +111,7 @@ const SiteDetail: React.FC = () => {
     const fetchPhotos = async () => {
       setPhotosLoading(true);
       try {
-        const res = await fetch(`/api/cctv/history/?type=photos&page=${photosPage}&limit=${ITEMS_PER_PAGE}`);
+        const res = await fetch(`/api/cctv/history/?type=photos&category=${photoCategory}&page=${photosPage}&limit=${ITEMS_PER_PAGE}`);
         if (res.ok) {
           const data = await res.json();
           setPhotosData(data);
@@ -123,7 +123,14 @@ const SiteDetail: React.FC = () => {
       }
     };
     fetchPhotos();
-  }, [photosPage]);
+  }, [photosPage, photoCategory]);
+
+  const handleCategoryChange = (category: 'camera' | 'sensor') => {
+    if (photoCategory !== category) {
+      setPhotoCategory(category);
+      setPhotosPage(1);
+    }
+  };
 
   // Fetch videos
   useEffect(() => {
@@ -273,6 +280,24 @@ const SiteDetail: React.FC = () => {
             </div>
             <h2>Foto</h2>
           </div>
+
+          <div className="photo-category-tabs">
+            <button
+              className={`category-tab-btn ${photoCategory === 'camera' ? 'active' : ''}`}
+              onClick={() => handleCategoryChange('camera')}
+            >
+              <FaCamera className="tab-icon" />
+              Kamera
+            </button>
+            <button
+              className={`category-tab-btn ${photoCategory === 'sensor' ? 'active' : ''}`}
+              onClick={() => handleCategoryChange('sensor')}
+            >
+              <PiSiren className="tab-icon" />
+              Sensor
+            </button>
+          </div>
+
           <div className="total-count-badge">{photosData.total_count}</div>
         </div>
 
