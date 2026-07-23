@@ -245,10 +245,12 @@ class CameraMonitorThread(threading.Thread):
                     ffmpeg_exe,
                     "-y",
                     "-rtsp_transport", "tcp",
+                    "-fflags", "+genpts",
                     "-t", "10",
                     "-i", self.rtsp_url,
                     "-c:v", "copy",
                     "-c:a", "aac",
+                    "-movflags", "+faststart",
                     filepath
                 ]
                 
@@ -316,6 +318,7 @@ class CameraMonitorThread(threading.Thread):
                         timestamp = now.strftime('%Y%m%d_%H%M%S')
                         filename = f"{self.camera_id}_auto_{timestamp}.jpg"
                         filepath = os.path.join(output_dir, filename)
+                        os.makedirs(output_dir, exist_ok=True)  # Re-create if manually deleted in runtime
                         cv2.imwrite(filepath, frame)
 
                         self.log_message(f"Screenshot saved: {filename}", self.style.SUCCESS)
