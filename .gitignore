@@ -8,6 +8,7 @@ __pycache__/
 *.pyd
 db.sqlite3
 backend/media/
+backend/person_detector.log
 
 # Virtual environments
 venv/
