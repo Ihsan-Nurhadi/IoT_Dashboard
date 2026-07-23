@@ -6,7 +6,6 @@ import Footer from './components/Footer';
 import DeviceStatusCard from './components/DeviceStatusCard';
 import AudioControlCard from './components/AudioControlCard';
 import RotaryControlCard from './components/RotaryControlCard';
-import FloodlightControlCard from './components/FloodlightControlCard';
 import CCTVStreamCard from './components/CCTVStreamCard';
 import SiteDetail from './components/SiteDetail';
 import { FaCog, FaServer, FaVideo, FaChevronUp, FaChevronDown } from 'react-icons/fa';
@@ -37,9 +36,6 @@ const Dashboard = () => {
           <h2 className="section-title">Device Control</h2>
           <p className="section-subtitle">Manage your device operations</p>
         </div>
-      </div>
-      <div className="device-control-grid">
-        <FloodlightControlCard />
       </div>
       <div className="side-by-side-grid">
         <AudioControlCard />

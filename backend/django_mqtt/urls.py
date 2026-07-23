@@ -3,7 +3,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from devicestatusapp import views as dorlock_views
 from rotaryapp import views as rotary_views
-from floodlightapp import views as floodlight_views
 
 urlpatterns = [
     path('api/', include('speakerapp.urls')),
@@ -12,7 +11,6 @@ urlpatterns = [
     path('api/get-motion1-status/', dorlock_views.get_motion1_status, name='get_motion1_status'),
     path('api/get-motion2-status/', dorlock_views.get_motion2_status, name='get_motion2_status'),
     path('api/send-rotary/', rotary_views.send_mqtt, name='send_mqtt'),
-    path('api/send-floodlight/', floodlight_views.floodlight_mqtt, name='floodlight_mqtt'),
     path('api/cctv-stream/', dorlock_views.cctv_stream, name='cctv_stream'),
     path('api/cctv/capture-photo/', dorlock_views.capture_photo, name='capture_photo'),
     path('api/cctv/capture-video/', dorlock_views.capture_video, name='capture_video'),

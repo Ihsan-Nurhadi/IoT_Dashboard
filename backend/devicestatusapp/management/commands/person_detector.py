@@ -225,6 +225,40 @@ class CameraMonitorThread(threading.Thread):
                 pullpoint = None  # Reset pullpoint to trigger reconnection
                 time.sleep(3)
 
+    def record_video_async(self, timestamp):
+        def run_ffmpeg():
+            try:
+                import subprocess
+                import imageio_ffmpeg
+                
+                output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "videos")
+                os.makedirs(output_dir, exist_ok=True)
+                
+                filename = f"{self.camera_id}_auto_{timestamp}.mp4"
+                filepath = os.path.join(output_dir, filename)
+                
+                self.log_message(f"Starting async video capture to {filename}...")
+                
+                ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+                
+                cmd = [
+                    ffmpeg_exe,
+                    "-y",
+                    "-rtsp_transport", "tcp",
+                    "-t", "10",
+                    "-i", self.rtsp_url,
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    filepath
+                ]
+                
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+                self.log_message(f"Async video capture finished and saved: {filename}", self.style.SUCCESS)
+            except Exception as e:
+                self.log_message(f"Error in async video capture: {e}", self.style.ERROR)
+
+        threading.Thread(target=run_ffmpeg, daemon=True).start()
+
     def trigger_yolo_check(self, model, output_dir):
         cap = None
         try:
@@ -279,13 +313,17 @@ class CameraMonitorThread(threading.Thread):
 
                         # Save proof
                         now = timezone.now()
-                        filename = f"{self.camera_id}_auto_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+                        timestamp = now.strftime('%Y%m%d_%H%M%S')
+                        filename = f"{self.camera_id}_auto_{timestamp}.jpg"
                         filepath = os.path.join(output_dir, filename)
                         cv2.imwrite(filepath, frame)
 
                         self.log_message(f"Screenshot saved: {filename}", self.style.SUCCESS)
+                        
+                        # Start video recording
+                        self.record_video_async(timestamp)
                     else:
-                        self.log_message("Person detected but cooldown active. Skipping screenshot.")
+                        self.log_message("Person detected but cooldown active. Skipping screenshot and video recording.")
                     
                     return  # Stop checking since we already found a person
 

@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'devicestatusapp',
-    'floodlightapp',
     # 'gps_tracer',
 ]
 
