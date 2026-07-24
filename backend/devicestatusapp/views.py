@@ -454,33 +454,28 @@ def cctv_latest(request):
     def get_latest_media(src, folder, extension):
         directory = os.path.join(settings.MEDIA_ROOT, "cctv", folder)
         if not os.path.exists(directory):
-            return None, "-", None
+            return None, "-", 0
         files = [f for f in os.listdir(directory) if f.startswith(src) and f.endswith(extension) and "_latest" not in f]
         if not files:
-            return None, "-", None
+            return None, "-", 0
         # Sort by mtime so newest timestamp is last
         files.sort(key=lambda x: os.path.getmtime(os.path.join(directory, x)))
         latest_file = files[-1]
-        
-        # Extract numeric timestamp segments dynamically (e.g. ['20260721', '092800'])
-        parts = os.path.splitext(latest_file)[0].split('_')
-        numeric_parts = [p for p in parts if p.isdigit()]
-        ts_str = "_".join(numeric_parts)
             
         filepath = os.path.join(directory, latest_file)
         mtime = os.path.getmtime(filepath)
         dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
         formatted_time = dt.strftime("%b %d, %I:%M %p")
         
-        return f"/media/cctv/{folder}/{latest_file}", formatted_time, ts_str
+        return f"/media/cctv/{folder}/{latest_file}", formatted_time, mtime
 
     response_data = {}
     for src in ["cctv", "cctv2"]:
-        photo_url, photo_time, photo_ts = get_latest_media(src, "photos", ".jpg")
-        video_url, _, video_ts = get_latest_media(src, "videos", ".mp4")
+        photo_url, photo_time, photo_mtime = get_latest_media(src, "photos", ".jpg")
+        video_url, _, video_mtime = get_latest_media(src, "videos", ".mp4")
 
         # If video is older than photo, hide the video URL (reset to None)
-        if video_ts and photo_ts and video_ts < photo_ts:
+        if video_mtime and photo_mtime and video_mtime < photo_mtime:
             video_url = None
 
         response_data[src] = {
