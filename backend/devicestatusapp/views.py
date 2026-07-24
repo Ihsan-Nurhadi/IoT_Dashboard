@@ -288,7 +288,7 @@ def capture_photo(request):
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         # Save single historical image (no latest file clone)
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
         filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = os.path.join(output_dir, filename)
         cv2.imwrite(filepath, frame)
@@ -318,7 +318,7 @@ def capture_video(request):
     output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "videos")
     os.makedirs(output_dir, exist_ok=True)
 
-    now = timezone.now()
+    now = timezone.localtime(timezone.now())
     filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
     filepath = os.path.join(output_dir, filename)
 
