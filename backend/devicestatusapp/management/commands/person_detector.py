@@ -192,9 +192,10 @@ class CameraMonitorThread(threading.Thread):
                     consecutive_failures += 1
                     
                     if consecutive_failures >= 3:
-                        self.log_message("ONVIF connection repeatedly failed. Falling back to 1.5s POLLING mode...", self.style.WARNING)
-                        self.run_polling_loop(model, output_dir)
-                        return
+                        self.log_message("ONVIF connection repeatedly failed. Waiting 30s before retrying ONVIF connection...", self.style.WARNING)
+                        time.sleep(30)
+                        consecutive_failures = 0
+                        continue
                     
                     time.sleep(5)
                     continue
