@@ -288,7 +288,7 @@ def capture_photo(request):
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         # Save single historical image (no latest file clone)
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
         filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = os.path.join(output_dir, filename)
         cv2.imwrite(filepath, frame)
@@ -318,7 +318,7 @@ def capture_video(request):
     output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "videos")
     os.makedirs(output_dir, exist_ok=True)
 
-    now = timezone.now()
+    now = timezone.localtime(timezone.now())
     filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
     filepath = os.path.join(output_dir, filename)
 
@@ -469,7 +469,7 @@ def cctv_latest(request):
             
         filepath = os.path.join(directory, latest_file)
         mtime = os.path.getmtime(filepath)
-        dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+        dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
         formatted_time = dt.strftime("%b %d, %I:%M %p")
         
         return f"/media/cctv/{folder}/{latest_file}", formatted_time, ts_str
@@ -527,7 +527,7 @@ def cctv_history(request):
     for f in files:
         filepath = os.path.join(directory, f)
         mtime = os.path.getmtime(filepath)
-        dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+        dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
         
         # Parse camera name
         cam_label = "Kamera #1"
@@ -589,7 +589,7 @@ def cctv_alerts(request):
         for f in auto_files:
             filepath = os.path.join(directory, f)
             mtime = os.path.getmtime(filepath)
-            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+            dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
             
             cam_label = "Kamera #1"
             if f.startswith("cctv2"):
@@ -614,7 +614,7 @@ def cctv_alerts(request):
         for f in pir_files:
             filepath = os.path.join(directory, f)
             mtime = os.path.getmtime(filepath)
-            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+            dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
             
             parts = os.path.splitext(f)[0].split('_pir_')
             ts_key = parts[1] if len(parts) > 1 else str(int(mtime))
