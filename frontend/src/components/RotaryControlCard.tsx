@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import Card from './Card';
 import './RotaryControlCard.css';
-import { PiSiren } from "react-icons/pi";
-import { FaPlay, FaStop } from 'react-icons/fa';
+import { FaLightbulb } from 'react-icons/fa';
 
-
-const API_URL = "/api/send-rotary/"; // sesuaikan
+const API_URL = "/api/send-rotary/";
 
 const RotaryControlCard: React.FC = () => {
   const [isMotorOn, setIsMotorOn] = useState(false);
@@ -29,46 +27,36 @@ const RotaryControlCard: React.FC = () => {
     }
   };
 
+  const handleToggle = () => {
+    if (loading) return;
+    const nextState = isMotorOn ? 0 : 1;
+    sendStatus(nextState);
+  };
+
   return (
     <Card className="rotary-control-card">
-      <div className="card-header">
-        <div className="icon-container rotary">
-          <PiSiren />
+      <div className="lampu-card-content">
+        <div className="lampu-left">
+          <div className="icon-container rotary">
+            <FaLightbulb />
+          </div>
+          <div className="header-text">
+            <h3 className="card-title">Lampu</h3>
+            <p className="card-subtitle">Rotary Light</p>
+          </div>
         </div>
-        <div className="header-text">
-          <h3 className="card-title">Rotary Control</h3>
-          <p className="card-subtitle">Motor operation control</p>
+
+        <div className="lampu-right">
+          <span className="switch-label">{isMotorOn ? 'ON' : 'OFF'}</span>
+          <button 
+            className={`toggle-switch-btn ${isMotorOn ? 'on' : 'off'}`}
+            onClick={handleToggle}
+            disabled={loading}
+            title={isMotorOn ? "Matikan Lampu" : "Nyalakan Lampu"}
+          >
+            <span className="toggle-switch-slider"></span>
+          </button>
         </div>
-      </div>
-
-      <div className="rotary-status-container">
-        <div className={`rotary-indicator ${isMotorOn ? 'motor-on' : ''}`} />
-      </div>
-
-      <div className="motor-status">
-        <FaPlay className="motor-status-icon" />
-        <span>Motor Status</span>
-        <span className={`motor-status-badge ${isMotorOn ? 'on' : ''}`}>
-          {isMotorOn ? 'Running' : 'Stopped'}
-        </span>
-      </div>
-
-      <div className="control-buttons">
-        <button
-          className={`control-button on ${isMotorOn ? 'active' : ''}`}
-          onClick={() => sendStatus(1)}
-          disabled={loading}
-        >
-          <FaPlay /> Turn ON
-        </button>
-
-        <button
-          className={`control-button off ${!isMotorOn ? 'active' : ''}`}
-          onClick={() => sendStatus(0)}
-          disabled={loading}
-        >
-          <FaStop /> Turn OFF
-        </button>
       </div>
     </Card>
   );

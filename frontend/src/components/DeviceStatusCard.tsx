@@ -89,6 +89,21 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
   // Jika Pintu: OPEN = Active (Hijau)
   // Jika PLN: Active/ON = Active (Hijau)
   // Jika Motion: Detected = Active (Hijau)
+  // --- LOGIC DISPLAY LABELS & STATUS ---
+  let displayTitle = deviceName;
+  if (isPLN) displayTitle = "Power Device";
+  if (isDoorPanel) displayTitle = "Pintu";
+
+  const getStatusText = () => {
+    if (isPLN) {
+      return currentStatus === "Active" || currentStatus === "ON" ? "ON" : "OFF";
+    }
+    if (isDoorPanel) {
+      return currentStatus.toUpperCase() === "OPEN" ? "Terbuka" : "Tertutup";
+    }
+    return currentStatus;
+  };
+
   const isActive =
     currentStatus.toUpperCase() === "OPEN" ||
     currentStatus === "Active" ||
@@ -106,13 +121,10 @@ const DeviceStatusCard: React.FC<DeviceStatusCardProps> = ({
           {getIcon()}
         </div>
         <div className="device-info">
-          <h3 className="device-name">{deviceName}</h3>
-          <p className="device-type">{deviceType}</p>
-          <p className="timestamp">
-            {lastUpdated}
-          </p>
+          <h3 className="device-name">{displayTitle}</h3>
+          <p className="timestamp">{lastUpdated}</p>
         </div>
-        <div className={`status-badge ${statusClass}`}>{currentStatus}</div>
+        <div className={`status-badge ${statusClass}`}>{getStatusText()}</div>
       </div>
     </Card>
   );

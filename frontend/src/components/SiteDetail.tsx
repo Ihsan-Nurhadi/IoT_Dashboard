@@ -15,6 +15,7 @@ import {
   FaMinusCircle
 } from 'react-icons/fa';
 import { PiSiren } from 'react-icons/pi';
+import DetectionLogsTable from './DetectionLogsTable';
 import './SiteDetail.css';
 
 interface MediaItem {
@@ -191,6 +192,9 @@ const SiteDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 1.5 Detection Logs Section (Person Detector & PIR Detection) */}
+      <DetectionLogsTable />
 
       {/* 2. Device Control & Door Parameter Log Section */}
       <div className="device-cards-grid">

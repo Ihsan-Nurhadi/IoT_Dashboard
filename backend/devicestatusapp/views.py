@@ -700,3 +700,147 @@ def get_door_logs(request):
         "total_pages": total_pages,
         "current_page": page
     })
+
+@csrf_exempt
+def cctv_detection_logs(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "GET only"}, status=405)
+
+    category = request.GET.get("category", "all").lower()  # "all", "gerakan" (pir), "orang" (person)
+    start_date_str = request.GET.get("start_date")
+    end_date_str = request.GET.get("end_date")
+    page = int(request.GET.get("page", 1))
+    limit = int(request.GET.get("limit", 10))
+
+    directory = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
+    if not os.path.exists(directory):
+        return JsonResponse({
+            "items": [],
+            "total_count": 0,
+            "total_pages": 1,
+            "current_page": page
+        })
+
+    all_files = os.listdir(directory)
+    items = []
+
+    # Parse optional ISO date range filters
+    start_dt = None
+    end_dt = None
+    if start_date_str:
+        try:
+            start_dt = timezone.datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+        except Exception:
+            pass
+    if end_date_str:
+        try:
+            end_dt = timezone.datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+        except Exception:
+            pass
+
+    # 1. Camera Person Detection Logs (_auto_)
+    if category in ["all", "orang", "person"]:
+        auto_files = [f for f in all_files if f.endswith(".jpg") and "_auto_" in f]
+        for f in auto_files:
+            filepath = os.path.join(directory, f)
+            mtime = os.path.getmtime(filepath)
+            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+            
+            if start_dt and dt < start_dt:
+                continue
+            if end_dt and dt > end_dt:
+                continue
+
+            cam_label = "Cam 1"
+            video_src = "cctv"
+            if f.startswith("cctv2"):
+                cam_label = "Cam 2"
+                video_src = "cctv2"
+
+            # Companion video url if available
+            video_url = None
+            video_name = f.replace(".jpg", ".mp4")
+            video_path = os.path.join(settings.MEDIA_ROOT, "cctv", "videos", video_name)
+            if os.path.exists(video_path):
+                video_url = f"/media/cctv/videos/{video_name}"
+
+            formatted_time = dt.strftime("%d %b %Y, %I:%M %p")
+
+            items.append({
+                "id": f,
+                "type": "person",
+                "type_label": "Orang x1",
+                "camera": cam_label,
+                "video_src": video_src,
+                "photo_url": f"/media/cctv/photos/{f}",
+                "video_url": video_url,
+                "timestamp": formatted_time,
+                "raw_time": dt.isoformat(),
+                "mtime": mtime
+            })
+
+    # 2. PIR Motion Sensor Logs (_pir_)
+    if category in ["all", "gerakan", "pir", "sensor"]:
+        pir_files = [f for f in all_files if f.endswith(".jpg") and "_pir_" in f]
+        pir_groups = {}
+        for f in pir_files:
+            filepath = os.path.join(directory, f)
+            mtime = os.path.getmtime(filepath)
+            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+
+            if start_dt and dt < start_dt:
+                continue
+            if end_dt and dt > end_dt:
+                continue
+
+            parts = os.path.splitext(f)[0].split('_pir_')
+            ts_key = parts[1] if len(parts) > 1 else str(int(mtime))
+
+            cam_label = "Cam 1"
+            video_src = "cctv"
+            if f.startswith("cctv2"):
+                cam_label = "Cam 2"
+                video_src = "cctv2"
+
+            if ts_key not in pir_groups:
+                pir_groups[ts_key] = {
+                    "file": f,
+                    "mtime": mtime,
+                    "dt": dt,
+                    "camera": cam_label,
+                    "video_src": video_src
+                }
+
+        for ts_key, data in pir_groups.items():
+            f = data["file"]
+            dt = data["dt"]
+            formatted_time = dt.strftime("%d %b %Y, %I:%M %p")
+            items.append({
+                "id": f"pir_{ts_key}",
+                "type": "motion",
+                "type_label": "Motion Detected",
+                "camera": data["camera"],
+                "video_src": data["video_src"],
+                "photo_url": f"/media/cctv/photos/{f}",
+                "video_url": None,
+                "timestamp": formatted_time,
+                "raw_time": dt.isoformat(),
+                "mtime": data["mtime"]
+            })
+
+    # Sort descending by mtime (newest detection first)
+    items.sort(key=lambda x: x["mtime"], reverse=True)
+
+    total_count = len(items)
+    import math
+    total_pages = math.ceil(total_count / limit) or 1
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    paginated_items = items[start_idx:end_idx]
+
+    return JsonResponse({
+        "items": paginated_items,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": page
+    })

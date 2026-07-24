@@ -1,21 +1,30 @@
 import React, { useState } from "react";
-import { BsSpeakerFill } from "react-icons/bs";
 import {
-  FaMusic,
-  FaRegPlayCircle,
-  FaVolumeDown,
   FaVolumeUp,
+  FaVolumeDown,
+  FaMicrophone,
+  FaBullhorn,
+  FaExclamationTriangle,
+  FaBell,
 } from "react-icons/fa";
+import { PiSiren } from "react-icons/pi";
 import "./AudioControlCard.css";
 import Card from "./Card";
 
-const audioChannels = [
-  "Audio 1",
-  "Audio 2",
-  "Audio 3",
-  "Audio 4",
-  "Audio 5",
-  "Audio 6",
+interface SirineButton {
+  id: string;
+  label: string;
+  sirenNum: string;
+  icon: React.ReactNode;
+}
+
+const sirineButtons: SirineButton[] = [
+  { id: "s1", label: "Suara 1", sirenNum: "1", icon: <FaMicrophone /> },
+  { id: "s2", label: "Suara 2", sirenNum: "2", icon: <FaMicrophone /> },
+  { id: "s3", label: "Suara 3", sirenNum: "3", icon: <FaBullhorn /> },
+  { id: "polisi", label: "Polisi", sirenNum: "4", icon: <PiSiren /> },
+  { id: "darurat", label: "Darurat", sirenNum: "5", icon: <FaExclamationTriangle /> },
+  { id: "beep", label: "Beep", sirenNum: "6", icon: <FaBell /> },
 ];
 
 const AudioControlCard: React.FC = () => {
@@ -55,15 +64,13 @@ const AudioControlCard: React.FC = () => {
     }
   };
 
-  const handleChannelClick = async (channel: string) => {
-    const isDeactivating = selectedChannel === channel;
-    const nextChannel = isDeactivating ? null : channel;
+  const handleChannelClick = async (btn: SirineButton) => {
+    const isDeactivating = selectedChannel === btn.id;
+    const nextChannel = isDeactivating ? null : btn.id;
     setSelectedChannel(nextChannel);
 
     if (nextChannel) {
-      const numMatch = nextChannel.match(/\d+/);
-      const sirenNum = numMatch ? numMatch[0] : "1";
-      await sendMqttCommand(`SIREN${sirenNum}ON`, volume);
+      await sendMqttCommand(`SIREN${btn.sirenNum}ON`, volume);
     } else {
       await sendMqttCommand("SIREN#OFF");
     }
@@ -73,18 +80,18 @@ const AudioControlCard: React.FC = () => {
     <Card className="audio-control-card">
       <div className="card-header">
         <div className="icon-container audio">
-          <BsSpeakerFill />
+          <FaVolumeUp />
         </div>
         <div className="header-text">
-          <h3 className="card-title">Audio Control</h3>
-          <p className="card-subtitle">Select audio channel</p>
+          <h3 className="card-title">Sirine</h3>
+          <p className="card-subtitle">Audio Broadcast</p>
         </div>
         <div className="volume-control">
           <button
             className="volume-button"
             onClick={() => setShowVolume(!showVolume)}
+            title="Adjust Volume"
           >
-            <span>Adjust Volume</span>
             <FaVolumeUp />
           </button>
           {showVolume && (
@@ -112,31 +119,19 @@ const AudioControlCard: React.FC = () => {
         </div>
       </div>
       <div className="audio-channels">
-        {audioChannels.map((channel) => (
+        {sirineButtons.map((btn) => (
           <button
-            key={channel}
+            key={btn.id}
             className={`channel-button ${
-              selectedChannel === channel ? "active" : ""
+              selectedChannel === btn.id ? "active" : ""
             }`}
-            onClick={() => handleChannelClick(channel)}
+            onClick={() => handleChannelClick(btn)}
           >
-            <FaMusic />
-            <span>{channel}</span>
+            <span className="btn-icon">{btn.icon}</span>
+            <span className="btn-label">{btn.label}</span>
           </button>
         ))}
       </div>
-      {selectedChannel && (
-        <div className="active-channel-display">
-          <div className="active-channel-info">
-            <FaRegPlayCircle />
-            <span>Active Channel</span>
-          </div>
-          <div className="active-channel-name">
-            <span className="active-dot"></span>
-            {selectedChannel}
-          </div>
-        </div>
-      )}
     </Card>
   );
 };

@@ -1,51 +1,128 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 html {
-  font-size: 18px; /* Base font size */
+  font-size: 16px;
 }
 
-:root {
-  --background-color: #f4f7fa;
-  --card-background: #ffffff;
-  --text-color: #1e293b;
-  --secondary-text-color: #64748b;
+*,
+*::before,
+*::after,
+::backdrop {
+  box-sizing: border-box;
+}
+
+/* Light Theme (Default & .light / [data-theme="light"]) */
+:root,
+:root[data-theme="light"],
+.light {
+  color-scheme: light;
+  --lightningcss-light: initial;
+  --lightningcss-dark: ;
+  
+  --background: oklch(100% 0 0);
+  --foreground: oklch(14.5% 0 0);
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(14.5% 0 0);
+  --popover: oklch(100% 0 0);
+  --popover-foreground: oklch(14.5% 0 0);
+  --primary: oklch(20.5% 0 0);
+  --primary-foreground: oklch(98.5% 0 0);
+  --secondary: oklch(97% 0 0);
+  --secondary-foreground: oklch(20.5% 0 0);
+  --muted: oklch(97% 0 0);
+  --muted-foreground: oklch(55.6% 0 0);
+  --accent: oklch(97% 0 0);
+  --accent-foreground: oklch(20.5% 0 0);
+  --destructive: oklch(57.7% .245 27.325);
+  --border: oklch(92.2% 0 0);
+  --input: oklch(92.2% 0 0);
+  --ring: oklch(70.8% 0 0);
+
+  /* Legacy Mapping for compatibility */
+  --background-color: var(--background);
+  --card-background: var(--card);
+  --text-color: var(--foreground);
+  --secondary-text-color: var(--muted-foreground);
+  --border-color: var(--border);
+
   --accent-color-green: #10b981;
   --accent-color-blue: #3b82f6;
   --accent-color-purple: #8b5cf6;
   --accent-color-orange: #f97316;
-  --border-color: #e2e8f0;
 
   font-family: "Inter", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: var(--text-color);
-  background-color: var(--background-color);
+  color: var(--foreground);
+  background-color: var(--background);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+/* Dark Theme (.dark / [data-theme="dark"]) */
+:root[data-theme="dark"],
+.dark {
+  color-scheme: dark;
+  --background: oklch(14.5% 0 0);
+  --foreground: oklch(98.5% 0 0);
+  --card: oklch(20.5% 0 0);
+  --card-foreground: oklch(98.5% 0 0);
+  --popover: oklch(20.5% 0 0);
+  --popover-foreground: oklch(98.5% 0 0);
+  --primary: oklch(92.2% 0 0);
+  --primary-foreground: oklch(20.5% 0 0);
+  --secondary: oklch(26.9% 0 0);
+  --secondary-foreground: oklch(98.5% 0 0);
+  --muted: oklch(26.9% 0 0);
+  --muted-foreground: oklch(70.8% 0 0);
+  --accent: oklch(26.9% 0 0);
+  --accent-foreground: oklch(98.5% 0 0);
+  --destructive: oklch(70.4% .191 22.216);
+  --border: oklch(100% 0 0 / .1);
+  --input: oklch(100% 0 0 / .15);
+  --ring: oklch(55.6% 0 0);
+  --chart-1: oklch(48.8% .243 264.376);
+  --chart-2: oklch(69.6% .17 162.48);
+  --chart-3: oklch(76.9% .188 70.08);
+  --chart-4: oklch(62.7% .265 303.9);
+  --chart-5: oklch(64.5% .246 16.439);
+  --sidebar: oklch(20.5% 0 0);
+  --sidebar-foreground: oklch(98.5% 0 0);
+  --sidebar-primary: oklch(48.8% .243 264.376);
+  --sidebar-primary-foreground: oklch(98.5% 0 0);
+  --sidebar-accent: oklch(26.9% 0 0);
+  --sidebar-accent-foreground: oklch(98.5% 0 0);
+  --sidebar-border: oklch(100% 0 0 / .1);
+  --sidebar-ring: oklch(55.6% 0 0);
+
+  /* Legacy Mapping for compatibility */
+  --background-color: var(--background);
+  --card-background: var(--card);
+  --text-color: var(--foreground);
+  --secondary-text-color: var(--muted-foreground);
+  --border-color: var(--border);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-:root[data-theme="dark"] {
-  --background-color: #0b0f19;
-  --card-background: #111827;
-  --text-color: #f8fafc;
-  --secondary-text-color: #94a3b8;
-  --border-color: #1f2937;
+@supports (color: color-mix(in lab, red, red)) {
+  * {
+    outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  }
+}
+
+* {
+  border-color: var(--border);
+  outline-color: var(--ring);
 }
 
 

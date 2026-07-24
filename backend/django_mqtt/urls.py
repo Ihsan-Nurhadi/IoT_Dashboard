@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/cctv/latest/', dorlock_views.cctv_latest, name='cctv_latest'),
     path('api/cctv/history/', dorlock_views.cctv_history, name='cctv_history'),
     path('api/cctv/alerts/', dorlock_views.cctv_alerts, name='cctv_alerts'),
+    path('api/cctv/detection-logs/', dorlock_views.cctv_detection_logs, name='cctv_detection_logs'),
     path('api/door-logs/', dorlock_views.get_door_logs, name='get_door_logs'),
     # path('', include('gps_tracer.urls')),
 ]
