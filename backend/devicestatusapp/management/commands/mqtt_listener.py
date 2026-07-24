@@ -46,7 +46,7 @@ def trigger_pir_cctv_snapshot(stdout=None):
                         cap.grab()
                     ret, frame = cap.retrieve()
                     if ret and frame is not None:
-                        now = timezone.localtime(timezone.now())
+                        now = timezone.now()
                         timestamp = now.strftime('%Y%m%d_%H%M%S')
                         filename = f"{camera_id}_pir_{timestamp}.jpg"
                         filepath = os.path.join(output_dir, filename)

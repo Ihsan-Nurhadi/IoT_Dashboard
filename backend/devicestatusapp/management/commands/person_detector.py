@@ -315,7 +315,7 @@ class CameraMonitorThread(threading.Thread):
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
                         # Save proof
-                        now = timezone.localtime(timezone.now())
+                        now = timezone.now()
                         timestamp = now.strftime('%Y%m%d_%H%M%S')
                         filename = f"{self.camera_id}_auto_{timestamp}.jpg"
                         filepath = os.path.join(output_dir, filename)
@@ -382,7 +382,7 @@ class CameraMonitorThread(threading.Thread):
                             cv2.putText(frame, label, (x1, y1 - 10), 
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                        now = timezone.localtime(timezone.now())
+                        now = timezone.now()
                         filename = f"{self.camera_id}_auto_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
                         filepath = os.path.join(output_dir, filename)
                         cv2.imwrite(filepath, frame)

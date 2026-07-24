@@ -288,7 +288,7 @@ def capture_photo(request):
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         # Save single historical image (no latest file clone)
-        now = timezone.localtime(timezone.now())
+        now = timezone.now()
         filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = os.path.join(output_dir, filename)
         cv2.imwrite(filepath, frame)
@@ -318,7 +318,7 @@ def capture_video(request):
     output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "videos")
     os.makedirs(output_dir, exist_ok=True)
 
-    now = timezone.localtime(timezone.now())
+    now = timezone.now()
     filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
     filepath = os.path.join(output_dir, filename)
 
@@ -454,28 +454,33 @@ def cctv_latest(request):
     def get_latest_media(src, folder, extension):
         directory = os.path.join(settings.MEDIA_ROOT, "cctv", folder)
         if not os.path.exists(directory):
-            return None, "-", 0
+            return None, "-", None
         files = [f for f in os.listdir(directory) if f.startswith(src) and f.endswith(extension) and "_latest" not in f]
         if not files:
-            return None, "-", 0
+            return None, "-", None
         # Sort by mtime so newest timestamp is last
         files.sort(key=lambda x: os.path.getmtime(os.path.join(directory, x)))
         latest_file = files[-1]
+        
+        # Extract numeric timestamp segments dynamically (e.g. ['20260721', '092800'])
+        parts = os.path.splitext(latest_file)[0].split('_')
+        numeric_parts = [p for p in parts if p.isdigit()]
+        ts_str = "_".join(numeric_parts)
             
         filepath = os.path.join(directory, latest_file)
         mtime = os.path.getmtime(filepath)
-        dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
+        dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
         formatted_time = dt.strftime("%b %d, %I:%M %p")
         
-        return f"/media/cctv/{folder}/{latest_file}", formatted_time, mtime
+        return f"/media/cctv/{folder}/{latest_file}", formatted_time, ts_str
 
     response_data = {}
     for src in ["cctv", "cctv2"]:
-        photo_url, photo_time, photo_mtime = get_latest_media(src, "photos", ".jpg")
-        video_url, _, video_mtime = get_latest_media(src, "videos", ".mp4")
+        photo_url, photo_time, photo_ts = get_latest_media(src, "photos", ".jpg")
+        video_url, _, video_ts = get_latest_media(src, "videos", ".mp4")
 
         # If video is older than photo, hide the video URL (reset to None)
-        if video_mtime and photo_mtime and video_mtime < photo_mtime:
+        if video_ts and photo_ts and video_ts < photo_ts:
             video_url = None
 
         response_data[src] = {
@@ -522,7 +527,7 @@ def cctv_history(request):
     for f in files:
         filepath = os.path.join(directory, f)
         mtime = os.path.getmtime(filepath)
-        dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
+        dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
         
         # Parse camera name
         cam_label = "Kamera #1"
@@ -584,7 +589,7 @@ def cctv_alerts(request):
         for f in auto_files:
             filepath = os.path.join(directory, f)
             mtime = os.path.getmtime(filepath)
-            dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
+            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
             
             cam_label = "Kamera #1"
             if f.startswith("cctv2"):
@@ -609,7 +614,7 @@ def cctv_alerts(request):
         for f in pir_files:
             filepath = os.path.join(directory, f)
             mtime = os.path.getmtime(filepath)
-            dt = timezone.localtime(timezone.datetime.fromtimestamp(mtime, tz=timezone.utc))
+            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
             
             parts = os.path.splitext(f)[0].split('_pir_')
             ts_key = parts[1] if len(parts) > 1 else str(int(mtime))
