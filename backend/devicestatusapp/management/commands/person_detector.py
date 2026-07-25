@@ -129,9 +129,12 @@ class CameraMonitorThread(threading.Thread):
             topic_lower = topic.lower()
             topic_triggers = ["motion", "alarm", "people", "tamper", "linecross", "detector"]
             if not any(t in topic_lower for t in topic_triggers):
-                return False
+                return False, False
 
             self.log_message(f"Processing event topic '{topic}'. Notification data: {n}")
+
+            is_motion = False
+            is_people = "people" in topic_lower
 
             # Extract message details
             if hasattr(n, 'Message') and n.Message:
@@ -153,7 +156,9 @@ class CameraMonitorThread(threading.Thread):
                             val = item.attrib.get('Value') or item.attrib.get('value', '')
                             self.log_message(f"Parsed XML SimpleItem - Name: '{name}', Value: '{val}'")
                             if name in ["State", "IsMotion", "IsPeople", "IsLineCross", "IsTamper", "Active"] and str(val).lower() in ["true", "1"]:
-                                return True
+                                is_motion = True
+                                if name == "IsPeople":
+                                    is_people = True
                 else:
                     # Fallback to Python object attribute parsing
                     if hasattr(message, 'Data') and message.Data:
@@ -169,10 +174,14 @@ class CameraMonitorThread(threading.Thread):
                             val = getattr(item, '_attr_Value', '') or getattr(item, 'Value', '')
                             self.log_message(f"Parsed Obj SimpleItem - Name: '{name}', Value: '{val}' (type: {type(val)})")
                             if name in ["State", "IsMotion", "IsPeople", "IsLineCross", "IsTamper", "Active"] and str(val).lower() in ["true", "1"]:
-                                return True
+                                is_motion = True
+                                if name == "IsPeople":
+                                    is_people = True
+
+            return is_motion, is_people
         except Exception as e:
             self.log_message(f"Error in check_for_motion: {e}", level="error")
-        return False
+        return False, False
 
     def run_onvif_loop(self, model, output_dir):
         self.log_message("Running in EVENT-DRIVEN ONVIF mode...", self.style.SUCCESS)
@@ -210,16 +219,20 @@ class CameraMonitorThread(threading.Thread):
                         notifications = [notifications]
                         
                     motion_detected = False
+                    people_detected = False
                     for n in notifications:
                         topic = getattr(n, 'Topic', None)
                         topic_val = getattr(topic, '_value_1', None) or str(topic)
                         self.log_message(f"Notification received (Topic: {topic_val})")
-                        if self.check_for_motion(n):
+                        is_m, is_p = self.check_for_motion(n)
+                        if is_m:
                             motion_detected = True
+                        if is_p:
+                            people_detected = True
                             
                     if motion_detected:
-                        self.log_message("ONVIF Motion detected! Analyzing via YOLO...", self.style.WARNING)
-                        self.trigger_yolo_check(model, output_dir)
+                        self.log_message(f"ONVIF Motion detected (is_people={people_detected})! Analyzing via YOLO...", self.style.WARNING)
+                        self.trigger_yolo_check(model, output_dir, onvif_is_people=people_detected)
                         
             except Exception as e:
                 self.log_message(f"ONVIF Event Loop Error: {e}", self.style.ERROR)
@@ -262,10 +275,10 @@ class CameraMonitorThread(threading.Thread):
 
         threading.Thread(target=run_ffmpeg, daemon=True).start()
 
-    def trigger_yolo_check(self, model, output_dir):
+    def trigger_yolo_check(self, model, output_dir, onvif_is_people=False):
         cap = None
         try:
-            self.log_message("Starting YOLO trigger check (checking frames over 2.5s)...")
+            self.log_message(f"Starting YOLO trigger check (checking frames over 2.5s, onvif_is_people={onvif_is_people})...")
             os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
             cap = cv2.VideoCapture(self.rtsp_url)
             if not cap.isOpened():
@@ -274,13 +287,16 @@ class CameraMonitorThread(threading.Thread):
 
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-            # We will check multiple times over a 2.5-second window
-            check_interval = 0.5  # seconds
-            num_checks = 5
+            check_interval = 0.4  # seconds
+            num_checks = 6
+            
+            best_frame = None
+            detected_person = False
+            boxes = []
             
             for check_idx in range(num_checks):
                 # Flush buffer
-                for _ in range(15):
+                for _ in range(8):
                     cap.grab()
                 ret, frame = cap.retrieve()
                 if not ret or frame is None:
@@ -288,52 +304,67 @@ class CameraMonitorThread(threading.Thread):
                     time.sleep(check_interval)
                     continue
 
-                # Run person detection with confidence >= 0.35
-                results = model(frame, classes=[0], conf=0.35, verbose=False)
+                if best_frame is None:
+                    best_frame = frame.copy()
+
+                # Run person detection with conf >= 0.25 (lower threshold for night/distance)
+                results = model(frame, classes=[0], conf=0.25, verbose=False)
                 
-                detected_person = False
-                boxes = []
+                cur_boxes = []
                 for r in results:
                     for box in r.boxes:
                         detected_person = True
                         x1, y1, x2, y2 = box.xyxy[0]
                         conf = float(box.conf[0])
-                        boxes.append((int(x1), int(y1), int(x2), int(y2), conf))
+                        cur_boxes.append((int(x1), int(y1), int(x2), int(y2), conf))
 
                 if detected_person:
-                    self.log_message(f"YOLO confirmed PERSON at check {check_idx+1}/{num_checks} (conf >= 0.35)", self.style.SUCCESS)
-                    
-                    now_time = time.time()
-                    if now_time - self.last_capture_time >= self.cooldown:
-                        self.last_capture_time = now_time
-
-                        # Draw bounding boxes
-                        for (x1, y1, x2, y2, conf) in boxes:
-                            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                            label = f"Person {conf:.2f}"
-                            cv2.putText(frame, label, (x1, y1 - 10), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-                        # Save proof
-                        now = timezone.now()
-                        timestamp = now.strftime('%Y%m%d_%H%M%S')
-                        filename = f"{self.camera_id}_auto_{timestamp}.jpg"
-                        filepath = os.path.join(output_dir, filename)
-                        os.makedirs(output_dir, exist_ok=True)  # Re-create if manually deleted in runtime
-                        cv2.imwrite(filepath, frame)
-
-                        self.log_message(f"Screenshot saved: {filename}", self.style.SUCCESS)
-                        
-                        # Start video recording
-                        self.record_video_async(timestamp)
-                    else:
-                        self.log_message("Person detected but cooldown active. Skipping screenshot and video recording.")
-                    
-                    return  # Stop checking since we already found a person
+                    self.log_message(f"YOLO confirmed PERSON at check {check_idx+1}/{num_checks} (conf >= 0.25)", self.style.SUCCESS)
+                    best_frame = frame
+                    boxes = cur_boxes
+                    break
 
                 time.sleep(check_interval)
 
-            self.log_message("YOLO check complete: No person detected in any checked frame.")
+            now_time = time.time()
+            if now_time - self.last_capture_time < self.cooldown:
+                self.log_message("Cooldown active. Skipping screenshot and video recording.")
+                return
+
+            # If YOLO detected a person OR ONVIF explicitly reported IsPeople/PeopleDetector = true:
+            if detected_person or onvif_is_people:
+                self.last_capture_time = now_time
+
+                save_frame = best_frame if best_frame is not None else frame
+
+                if detected_person:
+                    # Draw bounding boxes
+                    for (x1, y1, x2, y2, conf) in boxes:
+                        cv2.rectangle(save_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        label = f"Person {conf:.2f}"
+                        cv2.putText(save_frame, label, (x1, y1 - 10), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                else:
+                    # Fallback label for ONVIF Tapo AI detection when YOLO missed bounding box due to RTSP delay/night vision
+                    self.log_message("YOLO missed bounding box, but Tapo ONVIF confirmed IsPeople=true. Saving Tapo AI proof snapshot!", self.style.WARNING)
+                    cv2.putText(save_frame, "Person (Tapo AI)", (20, 40), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+                # Save proof image
+                now = timezone.now()
+                timestamp = now.strftime('%Y%m%d_%H%M%S')
+                filename = f"{self.camera_id}_auto_{timestamp}.jpg"
+                filepath = os.path.join(output_dir, filename)
+                os.makedirs(output_dir, exist_ok=True)
+                cv2.imwrite(filepath, save_frame)
+
+                self.log_message(f"Detection proof saved: {filename}", self.style.SUCCESS)
+                
+                # Start 10s video recording
+                self.record_video_async(timestamp)
+            else:
+                self.log_message("YOLO check complete: No person detected in any checked frame.")
+
         except Exception as err:
             self.log_message(f"trigger_yolo_check error: {err}", self.style.ERROR)
         finally:
