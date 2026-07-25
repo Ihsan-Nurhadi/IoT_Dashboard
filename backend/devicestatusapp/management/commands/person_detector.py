@@ -424,6 +424,31 @@ class CameraMonitorThread(threading.Thread):
 
             time.sleep(1.5)
 
+class MediaCleanupThread(threading.Thread):
+    def __init__(self, stdout, style):
+        super().__init__()
+        self.stdout = stdout
+        self.style = style
+        self.running = True
+        self.daemon = True
+
+    def run(self):
+        from django.core.management import call_command
+        # Wait 10s on startup before first cleanup
+        time.sleep(10)
+        while self.running:
+            try:
+                self.stdout.write(self.style.WARNING("[CleanupWorker] Running automatic background CCTV media cleanup..."))
+                call_command('cleanup_media', days=7, max_size=2000, target_size=1500)
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"[CleanupWorker] Automatic media cleanup error: {e}"))
+            
+            # Sleep 1 hour (3600s)
+            for _ in range(3600):
+                if not self.running:
+                    break
+                time.sleep(1)
+
     def stop(self):
         self.running = False
 
@@ -470,8 +495,14 @@ class Command(BaseCommand):
             style=self.style
         )
 
+        tc = MediaCleanupThread(
+            stdout=self.stdout,
+            style=self.style
+        )
+
         t1.start()
         t2.start()
+        tc.start()
 
         try:
             while True:
@@ -480,6 +511,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("\nStopping monitors..."))
             t1.stop()
             t2.stop()
+            tc.stop()
             t1.join()
             t2.join()
             self.stdout.write(self.style.SUCCESS("Monitors stopped successfully."))
