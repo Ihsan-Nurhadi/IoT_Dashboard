@@ -13,8 +13,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         retention_days = options['days']
-        max_size_mb = options['max-size']
-        target_size_mb = options['target-size']
+        max_size_mb = options.get('max_size', options.get('max-size', 2000))
+        target_size_mb = options.get('target_size', options.get('target-size', 1500))
         
         self.stdout.write(self.style.WARNING(
             f"Starting CCTV media cleanup... Policy: Age > {retention_days} days OR Capacity > {max_size_mb} MB"
