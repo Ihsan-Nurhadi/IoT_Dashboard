@@ -2,6 +2,7 @@ import os
 import time
 import cv2
 import threading
+import concurrent.futures
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.conf import settings
@@ -20,6 +21,7 @@ class CameraMonitorThread(threading.Thread):
         self.running = True
         self.last_capture_time = 0.0
         self.cooldown = 30.0  # 30 seconds cooldown between auto-screenshots
+        self.daemon = True   # Thread dies with main process
 
     def log_message(self, text, style_fn=None, level="info"):
         # Format text
@@ -41,21 +43,43 @@ class CameraMonitorThread(threading.Thread):
             pass
 
     def run(self):
-        self.log_message(f"Initializing YOLO model for {self.camera_id}...", self.style.WARNING)
-        try:
-            from ultralytics import YOLO
-            # Load yolov8n model locally for this thread
-            model = YOLO("yolov8n.pt")
-            self.log_message(f"YOLO model loaded successfully for {self.camera_id}", self.style.SUCCESS)
-        except Exception as e:
-            self.log_message(f"Failed to load YOLO: {e}", self.style.ERROR)
-            return
+        """
+        Outer restart loop: if run_onvif_loop() crashes for any reason,
+        this will wait 30s and restart everything (including YOLO model reload).
+        This ensures the thread NEVER dies permanently.
+        """
+        while self.running:
+            try:
+                self.log_message(f"Initializing YOLO model for {self.camera_id}...", self.style.WARNING)
+                try:
+                    from ultralytics import YOLO
+                    # Load yolov8n model locally for this thread
+                    model = YOLO("yolov8n.pt")
+                    self.log_message(f"YOLO model loaded successfully for {self.camera_id}", self.style.SUCCESS)
+                except Exception as e:
+                    self.log_message(f"Failed to load YOLO: {e}. Retrying in 30s...", self.style.ERROR, level="error")
+                    time.sleep(30)
+                    continue
 
-        # Ensure output directory exists
-        output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
-        os.makedirs(output_dir, exist_ok=True)
+                # Ensure output directory exists
+                output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
+                os.makedirs(output_dir, exist_ok=True)
 
-        self.run_onvif_loop(model, output_dir)
+                self.run_onvif_loop(model, output_dir)
+
+            except Exception as e:
+                self.log_message(
+                    f"FATAL: Unhandled exception in main run loop: {e}. Restarting in 30s...",
+                    self.style.ERROR,
+                    level="error"
+                )
+                time.sleep(30)
+
+        self.log_message("Thread stopped (running=False).", level="info")
+
+    def stop(self):
+        self.running = False
+
 
     def init_onvif(self):
         from onvif import ONVIFCamera
@@ -98,14 +122,23 @@ class CameraMonitorThread(threading.Thread):
             if cur_addr:
                 event_service.ws_client.service._binding_options['address'] = rewrite_url_to_target(cur_addr, self.onvif_ip, self.onvif_port)
         
-        # Create PullPoint subscription
-        subscription_ref = event_service.CreatePullPointSubscription()
+        # Create PullPoint subscription with 1-hour TTL.
+        # Without this, Tapo cameras expire the subscription in ~1-5 minutes
+        # and PullMessages() silently returns empty forever (no exception raised).
+        try:
+            subscription_ref = event_service.CreatePullPointSubscription({
+                'InitialTerminationTime': 'PT1H'
+            })
+        except Exception:
+            # Fallback: some firmware ignores the param — create without it
+            subscription_ref = event_service.CreatePullPointSubscription()
+
         try:
             sub_addr = subscription_ref.SubscriptionReference.Address._value_1
             fixed_sub_addr = rewrite_url_to_target(sub_addr, self.onvif_ip, self.onvif_port)
         except Exception:
             fixed_sub_addr = f"http://{self.onvif_ip}:{self.onvif_port}/onvif/service"
-        
+
         # Set xaddr for PullPointSubscription in mycam.xaddrs
         mycam.xaddrs['http://www.onvif.org/ver10/events/wsdl/PullPointSubscription'] = fixed_sub_addr
 
@@ -113,8 +146,16 @@ class CameraMonitorThread(threading.Thread):
         pullpoint = mycam.create_pullpoint_service()
         if hasattr(pullpoint, 'ws_client') and hasattr(pullpoint.ws_client, 'service'):
             pullpoint.ws_client.service._binding_options['address'] = fixed_sub_addr
-            
-        return pullpoint
+
+        # Record when this subscription was created (used for proactive renewal)
+        subscription_start_time = time.time()
+        self.log_message(
+            f"ONVIF subscription created with PT1H TTL at {timezone.now().strftime('%H:%M:%S')}",
+            self.style.SUCCESS
+        )
+
+        return pullpoint, subscription_start_time
+
 
     def check_for_motion(self, n):
         try:
@@ -183,41 +224,138 @@ class CameraMonitorThread(threading.Thread):
             self.log_message(f"Error in check_for_motion: {e}", level="error")
         return False, False
 
+    def _pull_messages_with_timeout(self, pullpoint, timeout_seconds=15):
+        """
+        Wrap PullMessages in a thread with timeout to prevent it hanging forever.
+        Returns None if timeout is exceeded — the caller should reconnect.
+        """
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                pullpoint.PullMessages,
+                {'Timeout': 'PT5S', 'MessageLimit': 10}
+            )
+            try:
+                return future.result(timeout=timeout_seconds)
+            except concurrent.futures.TimeoutError:
+                return None
+            except Exception:
+                raise  # Re-raise other exceptions to caller
+
     def run_onvif_loop(self, model, output_dir):
         self.log_message("Running in EVENT-DRIVEN ONVIF mode...", self.style.SUCCESS)
-        
+
         pullpoint = None
+        subscription_start_time = None
         consecutive_failures = 0
-        
+
+        # ── Tuneable constants ───────────────────────────────────────────────
+        # After this many seconds, proactively recreate the subscription
+        # (prevents silent expiry; Tapo default TTL is often 1–5 min without PT1H).
+        SUBSCRIPTION_MAX_AGE_SEC = 50 * 60  # 50 minutes
+
+        # If this many consecutive PullMessages return empty, assume the
+        # subscription silently expired and force a reconnect.
+        # Each PullMessages call holds up to ~5s, so 120 × 5s ≈ 10 min of silence.
+        EMPTY_POLL_RECONNECT_THRESHOLD = 120
+
+        # Heartbeat log interval
+        HEARTBEAT_INTERVAL_SEC = 5 * 60  # every 5 minutes
+
+        consecutive_empty_polls = 0
+        last_heartbeat_time = time.time()
+
         while self.running:
+
+            # ── Heartbeat ──────────────────────────────────────────────────
+            now = time.time()
+            if now - last_heartbeat_time >= HEARTBEAT_INTERVAL_SEC:
+                sub_age_min = ((now - subscription_start_time) / 60) if subscription_start_time else 0
+                self.log_message(
+                    f"[HEARTBEAT] ONVIF loop alive. "
+                    f"Subscription age: {sub_age_min:.1f}min. "
+                    f"Consecutive empty polls: {consecutive_empty_polls}.",
+                    level="info"
+                )
+                last_heartbeat_time = now
+
+            # ── Proactive subscription renewal ─────────────────────────────
+            if pullpoint is not None and subscription_start_time is not None:
+                sub_age = time.time() - subscription_start_time
+                if sub_age >= SUBSCRIPTION_MAX_AGE_SEC:
+                    self.log_message(
+                        f"[RENEW] Subscription age {sub_age/60:.1f}min reached limit. "
+                        f"Proactively recreating subscription...",
+                        self.style.WARNING,
+                        level="warning"
+                    )
+                    pullpoint = None
+                    subscription_start_time = None
+                    consecutive_empty_polls = 0
+
+            # ── Silent expiry detection ────────────────────────────────────
+            if pullpoint is not None and consecutive_empty_polls >= EMPTY_POLL_RECONNECT_THRESHOLD:
+                self.log_message(
+                    f"[SILENT EXPIRY] {consecutive_empty_polls} consecutive empty polls "
+                    f"(~{consecutive_empty_polls * 5 / 60:.1f}min of silence). "
+                    f"Subscription likely expired silently. Forcing reconnect...",
+                    self.style.ERROR,
+                    level="error"
+                )
+                pullpoint = None
+                subscription_start_time = None
+                consecutive_empty_polls = 0
+
+            # ── Connect / Reconnect ────────────────────────────────────────
             if pullpoint is None:
                 try:
-                    pullpoint = self.init_onvif()
+                    pullpoint, subscription_start_time = self.init_onvif()
                     self.log_message(f"ONVIF PullPoint active on port {self.onvif_port}!", self.style.SUCCESS)
                     consecutive_failures = 0
+                    consecutive_empty_polls = 0
+                    last_heartbeat_time = time.time()
                 except Exception as onvif_err:
-                    self.log_message(f"ONVIF subscription attempt failed ({onvif_err}).", self.style.ERROR)
+                    self.log_message(f"ONVIF subscription attempt failed ({onvif_err}).", self.style.ERROR, level="error")
                     pullpoint = None
+                    subscription_start_time = None
                     consecutive_failures += 1
-                    
-                    if consecutive_failures >= 3:
-                        self.log_message("ONVIF connection repeatedly failed. Waiting 30s before retrying ONVIF connection...", self.style.WARNING)
-                        time.sleep(30)
-                        consecutive_failures = 0
-                        continue
-                    
-                    time.sleep(5)
+
+                    # Exponential-ish backoff capped at 5 minutes
+                    wait_sec = min(5 * consecutive_failures, 300)
+                    self.log_message(
+                        f"Retry #{consecutive_failures}. Waiting {wait_sec}s before next attempt...",
+                        self.style.WARNING
+                    )
+                    time.sleep(wait_sec)
                     continue
 
+            # ── Poll messages ──────────────────────────────────────────────
             try:
-                # Poll message with 5s timeout
-                msgs = pullpoint.PullMessages({'Timeout': 'PT5S', 'MessageLimit': 10})
+                msgs = self._pull_messages_with_timeout(pullpoint, timeout_seconds=15)
+
+                if msgs is None:
+                    # PullMessages hung and was killed by timeout
+                    self.log_message(
+                        "PullMessages timed out (>15s). Subscription may be stuck. Reconnecting...",
+                        self.style.ERROR,
+                        level="error"
+                    )
+                    pullpoint = None
+                    subscription_start_time = None
+                    consecutive_empty_polls = 0
+                    time.sleep(3)
+                    continue
+
                 notifications = getattr(msgs, "NotificationMessage", None)
-                
-                if notifications:
+
+                if not notifications:
+                    consecutive_empty_polls += 1
+                else:
+                    # Got notifications → reset empty poll counter
+                    consecutive_empty_polls = 0
+
                     if not isinstance(notifications, list):
                         notifications = [notifications]
-                        
+
                     motion_detected = False
                     people_detected = False
                     for n in notifications:
@@ -229,15 +367,21 @@ class CameraMonitorThread(threading.Thread):
                             motion_detected = True
                         if is_p:
                             people_detected = True
-                            
+
                     if motion_detected:
-                        self.log_message(f"ONVIF Motion detected (is_people={people_detected})! Analyzing via YOLO...", self.style.WARNING)
+                        self.log_message(
+                            f"ONVIF Motion detected (is_people={people_detected})! Analyzing via YOLO...",
+                            self.style.WARNING
+                        )
                         self.trigger_yolo_check(model, output_dir, onvif_is_people=people_detected)
-                        
+
             except Exception as e:
-                self.log_message(f"ONVIF Event Loop Error: {e}", self.style.ERROR)
+                self.log_message(f"ONVIF Event Loop Error: {e}", self.style.ERROR, level="error")
                 pullpoint = None  # Reset pullpoint to trigger reconnection
+                subscription_start_time = None
+                consecutive_empty_polls = 0
                 time.sleep(3)
+
 
     def record_video_async(self, timestamp):
         def run_ffmpeg():
@@ -366,10 +510,13 @@ class CameraMonitorThread(threading.Thread):
                 self.log_message("YOLO check complete: No person detected in any checked frame.")
 
         except Exception as err:
-            self.log_message(f"trigger_yolo_check error: {err}", self.style.ERROR)
+            self.log_message(f"trigger_yolo_check error: {err}", self.style.ERROR, level="error")
         finally:
             if cap is not None:
-                cap.release()
+                try:
+                    cap.release()
+                except Exception:
+                    pass
 
     def run_polling_loop(self, model, output_dir):
         self.log_message("Running in 1.5s POLLING mode...", self.style.SUCCESS)
@@ -424,6 +571,65 @@ class CameraMonitorThread(threading.Thread):
 
             time.sleep(1.5)
 
+class WatchdogThread(threading.Thread):
+    """
+    Monitors CameraMonitorThreads and restarts them if they die unexpectedly.
+    Checks every 30 seconds. Acts as a safety net on top of the
+    self-healing outer loop already built into CameraMonitorThread.run().
+    """
+    def __init__(self, managed_list, stdout, style):
+        super().__init__()
+        self.managed = managed_list  # list of {'config': {...}, 'thread': CameraMonitorThread}
+        self.stdout = stdout
+        self.style = style
+        self.running = True
+        self.daemon = True
+
+    def _log(self, text, style_fn=None):
+        msg = f"[Watchdog] {text}"
+        if style_fn:
+            self.stdout.write(style_fn(msg))
+        else:
+            self.stdout.write(msg)
+        log_file = os.path.join(settings.BASE_DIR, "person_detector.log")
+        try:
+            timestamp = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open(log_file, "a") as f:
+                f.write(f"{timestamp} [Watchdog] [INFO] {text}\n")
+        except Exception:
+            pass
+
+    def run(self):
+        self._log("Watchdog started. Monitoring camera threads every 30s.", self.style.SUCCESS)
+        while self.running:
+            time.sleep(30)
+            if not self.running:
+                break
+            for m in self.managed:
+                t = m['thread']
+                if not t.is_alive():
+                    self._log(
+                        f"Thread for {m['config']['camera_id']} is DEAD. Restarting...",
+                        self.style.ERROR
+                    )
+                    new_thread = CameraMonitorThread(
+                        **m['config'],
+                        stdout=self.stdout,
+                        style=self.style
+                    )
+                    new_thread.start()
+                    m['thread'] = new_thread
+                    self._log(
+                        f"Thread for {m['config']['camera_id']} restarted successfully.",
+                        self.style.SUCCESS
+                    )
+
+    def stop_all(self):
+        self.running = False
+        for m in self.managed:
+            m['thread'].stop()
+
+
 class MediaCleanupThread(threading.Thread):
     def __init__(self, stdout, style):
         super().__init__()
@@ -442,7 +648,7 @@ class MediaCleanupThread(threading.Thread):
                 call_command('cleanup_media', days=7, max_size=2000, target_size=1500)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"[CleanupWorker] Automatic media cleanup error: {e}"))
-            
+
             # Sleep 1 hour (3600s)
             for _ in range(3600):
                 if not self.running:
@@ -459,49 +665,40 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.WARNING("Starting CCTV Person Detection Monitor Service (ONVIF Triggered)..."))
 
-        # CCTV 1 Config
-        cctv1_rtsp = "rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1"
-        cctv1_onvif_ip = "10.10.0.5"
-        cctv1_onvif_port = 2020  # Change if port-forwarded differently
-        cctv1_user = "nykws1"
-        cctv1_pass = "nykworkshop"
+        # Camera configurations — credentials only, no live thread refs here
+        cameras_config = [
+            {
+                'camera_id': 'cctv',
+                'rtsp_url': 'rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1',
+                'onvif_ip': '10.10.0.5',
+                'onvif_port': 2020,
+                'onvif_user': 'nykws1',
+                'onvif_password': 'nykworkshop',
+            },
+            {
+                'camera_id': 'cctv2',
+                'rtsp_url': 'rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1',
+                'onvif_ip': '10.10.0.5',
+                'onvif_port': 2021,
+                'onvif_user': 'nykws2',
+                'onvif_password': 'nykworkshop',
+            },
+        ]
 
-        # CCTV 2 Config
-        cctv2_rtsp = "rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1"
-        cctv2_onvif_ip = "10.10.0.5"
-        cctv2_onvif_port = 2021  # Change if port-forwarded differently (e.g. 2021)
-        cctv2_user = "nykws2"
-        cctv2_pass = "nykworkshop"
+        # Build managed thread list and start all camera threads
+        managed_list = []
+        for cfg in cameras_config:
+            t = CameraMonitorThread(**cfg, stdout=self.stdout, style=self.style)
+            managed_list.append({'config': cfg, 'thread': t})
+            t.start()
+            self.stdout.write(self.style.SUCCESS(f"Started camera thread: {cfg['camera_id']}"))
 
-        t1 = CameraMonitorThread(
-            camera_id="cctv",
-            rtsp_url=cctv1_rtsp,
-            onvif_ip=cctv1_onvif_ip,
-            onvif_port=cctv1_onvif_port,
-            onvif_user=cctv1_user,
-            onvif_password=cctv1_pass,
-            stdout=self.stdout,
-            style=self.style
-        )
-        
-        t2 = CameraMonitorThread(
-            camera_id="cctv2",
-            rtsp_url=cctv2_rtsp,
-            onvif_ip=cctv2_onvif_ip,
-            onvif_port=cctv2_onvif_port,
-            onvif_user=cctv2_user,
-            onvif_password=cctv2_pass,
-            stdout=self.stdout,
-            style=self.style
-        )
+        # Watchdog monitors and auto-restarts dead camera threads
+        watchdog = WatchdogThread(managed_list, stdout=self.stdout, style=self.style)
+        watchdog.start()
 
-        tc = MediaCleanupThread(
-            stdout=self.stdout,
-            style=self.style
-        )
-
-        t1.start()
-        t2.start()
+        # Media cleanup worker
+        tc = MediaCleanupThread(stdout=self.stdout, style=self.style)
         tc.start()
 
         try:
@@ -509,9 +706,6 @@ class Command(BaseCommand):
                 time.sleep(1)
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING("\nStopping monitors..."))
-            t1.stop()
-            t2.stop()
+            watchdog.stop_all()
             tc.stop()
-            t1.join()
-            t2.join()
             self.stdout.write(self.style.SUCCESS("Monitors stopped successfully."))
