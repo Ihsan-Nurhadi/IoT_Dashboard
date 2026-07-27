@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import './Header.css';
 import { FaHome, FaBell, FaCheckDouble, FaSun, FaMoon, FaCamera, FaMapMarkerAlt, FaExternalLinkAlt } from 'react-icons/fa';
 import { PiSiren } from 'react-icons/pi';
@@ -15,6 +15,7 @@ interface AlertItem {
 }
 
 const Header: React.FC = () => {
+  const location = useLocation();
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [alertCategory, setAlertCategory] = useState<'all' | 'camera' | 'pir'>('all');
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -122,20 +123,24 @@ const Header: React.FC = () => {
 
   return (
     <header className="app-header">
-      <div className="logo-container">
-        <img src="/logo.svg" alt="logo" className="logo-icon" />
-        <div>
-          <h1 className="app-title">NMS Control Panel</h1>
-          <p className="app-subtitle">Real-time device management</p>
+      <div className="header-left">
+        <Link to="/" className="nav-logo" style={{ textDecoration: 'none' }}>
+          <div className="nav-logo-icon">📡</div>
+          TOWER SENTINEL
+        </Link>
+        <div className="status-badge">
+          <div className="status-dot"></div>
+          <span className="badge-text">ACTIVE</span>
         </div>
       </div>
 
-      <nav className="header-nav">
-        <Link to="/" className="nav-link"><FaHome /> Dashboard</Link>
-        <Link to="/site-detail" className="nav-link">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link size-3.5" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
-        Site Detail</Link>
-        
+      <div className="header-nav-links">
+        <Link to="/" className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}><FaHome /> Portal</Link>
+        <Link to="/site-detail" className={`nav-link ${location.pathname === '/site-detail' ? 'active' : ''}`}>Site Detail</Link>
+        <Link to="/aqms" className={`nav-link ${location.pathname === '/aqms' ? 'active' : ''}`}>AQMS</Link>
+      </div>
+
+      <div className="nav-actions">
         {/* Notification Bell Container */}
         <div className="notification-bell-container" ref={dropdownRef}>
           <button 
@@ -220,12 +225,9 @@ const Header: React.FC = () => {
         >
           {theme === 'light' ? <FaMoon /> : <FaSun />}
         </button>
-      </nav>
 
-      <div className="system-status">
-        <span className="status-indicator-dot"></span>
-        System Online
       </div>
+
 
       {/* Fullscreen Alert Photo Viewer Modal */}
       {fullscreenPhotoUrl && (

@@ -50,8 +50,10 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'devicestatusapp',
+    'monitoring',
     # 'gps_tracer',
 ]
+
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -117,6 +119,14 @@ NEW_MQTT_PORT = MQTT_PORT
 NEW_MQTT_USER = MQTT_USER
 NEW_MQTT_PASSWORD = MQTT_PASSWORD
 NEW_MQTT_TOPIC_SUB = MQTT_TOPIC_SUB
+
+# Verticality MQTT settings
+MQTT_TOPIC_TILT = os.environ.get("MQTT_TOPIC_TILT", "nms/E32_VER_WS/vertical/tilt")
+MQTT_TOPIC_WIND = os.environ.get("MQTT_TOPIC_WIND", "nms/E32_VER_WS/vertical/wind")
+
+# AQMS MQTT settings
+MQTT_TOPIC_AQMS = os.environ.get("MQTT_TOPIC_AQMS", "wqx/E32_WS/data")
+
 
 
 # client = mqtt.Client()

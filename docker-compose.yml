@@ -34,6 +34,42 @@ services:
     networks:
       - nms_network
 
+  # 2b. Verticality Listener (Worker Background)
+  verticality_listener:
+    build: ./backend
+    container_name: nms_verti_worker
+    restart: always
+    command: python manage.py verticality_listener
+    environment:
+      - TZ=Asia/Jakarta
+    env_file: .env
+    depends_on:
+      - backend
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    networks:
+      - nms_network
+
+  # 2c. AQMS Listener (Worker Background)
+  aqms_listener:
+    build: ./backend
+    container_name: nms_aqms_worker
+    restart: always
+    command: python manage.py aqms_listener
+    environment:
+      - TZ=Asia/Jakarta
+    env_file: .env
+    depends_on:
+      - backend
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    networks:
+      - nms_network
+
   # 3. Frontend (React)
   frontend:
     build: ./frontend

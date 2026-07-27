@@ -690,8 +690,10 @@ def get_door_logs(request):
         items.append({
             "id": log.id,
             "status": log.status,
-            "timestamp": local_time.strftime("%b %d, %I:%M %p")
+            "timestamp": local_time.strftime("%b %d, %I:%M %p"),
+            "raw_time": local_time.isoformat()
         })
+
 
     return JsonResponse({
         "current_status": current_status,

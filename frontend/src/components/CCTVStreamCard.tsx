@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FaCamera, FaPlay, FaRegFileVideo, FaSpinner } from 'react-icons/fa';
 import './CCTVStreamCard.css';
 
@@ -214,25 +215,27 @@ const CCTVStreamCard: React.FC<CCTVStreamCardProps> = ({
       </div>
 
       {/* Video Modal Player */}
-      {showVideoModal && videoUrl && (
+      {showVideoModal && videoUrl && createPortal(
         <div className="video-modal-overlay" onClick={() => setShowVideoModal(false)}>
           <div className="video-modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="close-modal-btn" onClick={() => setShowVideoModal(false)}>×</button>
             <h3 className="modal-title">Live Video - {cameraName}</h3>
             <video src={`${videoUrl}?t=${new Date().getTime()}`} controls autoPlay className="modal-video" />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Fullscreen Photo Modal */}
-      {showPhotoModal && photoUrl && (
+      {showPhotoModal && photoUrl && createPortal(
         <div className="video-modal-overlay" onClick={() => setShowPhotoModal(false)}>
           <div className="video-modal-content image-modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="close-modal-btn" onClick={() => setShowPhotoModal(false)}>×</button>
             <h3 className="modal-title">{cameraName} - Fullscreen View</h3>
             <img src={photoUrl} alt={cameraName} className="modal-image-fullscreen" />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

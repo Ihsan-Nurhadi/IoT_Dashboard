@@ -16,6 +16,7 @@ import {
 } from 'react-icons/fa';
 import { PiSiren } from 'react-icons/pi';
 import DetectionLogsTable from './DetectionLogsTable';
+import PirMotionCard from './PirMotionCard';
 import './SiteDetail.css';
 
 interface MediaItem {
@@ -274,6 +275,10 @@ const SiteDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* PIR Motion Radar & Channels */}
+      <PirMotionCard />
+
 
       {/* 3. Foto Section */}
       <div className="media-section">

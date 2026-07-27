@@ -3,6 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from devicestatusapp import views as dorlock_views
 from rotaryapp import views as rotary_views
+from monitoring import views as monitoring_views
 
 urlpatterns = [
     path('api/', include('speakerapp.urls')),
@@ -21,6 +22,10 @@ urlpatterns = [
     path('api/cctv/alerts/', dorlock_views.cctv_alerts, name='cctv_alerts'),
     path('api/cctv/detection-logs/', dorlock_views.cctv_detection_logs, name='cctv_detection_logs'),
     path('api/door-logs/', dorlock_views.get_door_logs, name='get_door_logs'),
+    path('api/verticality/', include('monitoring.urls')),
+    path('api/sensor-readings/latest/', monitoring_views.LatestReadingView.as_view(), name='sensor-latest'),
+    path('api/sensor-readings/history/', monitoring_views.SensorHistoryView.as_view(), name='sensor-history'),
+    path('api/sensor-readings/ingest/', monitoring_views.IngestSensorReadingView.as_view(), name='sensor-ingest'),
     # path('', include('gps_tracer.urls')),
 ]
 if settings.DEBUG:

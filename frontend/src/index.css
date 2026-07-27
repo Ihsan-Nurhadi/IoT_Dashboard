@@ -19,23 +19,32 @@ html {
   --lightningcss-light: initial;
   --lightningcss-dark: ;
   
-  --background: oklch(100% 0 0);
+  /* Background diubah dari 100% menjadi 98% (Off-white / Abu-abu sangat terang) */
+  --background: oklch(800 0);
   --foreground: oklch(14.5% 0 0);
-  --card: oklch(100% 0 0);
+  
+  /* Card dan Popover dibuat sedikit lebih terang dari background agar ada pemisah visual (99.5%) */
+  --card: oklch(99.5% 0 0);
   --card-foreground: oklch(14.5% 0 0);
-  --popover: oklch(100% 0 0);
+  --popover: oklch(99.5% 0 0);
   --popover-foreground: oklch(14.5% 0 0);
+  
   --primary: oklch(20.5% 0 0);
   --primary-foreground: oklch(98.5% 0 0);
-  --secondary: oklch(97% 0 0);
+  
+  /* Secondary, Muted, dan Accent digelapkan sedikit (dari 97% ke 95%) agar tetap terlihat di atas background baru */
+  --secondary: oklch(95% 0 0);
   --secondary-foreground: oklch(20.5% 0 0);
-  --muted: oklch(97% 0 0);
+  --muted: oklch(95% 0 0);
   --muted-foreground: oklch(55.6% 0 0);
-  --accent: oklch(97% 0 0);
+  --accent: oklch(95% 0 0);
   --accent-foreground: oklch(20.5% 0 0);
+  
   --destructive: oklch(57.7% .245 27.325);
-  --border: oklch(92.2% 0 0);
-  --input: oklch(92.2% 0 0);
+  
+  /* Border dan Input disesuaikan agar tetap terlihat (dari 92.2% ke 90%) */
+  --border: oklch(90% 0 0);
+  --input: oklch(90% 0 0);
   --ring: oklch(70.8% 0 0);
 
   /* Legacy Mapping for compatibility */
