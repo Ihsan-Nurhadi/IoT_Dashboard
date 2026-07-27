@@ -62,6 +62,7 @@ const TowerSentinel: React.FC = () => {
   const toggleWireframeRef = useRef<(() => void) | null>(null);
   const zoomInRef = useRef<(() => void) | null>(null);
   const zoomOutRef = useRef<(() => void) | null>(null);
+  const lastKnownNotifIdRef = useRef<string | null>(null);
 
   const [isAutoRotate, setIsAutoRotate] = useState<boolean>(true);
   const [isWireframe, setIsWireframe] = useState<boolean>(false);
@@ -353,6 +354,23 @@ const TowerSentinel: React.FC = () => {
         // 5. Combine and Sort
         const combined = [...cctvMapped, ...doorMapped];
         combined.sort((a, b) => new Date(b.rawTime).getTime() - new Date(a.rawTime).getTime());
+
+        // Play notification sound if a new notification arrives
+        if (combined.length > 0) {
+          const latestNotifId = combined[0].id;
+          if (lastKnownNotifIdRef.current !== null && lastKnownNotifIdRef.current !== latestNotifId) {
+            try {
+              const audio = new Audio('/notification.wav');
+              audio.volume = 0.7;
+              audio.play().catch(err => {
+                console.log("Audio autoplay waiting for user interaction:", err);
+              });
+            } catch (soundErr) {
+              console.error("Error playing notification sound:", soundErr);
+            }
+          }
+          lastKnownNotifIdRef.current = latestNotifId;
+        }
 
         setNotifications(combined);
       } catch (err) {
