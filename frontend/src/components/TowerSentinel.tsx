@@ -213,7 +213,7 @@ const TowerSentinel: React.FC = () => {
       try {
         const plnRes = await fetch('/api/get-pln-status/');
         const plnData = await plnRes.json();
-        
+
         const doorRes = await fetch('/api/get-door-status/');
         const doorData = await doorRes.json();
 
@@ -558,15 +558,20 @@ const TowerSentinel: React.FC = () => {
     const canvas = towerCanvasRef.current;
     if (!canvas) return;
 
+    const isDark = theme === 'dark';
+    const fogColor = isDark ? 0x0d1020 : 0xfaf6ee;
+    const groundColor = isDark ? 0x050a05 : 0x8da190;
+
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
+    renderer.setClearColor(fogColor, 1.0);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x0d1020, 0.010);
+    scene.fog = new THREE.FogExp2(fogColor, 0.010);
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 300);
     camera.position.set(0, 12, 38);
@@ -585,9 +590,11 @@ const TowerSentinel: React.FC = () => {
     window.addEventListener('resize', resize);
 
     // --- Lights ---
-    scene.add(new THREE.AmbientLight(0x4060a0, 2.5));
+    const ambientColor = isDark ? 0x4060a0 : 0xfff5e6;
+    const ambientIntensity = isDark ? 2.5 : 2.8;
+    scene.add(new THREE.AmbientLight(ambientColor, ambientIntensity));
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 4.5);
+    const dirLight = new THREE.DirectionalLight(0xffffff, isDark ? 4.5 : 3.5);
     dirLight.position.set(10, 30, 10);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.set(2048, 2048);
@@ -597,23 +604,29 @@ const TowerSentinel: React.FC = () => {
     dirLight.shadow.camera.bottom = dirLight.shadow.camera.left = -40;
     scene.add(dirLight);
 
-    const fillLight = new THREE.DirectionalLight(0x8ab4f8, 2.0);
+    const fillLightColor = isDark ? 0x8ab4f8 : 0xffeedd;
+    const fillLight = new THREE.DirectionalLight(fillLightColor, isDark ? 2.0 : 1.5);
     fillLight.position.set(-8, 20, 15);
     scene.add(fillLight);
 
-    const rimLight = new THREE.DirectionalLight(0x22d3ee, 1.5);
+    const rimLightColor = isDark ? 0x22d3ee : 0xffe4cc;
+    const rimLight = new THREE.DirectionalLight(rimLightColor, isDark ? 1.5 : 1.0);
     rimLight.position.set(0, 25, -20);
     scene.add(rimLight);
 
-    const bluePoint = new THREE.PointLight(0x3b82f6, 5, 50);
+    const bluePointColor = isDark ? 0x3b82f6 : 0xffe4b5;
+    const bluePoint = new THREE.PointLight(bluePointColor, isDark ? 5 : 2.5, 50);
     bluePoint.position.set(-5, 5, 5);
     scene.add(bluePoint);
 
-    const cyanPoint = new THREE.PointLight(0x22d3ee, 4, 40);
+    const cyanPointColor = isDark ? 0x22d3ee : 0xffebd7;
+    const cyanPoint = new THREE.PointLight(cyanPointColor, isDark ? 4 : 2.0, 40);
     cyanPoint.position.set(5, 15, -5);
     scene.add(cyanPoint);
 
-    const groundLight = new THREE.PointLight(0x3b82f6, 3, 25);
+    const groundLightColor = isDark ? 0x3b82f6 : 0xf59e0b;
+    const groundLightIntensity = isDark ? 3 : 1.5;
+    const groundLight = new THREE.PointLight(groundLightColor, groundLightIntensity, 25);
     groundLight.position.set(0, 0.5, 0);
     scene.add(groundLight);
 
@@ -790,7 +803,7 @@ const TowerSentinel: React.FC = () => {
 
     // Ground plane
     const groundMeshMat = new THREE.MeshStandardMaterial({
-      color: 0x050a05, roughness: 1, metalness: 0.0,
+      color: groundColor, roughness: 1, metalness: 0.0,
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1
     });
     const ground = new THREE.Mesh(
@@ -891,17 +904,19 @@ const TowerSentinel: React.FC = () => {
     warnPointLight.position.copy(warnLight.position);
     towerGroup.add(warnPointLight);
 
-    // Stars background
-    const starCount = 800;
-    const starPos = new Float32Array(starCount * 3);
-    for (let i = 0; i < starCount * 3; i += 3) {
-      starPos[i] = (Math.random() - 0.5) * 200;
-      starPos[i + 1] = Math.abs((Math.random() - 0.1)) * 100 + 5;
-      starPos[i + 2] = (Math.random() - 0.5) * 200;
+    // Stars background (Dark mode only)
+    if (isDark) {
+      const starCount = 800;
+      const starPos = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount * 3; i += 3) {
+        starPos[i] = (Math.random() - 0.5) * 200;
+        starPos[i + 1] = Math.abs((Math.random() - 0.1)) * 100 + 5;
+        starPos[i + 2] = (Math.random() - 0.5) * 200;
+      }
+      const starGeo = new THREE.BufferGeometry();
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, transparent: true, opacity: 0.7 })));
     }
-    const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, transparent: true, opacity: 0.7 })));
 
     // --- Modules (NMS, AQMS, Verticality) ---
     const nmsBoxMat = new THREE.MeshStandardMaterial({ color: 0x1a3a6e, metalness: 0.7, roughness: 0.3 });
@@ -1313,7 +1328,7 @@ const TowerSentinel: React.FC = () => {
       cancelAnimationFrame(animationId);
       renderer.dispose();
     };
-  }, []);
+  }, [theme]);
 
   // Update dynamic logic from state
   const aqiLevel = Math.max(aqmsData.pm25, aqmsData.pm10 * 0.5);
@@ -1397,18 +1412,18 @@ const TowerSentinel: React.FC = () => {
           <input type="text" placeholder="Search towers, cameras, alerts..." id="search-input" />
         </div>
         <div className="nav-actions">
-          <button 
+          <button
             className="theme-toggle-btn"
             onClick={toggleTheme}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: 'var(--text-muted)', 
-              fontSize: '1.2rem', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               marginRight: '12px',
               transition: 'color 0.2s'
             }}
@@ -1469,7 +1484,7 @@ const TowerSentinel: React.FC = () => {
 
         {/* Left Panel */}
         <div className={`left-panel ${isSidebarOpen && mobileView !== 'feeds' ? 'open' : ''}`}>
-                    {/* AQMS Weather Panel */}
+          {/* AQMS Weather Panel */}
           <div>
             <div className="panel-section-title">
               AQMS &middot; Weather
@@ -1582,19 +1597,18 @@ const TowerSentinel: React.FC = () => {
             </div>
 
             {/* Big Status Indicator */}
-            <div className={`verti-indicator-badge ${
-              vertiStatus.indikator === 'critical' ? 'critical' :
-              vertiStatus.indikator === 'warning' ? 'warning' : 'normal'
-            }`}>
+            <div className={`verti-indicator-badge ${vertiStatus.indikator === 'critical' ? 'critical' :
+                vertiStatus.indikator === 'warning' ? 'warning' : 'normal'
+              }`}>
               <span className="verti-indicator-icon">
                 {vertiStatus.indikator === 'critical' ? '🔴' :
-                 vertiStatus.indikator === 'warning' ? '⚠️' : '✅'}
+                  vertiStatus.indikator === 'warning' ? '⚠️' : '✅'}
               </span>
               <div className="verti-indicator-text">
                 <span className="verti-indicator-label">Status Tower</span>
                 <span className="verti-indicator-value">
                   {vertiStatus.indikator === 'critical' ? 'KRITIS' :
-                   vertiStatus.indikator === 'warning' ? 'PERINGATAN' : 'NORMAL'}
+                    vertiStatus.indikator === 'warning' ? 'PERINGATAN' : 'NORMAL'}
                 </span>
               </div>
             </div>
@@ -1633,8 +1647,8 @@ const TowerSentinel: React.FC = () => {
                     background: vertiStatus.indikator === 'critical'
                       ? 'linear-gradient(to right,#f59e0b,#ef4444)'
                       : vertiStatus.indikator === 'warning'
-                      ? 'linear-gradient(to right,#fde68a,#f59e0b)'
-                      : 'linear-gradient(to right,#22c55e,#22d3ee)'
+                        ? 'linear-gradient(to right,#fde68a,#f59e0b)'
+                        : 'linear-gradient(to right,#22c55e,#22d3ee)'
                   }}
                 />
               </div>
@@ -1643,7 +1657,7 @@ const TowerSentinel: React.FC = () => {
 
           <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
 
-                    {/* SITE STATUS — NMS Live */}
+          {/* SITE STATUS — NMS Live */}
           <div className="site-status-panel">
             <div className="panel-section-title">
               Site Status
@@ -1658,9 +1672,8 @@ const TowerSentinel: React.FC = () => {
                   <span className="sidebar-sensor-icon yellow">⚡</span>
                   <span className="sidebar-sensor-label">PLN Power</span>
                 </div>
-                <span className={`sidebar-sensor-pill ${
-                  nmsStatus.plnStatus === 'ON' || nmsStatus.plnStatus === 'Active' ? 'green' : 'gray'
-                }`}>
+                <span className={`sidebar-sensor-pill ${nmsStatus.plnStatus === 'ON' || nmsStatus.plnStatus === 'Active' ? 'green' : 'gray'
+                  }`}>
                   {nmsStatus.plnStatus === 'ON' || nmsStatus.plnStatus === 'Active' ? 'ACTIVE' : 'INACTIVE'}
                 </span>
               </div>
@@ -1671,9 +1684,8 @@ const TowerSentinel: React.FC = () => {
                   <span className="sidebar-sensor-icon cyan">🚪</span>
                   <span className="sidebar-sensor-label">Door Sensor</span>
                 </div>
-                <span className={`sidebar-sensor-pill ${
-                  nmsStatus.doorStatus === 'Open' || nmsStatus.doorStatus === 'OPEN' ? 'red' : 'green'
-                }`}>
+                <span className={`sidebar-sensor-pill ${nmsStatus.doorStatus === 'Open' || nmsStatus.doorStatus === 'OPEN' ? 'red' : 'green'
+                  }`}>
                   {nmsStatus.doorStatus === 'Open' || nmsStatus.doorStatus === 'OPEN' ? 'OPEN' : 'CLOSED'}
                 </span>
               </div>
@@ -2011,7 +2023,7 @@ const TowerSentinel: React.FC = () => {
                 {/* DEVICE CONTROL */}
                 <div className="nms-section">
                   <h3 className="nms-section-title">DEVICE CONTROL</h3>
-                  
+
                   {/* Lampu switch */}
                   <div className="nms-control-row">
                     <div className="control-info">
@@ -2025,7 +2037,7 @@ const TowerSentinel: React.FC = () => {
                       <span className="switch-label-text" style={{ marginRight: '8px', fontSize: '0.8rem', color: 'var(--text-sub)' }}>
                         {isLampuOn ? 'ON' : 'OFF'}
                       </span>
-                      <button 
+                      <button
                         className={`toggle-switch-btn ${isLampuOn ? 'on' : 'off'}`}
                         onClick={toggleLampu}
                         disabled={isLampuLoading}

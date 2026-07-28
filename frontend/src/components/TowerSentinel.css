@@ -331,6 +331,9 @@
   background: var(--bg-primary);
   overflow: hidden;
 }
+.light .center-panel {
+  background: #faf6ee;
+}
 .center-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 20px 10px;
