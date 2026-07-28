@@ -1407,10 +1407,6 @@ const TowerSentinel: React.FC = () => {
           <div className="status-dot"></div>
           <span className="badge-text">ACTIVE</span>
         </div>
-        <div className="nav-search">
-          <span className="nav-search-icon">🔍</span>
-          <input type="text" placeholder="Search towers, cameras, alerts..." id="search-input" />
-        </div>
         <div className="nav-actions">
           <button
             className="theme-toggle-btn"
@@ -1794,39 +1790,6 @@ const TowerSentinel: React.FC = () => {
                 <div className="sys-title">Verticality</div>
                 <div className="sys-sub">Tilt Sensor</div>
               </div>
-            </div>
-          </div>
-
-          {/* Bottom Toolbar */}
-          <div className="center-toolbar">
-            <div className="tool-btn active" title="3D View">🗼</div>
-            <div
-              className={`tool-btn ${isWireframe ? 'active' : ''}`}
-              title="Wireframe"
-              id="wireframe-btn"
-              onClick={() => toggleWireframeRef.current?.()}
-            >
-              ⬡
-            </div>
-            <div className="tool-btn" title="Info">ℹ️</div>
-            <div className="tool-sep"></div>
-            <div className="tool-btn" title="Camera 1">📷</div>
-            <div className="tool-btn" title="Camera 2">📷</div>
-            <div className="tool-btn" title="Measure">📏</div>
-            <div className="tool-btn" title="Download">⬇️</div>
-            <div
-              className="fullscreen-btn"
-              title="Fullscreen"
-              id="fullscreen-btn"
-              onClick={() => {
-                if (!document.fullscreenElement) {
-                  document.documentElement.requestFullscreen();
-                } else {
-                  document.exitFullscreen();
-                }
-              }}
-            >
-              ⛶
             </div>
           </div>
         </div>
