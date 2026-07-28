@@ -61,8 +61,14 @@ const TowerSentinel: React.FC = () => {
   const toggleAutoRotateRef = useRef<((val?: boolean) => void) | null>(null);
   const toggleWireframeRef = useRef<(() => void) | null>(null);
   const zoomInRef = useRef<(() => void) | null>(null);
-  const zoomOutRef = useRef<(() => void) | null>(null);
   const lastKnownNotifIdRef = useRef<string | null>(null);
+
+  // Three.js object references for dynamic theme colors
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const groundMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
+  const fillLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const rimLightRef = useRef<THREE.DirectionalLight | null>(null);
 
   const [isAutoRotate, setIsAutoRotate] = useState<boolean>(true);
   const [isWireframe, setIsWireframe] = useState<boolean>(false);
@@ -78,6 +84,67 @@ const TowerSentinel: React.FC = () => {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.className = theme;
     localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  // Dynamic 3D Scenery update on theme changes (Warm Light Mode & Cyber Dark Mode)
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const groundMat = groundMaterialRef.current;
+    const ambient = ambientLightRef.current;
+    const fill = fillLightRef.current;
+    const rim = rimLightRef.current;
+
+    if (!scene) return;
+
+    if (theme === 'light') {
+      // 1. Fog: Warm soft off-white/cream
+      scene.fog = new THREE.FogExp2(0xfaf6f0, 0.010);
+
+      // 2. Ground: Calm sage green (low contrast, easy on the eyes)
+      if (groundMat) {
+        groundMat.color.setHex(0x7ea47d);
+      }
+
+      // 3. Ambient: Warm cream morning glow
+      if (ambient) {
+        ambient.color.setHex(0xfffaee);
+        ambient.intensity = 2.2;
+      }
+
+      // 4. Lights: Soft warm directional lights
+      if (fill) {
+        fill.color.setHex(0xffe5bd);
+        fill.intensity = 1.8;
+      }
+      if (rim) {
+        rim.color.setHex(0xffd59e);
+        rim.intensity = 1.2;
+      }
+    } else {
+      // 1. Fog: Sci-fi cyber dark space blue
+      scene.fog = new THREE.FogExp2(0x0d1020, 0.010);
+
+      // 2. Ground: Cyberpunk deep dark green
+      if (groundMat) {
+        groundMat.color.setHex(0x050a05);
+      }
+
+      // 3. Ambient: Sci-fi cool blue ambient
+      if (ambient) {
+        ambient.color.setHex(0x4060a0);
+        ambient.intensity = 2.5;
+      }
+
+      // 4. Lights: Cyber neon fill & rim lights
+      if (fill) {
+        fill.color.setHex(0x8ab4f8);
+        fill.intensity = 2.0;
+      }
+      if (rim) {
+        rim.color.setHex(0x22d3ee);
+        rim.intensity = 1.5;
+      }
+    }
   }, [theme]);
 
   const toggleTheme = () => {
@@ -584,8 +651,12 @@ const TowerSentinel: React.FC = () => {
     resize();
     window.addEventListener('resize', resize);
 
+    sceneRef.current = scene;
+
     // --- Lights ---
-    scene.add(new THREE.AmbientLight(0x4060a0, 2.5));
+    const ambientLight = new THREE.AmbientLight(0x4060a0, 2.5);
+    scene.add(ambientLight);
+    ambientLightRef.current = ambientLight;
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 4.5);
     dirLight.position.set(10, 30, 10);
@@ -600,10 +671,12 @@ const TowerSentinel: React.FC = () => {
     const fillLight = new THREE.DirectionalLight(0x8ab4f8, 2.0);
     fillLight.position.set(-8, 20, 15);
     scene.add(fillLight);
+    fillLightRef.current = fillLight;
 
     const rimLight = new THREE.DirectionalLight(0x22d3ee, 1.5);
     rimLight.position.set(0, 25, -20);
     scene.add(rimLight);
+    rimLightRef.current = rimLight;
 
     const bluePoint = new THREE.PointLight(0x3b82f6, 5, 50);
     bluePoint.position.set(-5, 5, 5);
@@ -793,6 +866,7 @@ const TowerSentinel: React.FC = () => {
       color: 0x050a05, roughness: 1, metalness: 0.0,
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1
     });
+    groundMaterialRef.current = groundMeshMat;
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(25, 48),
       groundMeshMat

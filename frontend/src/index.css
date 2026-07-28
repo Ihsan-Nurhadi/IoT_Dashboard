@@ -19,8 +19,8 @@ html {
   --lightningcss-light: initial;
   --lightningcss-dark: ;
   
-  /* Background diubah dari 100% menjadi 98% (Off-white / Abu-abu sangat terang) */
-  --background: oklch(800 0);
+  /* Background diubah menjadi Warm Off-white / Cream lembut */
+  --background: #faf6f0;
   --foreground: oklch(14.5% 0 0);
   
   /* Card dan Popover dibuat sedikit lebih terang dari background agar ada pemisah visual (99.5%) */
