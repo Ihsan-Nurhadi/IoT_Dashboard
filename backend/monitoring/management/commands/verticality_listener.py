@@ -40,10 +40,13 @@ class Command(BaseCommand):
     help = 'Starts the MQTT subscriber daemon for Structural Health Monitoring (Verticality).'
 
     def handle(self, *args, **options):
-        client = mqtt.Client(
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-            client_id="shm_backend_subscriber"
-        )
+        try:
+            client = mqtt.Client(
+                callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+                client_id="shm_backend_subscriber"
+            )
+        except AttributeError:
+            client = mqtt.Client(client_id="shm_backend_subscriber")
         
         # Use settings from django_mqtt settings.py
         # Since settings matches Whitebox EMQX details, we map it to standard server configurations
