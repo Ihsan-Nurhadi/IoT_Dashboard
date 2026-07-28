@@ -1432,7 +1432,7 @@ const TowerSentinel: React.FC = () => {
               if (resetViewRef.current) resetViewRef.current();
             }}
           >
-            📡
+            🏠
           </div>
           <div
             className={`s-icon ${activeModal === 'nms' ? 'active' : ''}`}
@@ -1452,7 +1452,7 @@ const TowerSentinel: React.FC = () => {
               zoomToSystemRef.current?.('verti');
             }}
           >
-            ⚠️
+            📐
           </div>
           <div
             className={`s-icon ${activeModal === 'aqms' ? 'active' : ''}`}
@@ -1462,7 +1462,7 @@ const TowerSentinel: React.FC = () => {
               zoomToSystemRef.current?.('aqms');
             }}
           >
-            📊
+            🌤️
           </div>
           <div className="s-icon" title="Settings" style={{ marginTop: 'auto' }}>⚙️</div>
         </div>
