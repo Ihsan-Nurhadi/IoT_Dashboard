@@ -703,7 +703,7 @@
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 0.8rem;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   outline: none;
   transition: border-color 0.2s;
 }

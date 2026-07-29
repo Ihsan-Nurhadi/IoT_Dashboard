@@ -233,26 +233,53 @@ class LatestReadingView(APIView):
 class SensorHistoryView(APIView):
     """
     Returns historical readings for charts and data tables. Supports ?range=day|week|month query param.
+    Also supports custom date range using ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD.
     """
     def get(self, request):
         import random
-        from datetime import timedelta
+        from datetime import datetime, time, timedelta
+        from django.utils.dateparse import parse_date
+
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
         range_type = request.query_params.get('range', 'day')
         now = timezone.now()
-        
-        if range_type == 'week':
-            start_date = now - timedelta(days=7)
-            limit = 7
-        elif range_type == 'month':
-            start_date = now - timedelta(days=30)
-            limit = 30
-        else: # day
-            start_date = now - timedelta(hours=24)
-            limit = 24
 
-        readings = SensorReading.objects.filter(timestamp__gte=start_date).order_by('timestamp')[:limit]
-        
-        if not readings.exists():
+        if start_date_str and end_date_str:
+            start_date = parse_date(start_date_str)
+            end_date = parse_date(end_date_str)
+            if start_date and end_date:
+                start_datetime = datetime.combine(start_date, time.min)
+                end_datetime = datetime.combine(end_date, time.max)
+                if timezone.is_aware(now):
+                    start_datetime = timezone.make_aware(start_datetime)
+                    end_datetime = timezone.make_aware(end_datetime)
+                
+                readings = SensorReading.objects.filter(
+                    timestamp__gte=start_datetime,
+                    timestamp__lte=end_datetime
+                ).order_by('timestamp')
+                range_type = 'custom'
+                days_diff = (end_date - start_date).days + 1
+                limit = max(1, min(days_diff * 4, 100)) # 4 points per day for mock data, max 100
+            else:
+                readings = SensorReading.objects.none()
+                range_type = 'custom'
+                limit = 0
+        else:
+            if range_type == 'week':
+                start_date = now - timedelta(days=7)
+                limit = 7
+            elif range_type == 'month':
+                start_date = now - timedelta(days=30)
+                limit = 30
+            else: # day
+                start_date = now - timedelta(hours=24)
+                limit = 24
+
+            readings = SensorReading.objects.filter(timestamp__gte=start_date).order_by('timestamp')[:limit]
+
+        if not readings.exists() and limit > 0:
             readings = []
             base_temp = 32.04
             base_hum = 45.66
@@ -260,7 +287,12 @@ class SensorHistoryView(APIView):
             base_wind = 0.89
 
             for i in range(limit):
-                time_point = now - timedelta(hours=(limit - i))
+                if range_type == 'custom' and start_date_str and end_date_str:
+                    # Distribute mock dates evenly
+                    time_point = start_datetime + timedelta(days=(i * (days_diff) / limit))
+                else:
+                    time_point = now - timedelta(hours=(limit - i))
+
                 wave = random.uniform(-0.4, 0.4)
                 rec = SensorReading.objects.create(
                     node_id='E32_WS (Sector A)',
@@ -275,7 +307,8 @@ class SensorHistoryView(APIView):
                     pm25=1.0,
                     pm10=2.0,
                     negative_ion=138.0,
-                    noise=0.0
+                    noise=0.0,
+                    timestamp=time_point
                 )
                 readings.append(rec)
 

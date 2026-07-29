@@ -37,6 +37,7 @@ const Header: React.FC = () => {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.className = theme;
     localStorage.setItem("theme", theme);
+    window.dispatchEvent(new CustomEvent('theme-change', { detail: theme }));
   }, [theme]);
 
   const toggleTheme = () => {

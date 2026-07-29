@@ -324,6 +324,35 @@
   flex: 1;
 }
 
+/* Light theme overrides for HeroCard */
+.light .hero-card {
+  background: linear-gradient(100deg, #e2e8f0 0%, #cbd5e1 100%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.light .hero-bg {
+  mix-blend-mode: multiply;
+  opacity: 0.12;
+}
+.light .hero-title {
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+.light .stat-item {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.light .stat-icon-wrap {
+  background: rgba(14, 189, 181, 0.15);
+}
+.badge-update {
+  background-color: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.light .badge-update {
+  background-color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: var(--text-primary);
+}
+
 .stat-icon-wrap {
   width: 26px;
   height: 26px;

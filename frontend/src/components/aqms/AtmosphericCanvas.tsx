@@ -11,6 +11,18 @@ export const AtmosphericCanvas: React.FC<AtmosphericCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [flowMode, setFlowMode] = useState<'particles' | 'heat'>('particles');
+  const [theme, setTheme] = useState(() => document.documentElement.getAttribute('data-theme') || 'dark');
+
+  useEffect(() => {
+    const handleThemeChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setTheme(customEvent.detail);
+    };
+    window.addEventListener('theme-change', handleThemeChange);
+    return () => {
+      window.removeEventListener('theme-change', handleThemeChange);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -50,7 +62,8 @@ export const AtmosphericCanvas: React.FC<AtmosphericCanvasProps> = ({
     }
 
     const draw = () => {
-      ctx.fillStyle = 'rgba(11, 19, 38, 0.08)';
+      const isDark = theme === 'dark';
+      ctx.fillStyle = isDark ? 'rgba(11, 19, 38, 0.08)' : 'rgba(250, 246, 238, 0.08)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const angleRad = ((90 - windHeading) * Math.PI) / 180;
@@ -61,9 +74,13 @@ export const AtmosphericCanvas: React.FC<AtmosphericCanvasProps> = ({
 
       particles.forEach((p) => {
         if (flowMode === 'particles') {
-          ctx.strokeStyle = `rgba(137, 206, 255, ${p.opacity})`;
+          ctx.strokeStyle = isDark
+            ? `rgba(137, 206, 255, ${p.opacity})`
+            : `rgba(37, 99, 235, ${p.opacity})`;
         } else {
-          ctx.strokeStyle = `rgba(255, 185, 95, ${p.opacity})`;
+          ctx.strokeStyle = isDark
+            ? `rgba(255, 185, 95, ${p.opacity})`
+            : `rgba(217, 119, 6, ${p.opacity})`;
         }
 
         ctx.lineWidth = 1.5;
@@ -93,7 +110,7 @@ export const AtmosphericCanvas: React.FC<AtmosphericCanvasProps> = ({
       window.removeEventListener('resize', resizeCanvas);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [windSpeed, windHeading, flowMode]);
+  }, [windSpeed, windHeading, flowMode, theme]);
 
   return (
     <div className="aqms-canvas-container glass-card">

@@ -38,7 +38,7 @@ export default function HeroCard({ latest, isConnected, site, deviceId }: HeroCa
                         <span className="badge">Structural Health Monitoring</span>
                     </div>
 
-                    <span className="badge" style={{ backgroundColor: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span className="badge badge-update">
                         <RefreshCw size={12} className="text-teal" />
                         <div className="flex-col" style={{ gap: '0' }}>
                             <span style={{ color: 'var(--text-tertiary)', fontSize: '0.55rem', lineHeight: 1 }}>Last Update</span>
