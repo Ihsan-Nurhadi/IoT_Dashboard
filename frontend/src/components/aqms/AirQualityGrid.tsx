@@ -54,7 +54,7 @@ export const AirQualityGrid: React.FC<AirQualityGridProps> = ({ reading }) => {
         </div>
 
         {/* Kebisingan (Noise) Card */}
-        <div className="aqms-metric-card glass-card justify-between">
+        {/* <div className="aqms-metric-card glass-card justify-between">
           <div>
             <p className="aqms-metric-title uppercase">
               KEBISINGAN (NOISE)
@@ -67,7 +67,7 @@ export const AirQualityGrid: React.FC<AirQualityGridProps> = ({ reading }) => {
           <div className="aqms-card-footer-text text-secondary">
             <span>🔊 Tingkat Kebisingan Area</span>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

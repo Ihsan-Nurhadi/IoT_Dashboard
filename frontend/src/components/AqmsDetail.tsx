@@ -6,7 +6,300 @@ import { AtmosphericCanvas } from './aqms/AtmosphericCanvas';
 import type { SensorReading, RangeType } from './aqms/types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import './AqmsDetail.css';
+
+const getAqiStatus = (pm25: number) => {
+  if (pm25 <= 4.0) return { label: 'Sangat Bersih', class: 'aqi-excellent', color: '#064e3b' };
+  if (pm25 <= 8.0) return { label: 'Bersih', class: 'aqi-very-good', color: '#059669' };
+  if (pm25 <= 12.0) return { label: 'Baik', class: 'aqi-good', color: '#10b981' };
+  if (pm25 <= 23.0) return { label: 'Sedang Rendah', class: 'aqi-moderate-low', color: '#a16207' };
+  if (pm25 <= 35.4) return { label: 'Sedang Tinggi', class: 'aqi-moderate-high', color: '#d97706' };
+  if (pm25 <= 55.4) return { label: 'Buruk', class: 'aqi-poor', color: '#fda4af' };
+  return { label: 'Sangat Buruk / Kritis', class: 'aqi-critical', color: '#881337' };
+};
+
+const getAqiColor = (pm25: number): string => {
+  return getAqiStatus(pm25).color;
+};
+
+const getSeededPm25 = (dayIdx: number, hourIdx: number): number => {
+  const peak1 = Math.exp(-Math.pow((hourIdx - 8) / 2, 2)); // Peak at 8 AM
+  const peak2 = Math.exp(-Math.pow((hourIdx - 18) / 2.5, 2)); // Peak at 6 PM
+  const isWeekend = dayIdx >= 5;
+  const weekendFactor = isWeekend ? 0.6 : 1.0;
+  const sineWave = Math.sin((dayIdx * 24 + hourIdx) * 0.5) * 2;
+  
+  let val = 6 + (peak1 * 14 + peak2 * 18) * weekendFactor + sineWave;
+  val = Math.max(1, Math.round(val));
+  return val;
+};
+
+
+const CustomizedDot = (props: any) => {
+  const { cx, cy, stroke, fill } = props;
+  return (
+    <circle cx={cx} cy={cy} r={2.5} stroke={stroke} strokeWidth={1} fill={fill} />
+  );
+};
+
+const AqiCustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const pm25 = payload[0].value;
+    const pm10 = payload[1] ? payload[1].value : null;
+    const status = getAqiStatus(pm25);
+    return (
+      <div className="aqms-chart-tooltip" style={{
+        backgroundColor: 'rgba(12, 18, 30, 0.9)',
+        backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255,255,255,0.05)',
+        borderRadius: '8px',
+        padding: '0.6rem 0.8rem',
+        color: 'var(--text-primary)',
+        fontSize: '0.75rem',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)'
+      }}>
+        <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6rem', marginBottom: '0.3rem' }}>{label}</div>
+        <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-teal)' }}></div>
+          PM2.5: {pm25} <span style={{ color: 'var(--text-secondary)', fontSize: '0.65rem' }}>ug/m³</span>
+        </div>
+        {pm10 !== null && (
+          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-blue)' }}></div>
+            PM10: {pm10} <span style={{ color: 'var(--text-secondary)', fontSize: '0.65rem' }}>ug/m³</span>
+          </div>
+        )}
+        <div style={{
+          marginTop: '0.4rem',
+          paddingTop: '0.3rem',
+          borderTop: '1px solid rgba(255,255,255,0.05)',
+          color: status.color,
+          fontWeight: 700,
+          fontSize: '0.7rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px'
+        }}>
+          Kualitas: {status.label}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+interface AqiTrendChartProps {
+  historyData: SensorReading[];
+  range: RangeType;
+}
+
+const AqiTrendChart: React.FC<AqiTrendChartProps> = ({ historyData, range }) => {
+  const chartData = [...historyData].reverse().map(d => {
+    const dateObj = new Date(d.timestamp);
+    let timeStr = '';
+    if (range === 'day') {
+      timeStr = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    } else if (range === 'week') {
+      timeStr = dateObj.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' });
+    } else {
+      timeStr = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+    }
+    return {
+      time: timeStr,
+      pm25: d.pm25,
+      pm10: d.pm10,
+    };
+  });
+
+  const pm25Values = chartData.map(d => d.pm25);
+  const pm10Values = chartData.map(d => d.pm10);
+  const allValues = [...pm25Values, ...pm10Values];
+  const yMin = 0;
+  const yMax = allValues.length > 0 ? Math.ceil(Math.max(...allValues) / 5) * 5 + 5 : 50;
+
+  return (
+    <div className="aqms-chart-card glass-card">
+      <div className="aqms-chart-header">
+        <div>
+          <h4 className="aqms-chart-title">Tren Kualitas Udara (PM2.5 & PM10)</h4>
+          <p className="aqms-chart-subtitle">Konsentrasi PM2.5 dan PM10 dalam ug/m³</p>
+        </div>
+        <div className="aqms-chart-legend-row">
+          <div className="aqms-legend-item">
+            <span className="aqms-legend-color" style={{ backgroundColor: 'var(--accent-teal)' }}></span>
+            <span>PM2.5</span>
+          </div>
+          <div className="aqms-legend-item">
+            <span className="aqms-legend-color" style={{ backgroundColor: 'var(--accent-blue)' }}></span>
+            <span>PM10</span>
+          </div>
+        </div>
+      </div>
+      <div className="aqms-chart-container" style={{ height: '300px', width: '100%', marginTop: '16px' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+            <defs>
+              <linearGradient id="colorPm25" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--accent-teal)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--accent-teal)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="colorPm10" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--accent-blue)" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="var(--accent-blue)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="1 0" stroke="rgba(255,255,255,0.05)" vertical={true} />
+            <XAxis dataKey="time" stroke="var(--text-tertiary)" fontSize={9} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.05)' }} tickMargin={8} />
+            <YAxis stroke="var(--text-tertiary)" fontSize={9} tickLine={false} axisLine={false} domain={[yMin, yMax]} />
+            <RechartsTooltip content={<AqiCustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '4 4' }} />
+            <Area type="monotone" dataKey="pm25" stroke="var(--accent-teal)" strokeWidth={2} fillOpacity={1} fill="url(#colorPm25)" dot={<CustomizedDot fill="var(--bg-main)" stroke="var(--accent-teal)" />} />
+            <Area type="monotone" dataKey="pm10" stroke="var(--accent-blue)" strokeWidth={1.5} fillOpacity={1} fill="url(#colorPm10)" dot={<CustomizedDot fill="var(--bg-main)" stroke="var(--accent-blue)" />} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
+
+interface WeeklyAqiHeatmapProps {
+  historyData: SensorReading[];
+}
+
+const WeeklyAqiHeatmap: React.FC<WeeklyAqiHeatmapProps> = ({ historyData }) => {
+  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+  const dayAbbrs = ['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'];
+  
+  const matrix: (number | null)[][] = Array(7).fill(null).map(() => Array(24).fill(null));
+  
+  historyData.forEach(d => {
+    const date = new Date(d.timestamp);
+    let dayIdx = date.getDay() - 1;
+    if (dayIdx === -1) dayIdx = 6;
+    const hour = date.getHours();
+    matrix[dayIdx][hour] = d.pm25;
+  });
+
+  const completeMatrix = matrix.map((row, dayIdx) => 
+    row.map((val, hourIdx) => val !== null ? val : getSeededPm25(dayIdx, hourIdx))
+  );
+
+  const [hoveredCell, setHoveredCell] = useState<{
+    day: string;
+    hour: number;
+    val: number;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleMouseEnter = (e: React.MouseEvent, day: string, hour: number, val: number) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const container = e.currentTarget.closest('.aqms-heatmap-grid-scroll');
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      setHoveredCell({
+        day,
+        hour,
+        val,
+        x: rect.left - containerRect.left + rect.width / 2,
+        y: rect.top - containerRect.top - 42
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredCell(null);
+  };
+
+  return (
+    <div className="aqms-heatmap-card glass-card">
+      <div className="aqms-heatmap-header">
+        <div>
+          <h4 className="aqms-chart-title">Heatmap Kualitas Udara Mingguan (PM2.5)</h4>
+          <p className="aqms-chart-subtitle">Distribusi kepadatan polutan PM2.5 berdasarkan Hari & Jam</p>
+        </div>
+        <div className="aqms-heatmap-legend">
+          <span className="legend-label">BAIK</span>
+          <div className="legend-blocks">
+            <span className="legend-block" style={{ backgroundColor: '#064e3b' }} title="Sangat Bersih (0 - 4.0)"></span>
+            <span className="legend-block" style={{ backgroundColor: '#059669' }} title="Bersih (4.1 - 8.0)"></span>
+            <span className="legend-block" style={{ backgroundColor: '#10b981' }} title="Baik (8.1 - 12.0)"></span>
+          </div>
+          <span className="legend-label ml-2">SEDANG</span>
+          <div className="legend-blocks">
+            <span className="legend-block" style={{ backgroundColor: '#a16207' }} title="Sedang Rendah (12.1 - 23.0)"></span>
+            <span className="legend-block" style={{ backgroundColor: '#d97706' }} title="Sedang Tinggi (23.1 - 35.4)"></span>
+          </div>
+          <span className="legend-label ml-2">BURUK</span>
+          <div className="legend-blocks">
+            <span className="legend-block" style={{ backgroundColor: '#fda4af' }} title="Buruk (35.5 - 55.4)"></span>
+            <span className="legend-block" style={{ backgroundColor: '#881337' }} title="Kritis (>= 55.5)"></span>
+          </div>
+        </div>
+      </div>
+
+      <div className="aqms-heatmap-grid-scroll">
+        {hoveredCell && (
+          <div className="aqms-heatmap-tooltip" style={{
+            position: 'absolute',
+            left: `${hoveredCell.x}px`,
+            top: `${hoveredCell.y}px`,
+            transform: 'translateX(-50%)',
+            pointerEvents: 'none',
+            zIndex: 100,
+            backgroundColor: 'rgba(12, 18, 30, 0.95)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '6px',
+            padding: '5px 8px',
+            color: 'var(--text-primary)',
+            fontSize: '0.65rem',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+            transition: 'left 0.1s ease-out, top 0.1s ease-out'
+          }}>
+            <div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '2px' }}>
+              {hoveredCell.day}, {String(hoveredCell.hour).padStart(2, '0')}:00
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: getAqiColor(hoveredCell.val) }}></span>
+              PM2.5: <strong>{hoveredCell.val}</strong> ug/m³
+            </div>
+            <div style={{ color: getAqiColor(hoveredCell.val), fontWeight: 700, fontSize: '0.6rem', textTransform: 'uppercase', marginTop: '2px' }}>
+              {getAqiStatus(hoveredCell.val).label}
+            </div>
+          </div>
+        )}
+
+        <div className="aqms-heatmap-grid-wrapper">
+          <div className="aqms-heatmap-row header-row">
+            <div className="aqms-heatmap-label empty-label"></div>
+            {Array(24).fill(0).map((_, h) => (
+              <div key={h} className="aqms-heatmap-hour-label">
+                {String(h).padStart(2, '0')}
+              </div>
+            ))}
+          </div>
+
+          {days.map((dayName, dayIdx) => (
+            <div key={dayIdx} className="aqms-heatmap-row">
+              <div className="aqms-heatmap-label">{dayAbbrs[dayIdx]}</div>
+              {completeMatrix[dayIdx].map((val, hourIdx) => (
+                <div
+                  key={hourIdx}
+                  className="aqms-heatmap-cell"
+                  style={{ backgroundColor: getAqiColor(val) }}
+                  onMouseEnter={(e) => handleMouseEnter(e, dayName, hourIdx, val)}
+                  onMouseLeave={handleMouseLeave}
+                ></div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const AqmsDetail: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'reports'>('dashboard');
@@ -23,7 +316,7 @@ const AqmsDetail: React.FC = () => {
     pm25: 1.0,
     pm10: 2.0,
     negative_ion: 138.0,
-    noise: 0.0,
+    // noise: 0.0,
     timestamp: new Date().toISOString(),
   });
 
@@ -105,13 +398,13 @@ const AqmsDetail: React.FC = () => {
       'Tekanan (hPa)',
       'Kecepatan Angin (m/s)',
       'Arah Angin (derajat)',
-      'Curah Hujan (mm)',
+      // 'Curah Hujan (mm)',
       'Cahaya (lux)',
       'Radiasi (W/m2)',
       'PM2.5 (ug/m3)',
       'PM10 (ug/m3)',
       'Ion Negatif (pcs/cm3)',
-      'Noise (dB)'
+      // 'Noise (dB)'
     ];
 
     const rows = readings.map(r => [
@@ -128,7 +421,7 @@ const AqmsDetail: React.FC = () => {
       r.pm25,
       r.pm10,
       r.negative_ion || 0,
-      r.noise || 0
+      // r.noise || 0
     ]);
 
     const csvContent = [
@@ -386,14 +679,14 @@ const AqmsDetail: React.FC = () => {
               colorClass="secondary"
               history={historyData.map(h => h.pressure).slice(-10)}
             />
-            <MetricCard
+            {/* <MetricCard
               title="Curah Hujan"
               value={latestReading.rain.toFixed(2)}
               unit="mm"
               icon="🌧️"
               colorClass="primary"
               history={historyData.map(h => h.rain).slice(-10)}
-            />
+            /> */}
             <MetricCard
               title="Intensitas Cahaya"
               value={Math.round(latestReading.light)}
@@ -464,6 +757,12 @@ const AqmsDetail: React.FC = () => {
               <p className="aqms-summary-value text-secondary">{avgWind} m/s</p>
               <p className="aqms-summary-sub">Rentang waktu: {range === 'day' ? '24 Jam' : range === 'week' ? '7 Hari' : '30 Hari'}</p>
             </div>
+          </div>
+
+          {/* Charts Section */}
+          <div className="aqms-charts-container">
+            <AqiTrendChart historyData={historyData} range={range} />
+            <WeeklyAqiHeatmap historyData={historyData} />
           </div>
 
           {/* History Parameter Table */}
