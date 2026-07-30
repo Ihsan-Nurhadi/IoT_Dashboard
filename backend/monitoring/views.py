@@ -255,15 +255,18 @@ class SensorHistoryView(APIView):
                     start_datetime = timezone.make_aware(start_datetime)
                     end_datetime = timezone.make_aware(end_datetime)
                 
-                readings = SensorReading.objects.filter(
+                queryset = SensorReading.objects.filter(
                     timestamp__gte=start_datetime,
                     timestamp__lte=end_datetime
                 ).order_by('timestamp')
+                has_readings = queryset.exists()
+                readings = list(queryset) if has_readings else []
                 range_type = 'custom'
                 days_diff = (end_date - start_date).days + 1
                 limit = max(1, min(days_diff * 4, 100)) # 4 points per day for mock data, max 100
             else:
-                readings = SensorReading.objects.none()
+                has_readings = False
+                readings = []
                 range_type = 'custom'
                 limit = 0
         else:
@@ -277,9 +280,11 @@ class SensorHistoryView(APIView):
                 start_date = now - timedelta(hours=24)
                 limit = 24
 
-            readings = SensorReading.objects.filter(timestamp__gte=start_date).order_by('timestamp')[:limit]
+            queryset = SensorReading.objects.filter(timestamp__gte=start_date).order_by('-timestamp')[:limit]
+            has_readings = queryset.exists()
+            readings = list(queryset)[::-1] if has_readings else []
 
-        if not readings.exists() and limit > 0:
+        if not has_readings and limit > 0:
             readings = []
             base_temp = 32.04
             base_hum = 45.66
@@ -294,7 +299,7 @@ class SensorHistoryView(APIView):
                     time_point = now - timedelta(hours=(limit - i))
 
                 wave = random.uniform(-0.4, 0.4)
-                rec = SensorReading.objects.create(
+                rec = SensorReading(
                     node_id='E32_WS (Sector A)',
                     temperature=round(base_temp + wave * 0.4, 2),
                     humidity=round(base_hum + wave * 0.5, 2),

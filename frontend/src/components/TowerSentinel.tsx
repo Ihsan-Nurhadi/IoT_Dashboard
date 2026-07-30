@@ -17,6 +17,7 @@ interface AQMSData {
   pm25: number;
   pm10: number;
   ion_negatif: number;
+  timestamp?: string;
 }
 
 const TowerSentinel: React.FC = () => {
@@ -300,7 +301,8 @@ const TowerSentinel: React.FC = () => {
               radiasi: data.radiation || 244,
               pm25: data.pm25 || 0,
               pm10: data.pm10 || 1,
-              ion_negatif: data.negative_ion || 138
+              ion_negatif: data.negative_ion || 138,
+              timestamp: data.timestamp
             });
           }
         }
@@ -1387,6 +1389,13 @@ const TowerSentinel: React.FC = () => {
     }
   };
 
+  const isAqmsOnline = (() => {
+    if (!aqmsData.timestamp) return false;
+    const lastActive = new Date(aqmsData.timestamp).getTime();
+    const now = new Date().getTime();
+    return (now - lastActive) < 5 * 60 * 1000;
+  })();
+
   return (
     <div className="tower-sentinel-portal">
       {/* ===== NAVBAR ===== */}
@@ -1484,7 +1493,9 @@ const TowerSentinel: React.FC = () => {
           <div>
             <div className="panel-section-title">
               AQMS &middot; Weather
-              <span className="view-all" style={{ color: 'var(--accent-green)' }} id="aqms-live-badge">Live</span>
+              <span className="view-all" style={{ color: isAqmsOnline ? 'var(--accent-green)' : '#ef4444' }} id="aqms-live-badge">
+                {isAqmsOnline ? 'Live' : 'Offline'}
+              </span>
             </div>
             <div className="weather-card" id="aqms-weather-card">
               <div className="aqms-top-row">

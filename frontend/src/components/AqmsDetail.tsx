@@ -9,7 +9,10 @@ import autoTable from 'jspdf-autotable';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import './AqmsDetail.css';
 
-const getAqiStatus = (pm25: number) => {
+const getAqiStatus = (pm25: number | null | undefined) => {
+  if (pm25 === null || pm25 === undefined) {
+    return { label: 'Tidak ada data', class: 'aqi-nodata', color: 'rgba(255, 255, 255, 0.06)' };
+  }
   if (pm25 <= 4.0) return { label: 'Sangat Bersih', class: 'aqi-excellent', color: '#064e3b' };
   if (pm25 <= 8.0) return { label: 'Bersih', class: 'aqi-very-good', color: '#059669' };
   if (pm25 <= 12.0) return { label: 'Baik', class: 'aqi-good', color: '#10b981' };
@@ -19,7 +22,7 @@ const getAqiStatus = (pm25: number) => {
   return { label: 'Sangat Buruk / Kritis', class: 'aqi-critical', color: '#881337' };
 };
 
-const getAqiColor = (pm25: number): string => {
+const getAqiColor = (pm25: number | null | undefined): string => {
   return getAqiStatus(pm25).color;
 };
 
@@ -179,19 +182,17 @@ const WeeklyAqiHeatmap: React.FC<WeeklyAqiHeatmapProps> = ({ historyData }) => {
     matrix[dayIdx][hour] = d.pm25;
   });
 
-  const completeMatrix = matrix.map((row, dayIdx) => 
-    row.map((val, hourIdx) => val !== null ? val : getSeededPm25(dayIdx, hourIdx))
-  );
+  const completeMatrix = matrix;
 
   const [hoveredCell, setHoveredCell] = useState<{
     day: string;
     hour: number;
-    val: number;
+    val: number | null;
     x: number;
     y: number;
   } | null>(null);
 
-  const handleMouseEnter = (e: React.MouseEvent, day: string, hour: number, val: number) => {
+  const handleMouseEnter = (e: React.MouseEvent, day: string, hour: number, val: number | null) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const container = e.currentTarget.closest('.aqms-heatmap-grid-scroll');
     if (container) {
@@ -260,13 +261,21 @@ const WeeklyAqiHeatmap: React.FC<WeeklyAqiHeatmapProps> = ({ historyData }) => {
             <div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '2px' }}>
               {hoveredCell.day}, {String(hoveredCell.hour).padStart(2, '0')}:00
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: getAqiColor(hoveredCell.val) }}></span>
-              PM2.5: <strong>{hoveredCell.val}</strong> ug/m³
-            </div>
-            <div style={{ color: getAqiColor(hoveredCell.val), fontWeight: 700, fontSize: '0.6rem', textTransform: 'uppercase', marginTop: '2px' }}>
-              {getAqiStatus(hoveredCell.val).label}
-            </div>
+            {hoveredCell.val !== null ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: getAqiColor(hoveredCell.val) }}></span>
+                  PM2.5: <strong>{hoveredCell.val}</strong> ug/m³
+                </div>
+                <div style={{ color: getAqiColor(hoveredCell.val), fontWeight: 700, fontSize: '0.6rem', textTransform: 'uppercase', marginTop: '2px' }}>
+                  {getAqiStatus(hoveredCell.val).label}
+                </div>
+              </>
+            ) : (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+                Tidak ada data
+              </div>
+            )}
           </div>
         )}
 
@@ -604,12 +613,44 @@ const AqmsDetail: React.FC = () => {
     }
   };
 
+  const isDeviceOnline = (() => {
+    if (!latestReading.timestamp) return false;
+    const lastActive = new Date(latestReading.timestamp).getTime();
+    const now = new Date().getTime();
+    return (now - lastActive) < 5 * 60 * 1000;
+  })();
+
   return (
     <div className="dashboard-container">
       {/* Top Header section aligned with NMS & Verticality detail pages */}
       <div className="aqms-header-section">
         <div>
-          <h1 className="aqms-main-title">Air Quality Monitoring System (AQMS)</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1 className="aqms-main-title">Air Quality Monitoring System (AQMS)</h1>
+            <span className={`aqms-status-badge ${isDeviceOnline ? 'online' : 'offline'}`} style={{
+              padding: '4px 10px',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              backgroundColor: isDeviceOnline ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+              color: isDeviceOnline ? '#22c55e' : '#ef4444',
+              border: isDeviceOnline ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              lineHeight: 1
+            }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor: isDeviceOnline ? '#22c55e' : '#ef4444',
+                marginRight: '6px',
+                display: 'inline-block'
+              }}></span>
+              {isDeviceOnline ? 'Online' : 'Offline'}
+            </span>
+          </div>
           <p className="aqms-subtitle-text">
             PRR-01-004 &middot; E32_WS &middot; Pemantauan Kualitas Udara, Suhu, dan Parameter Meteorologi Real-time
           </p>
