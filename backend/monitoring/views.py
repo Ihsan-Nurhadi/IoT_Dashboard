@@ -239,6 +239,9 @@ class SensorHistoryView(APIView):
         import random
         from datetime import datetime, time, timedelta
         from django.utils.dateparse import parse_date
+        from django.db.models import Max
+        from django.db.models.functions import TruncHour, TruncDay
+        from django.conf import settings
 
         start_date_str = request.query_params.get('start_date')
         end_date_str = request.query_params.get('end_date')
@@ -255,13 +258,25 @@ class SensorHistoryView(APIView):
                     start_datetime = timezone.make_aware(start_datetime)
                     end_datetime = timezone.make_aware(end_datetime)
                 
-                readings = SensorReading.objects.filter(
-                    timestamp__gte=start_datetime,
-                    timestamp__lte=end_datetime
-                ).order_by('timestamp')
-                range_type = 'custom'
                 days_diff = (end_date - start_date).days + 1
-                limit = max(1, min(days_diff * 4, 100)) # 4 points per day for mock data, max 100
+                if days_diff <= 3:
+                    trunc_func = TruncHour
+                else:
+                    trunc_func = TruncDay
+
+                latest_ids = (
+                    SensorReading.objects.filter(
+                        timestamp__gte=start_datetime,
+                        timestamp__lte=end_datetime
+                    )
+                    .annotate(time_period=trunc_func('timestamp'))
+                    .values('time_period')
+                    .annotate(latest_id=Max('id'))
+                    .values_list('latest_id', flat=True)
+                )
+                readings = SensorReading.objects.filter(id__in=latest_ids).order_by('timestamp')
+                range_type = 'custom'
+                limit = max(1, min(days_diff * 4, 100))
             else:
                 readings = SensorReading.objects.none()
                 range_type = 'custom'
@@ -269,48 +284,58 @@ class SensorHistoryView(APIView):
         else:
             if range_type == 'week':
                 start_date = now - timedelta(days=7)
+                trunc_func = TruncDay
                 limit = 7
             elif range_type == 'month':
                 start_date = now - timedelta(days=30)
+                trunc_func = TruncDay
                 limit = 30
             else: # day
                 start_date = now - timedelta(hours=24)
+                trunc_func = TruncHour
                 limit = 24
 
-            readings = SensorReading.objects.filter(timestamp__gte=start_date).order_by('timestamp')[:limit]
+            latest_ids = (
+                SensorReading.objects.filter(timestamp__gte=start_date)
+                .annotate(time_period=trunc_func('timestamp'))
+                .values('time_period')
+                .annotate(latest_id=Max('id'))
+                .values_list('latest_id', flat=True)
+            )
+            readings = SensorReading.objects.filter(id__in=latest_ids).order_by('timestamp')
 
         if not readings.exists() and limit > 0:
             readings = []
-            base_temp = 32.04
-            base_hum = 45.66
-            base_press = 100.67
-            base_wind = 0.89
+            if settings.DEBUG:
+                base_temp = 32.04
+                base_hum = 45.66
+                base_press = 100.67
+                base_wind = 0.89
 
-            for i in range(limit):
-                if range_type == 'custom' and start_date_str and end_date_str:
-                    # Distribute mock dates evenly
-                    time_point = start_datetime + timedelta(days=(i * (days_diff) / limit))
-                else:
-                    time_point = now - timedelta(hours=(limit - i))
+                for i in range(limit):
+                    if range_type == 'custom' and start_date_str and end_date_str:
+                        time_point = start_datetime + timedelta(days=(i * (days_diff) / limit))
+                    else:
+                        time_point = now - timedelta(hours=(limit - i))
 
-                wave = random.uniform(-0.4, 0.4)
-                rec = SensorReading.objects.create(
-                    node_id='E32_WS (Sector A)',
-                    temperature=round(base_temp + wave * 0.4, 2),
-                    humidity=round(base_hum + wave * 0.5, 2),
-                    pressure=round(base_press + wave * 0.05, 2),
-                    wind_speed=round(max(0.1, base_wind + wave * 0.1), 2),
-                    wind_direction=324.0,
-                    rain=27.40,
-                    light=5817.0,
-                    radiation=45.0,
-                    pm25=1.0,
-                    pm10=2.0,
-                    negative_ion=138.0,
-                    noise=0.0,
-                    timestamp=time_point
-                )
-                readings.append(rec)
+                    wave = random.uniform(-0.4, 0.4)
+                    rec = SensorReading(
+                        node_id='E32_WS (Sector A)',
+                        temperature=round(base_temp + wave * 0.4, 2),
+                        humidity=round(base_hum + wave * 0.5, 2),
+                        pressure=round(base_press + wave * 0.05, 2),
+                        wind_speed=round(max(0.1, base_wind + wave * 0.1), 2),
+                        wind_direction=324.0,
+                        rain=27.40,
+                        light=5817.0,
+                        radiation=45.0,
+                        pm25=1.0,
+                        pm10=2.0,
+                        negative_ion=138.0,
+                        noise=0.0,
+                        timestamp=time_point
+                    )
+                    readings.append(rec)
 
         serializer = SensorReadingSerializer(readings, many=True)
         return Response({
@@ -318,6 +343,7 @@ class SensorHistoryView(APIView):
             'count': len(serializer.data),
             'results': serializer.data
         })
+
 
 
 class IngestSensorReadingView(APIView):
