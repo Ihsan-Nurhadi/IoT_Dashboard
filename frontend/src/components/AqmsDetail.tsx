@@ -331,6 +331,7 @@ const AqmsDetail: React.FC = () => {
 
   const [range, setRange] = useState<RangeType>('day');
   const [historyData, setHistoryData] = useState<SensorReading[]>([]);
+  const [heatmapData, setHeatmapData] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   // States for Audit Report Tab
@@ -383,6 +384,31 @@ const AqmsDetail: React.FC = () => {
 
     fetchHistory();
   }, [range, activeTab]);
+
+  // Fetch heatmap data for the past 7 days (unlimited hourly data)
+  useEffect(() => {
+    const fetchHeatmapData = async () => {
+      try {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(end.getDate() - 7);
+        const startStr = start.toISOString().split('T')[0];
+        const endStr = end.toISOString().split('T')[0];
+        
+        const res = await fetch(`/api/sensor-readings/history/?start_date=${startStr}&end_date=${endStr}`);
+        if (res.ok) {
+          const data = await res.json();
+          setHeatmapData(data.results || []);
+        }
+      } catch (err) {
+        console.error('Error fetching AQMS heatmap history:', err);
+      }
+    };
+
+    if (activeTab === 'analytics') {
+      fetchHeatmapData();
+    }
+  }, [activeTab]);
 
   // Calculations for Analytics Summary
   const avgTemp = historyData.length
@@ -803,7 +829,7 @@ const AqmsDetail: React.FC = () => {
           {/* Charts Section */}
           <div className="aqms-charts-container">
             <AqiTrendChart historyData={historyData} range={range} />
-            <WeeklyAqiHeatmap historyData={historyData} />
+            <WeeklyAqiHeatmap historyData={heatmapData} />
           </div>
 
           {/* History Parameter Table */}
