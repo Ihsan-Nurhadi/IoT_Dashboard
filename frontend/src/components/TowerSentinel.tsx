@@ -1104,7 +1104,7 @@ const TowerSentinel: React.FC = () => {
     const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), legMat);
     bracket.position.set(-0.35, 0, 0);
     vertiGroup.add(bracket);
-    vertiGroup.position.set(0.6, 15.0, 0.6);
+    vertiGroup.position.set(0.6, 20.0, 0.6);
 
     // Wind vane
     const vaneGroup = new THREE.Group();
@@ -1157,14 +1157,14 @@ const TowerSentinel: React.FC = () => {
 
     const hotspotNMS = makeHotspot(0xf59e0b, 3.5, 7.0, 0);
     const hotspotAQMS = makeHotspot(0x22d3ee, 2.0, 11.5, 0.5);
-    const hotspotVerti = makeHotspot(0xc084fc, 0.6, 15.0, 0.6);
-    const hotspotAsset = makeHotspot(0x10b981, 0, 20.2, 0.5);
+    const hotspotVerti = makeHotspot(0xc084fc, 0.6, 20.0, 0.6);
+    const hotspotAsset = makeHotspot(0x10b981, 0, 17.5, 0.5);
 
     const allHotspots = [
       { key: 'nms' as const, hs: hotspotNMS, lookAtY: 7, dist: 14, rotX: 0.06, rotY: 0.6, labelRef: labelNmsRef },
       { key: 'aqms' as const, hs: hotspotAQMS, lookAtY: 11.5, dist: 14, rotX: 0.08, rotY: 0.4, labelRef: labelAqmsRef },
-      { key: 'verti' as const, hs: hotspotVerti, lookAtY: 15, dist: 12, rotX: 0.05, rotY: -0.3, labelRef: labelVertiRef },
-      { key: 'asset' as const, hs: hotspotAsset, lookAtY: 20.2, dist: 12, rotX: 0.05, rotY: 0.1, labelRef: labelAssetRef },
+      { key: 'verti' as const, hs: hotspotVerti, lookAtY: 20.0, dist: 12, rotX: 0.05, rotY: -0.3, labelRef: labelVertiRef },
+      { key: 'asset' as const, hs: hotspotAsset, lookAtY: 17.5, dist: 12, rotX: 0.05, rotY: 0.1, labelRef: labelAssetRef },
     ];
 
     // Raycaster for clicking hotspots
