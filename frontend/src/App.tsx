@@ -7,6 +7,7 @@ import SiteDetail from './components/SiteDetail';
 import TowerSentinel from './components/TowerSentinel';
 import VerticalityDetail from './components/VerticalityDetail';
 import AqmsDetail from './components/AqmsDetail';
+import AssetMonitoringDetail from './components/AssetMonitoringDetail';
 
 // Layout wrapper untuk NMS views agar menyertakan Header & Footer
 const NmsLayout = () => {
@@ -31,6 +32,7 @@ const App: React.FC = () => {
           <Route path="/site-detail" element={<SiteDetail />} />
           <Route path="/verticality/:deviceId" element={<VerticalityDetail />} />
           <Route path="/aqms" element={<AqmsDetail />} />
+          <Route path="/asset-monitoring" element={<AssetMonitoringDetail />} />
         </Route>
       </Routes>
     </Router>

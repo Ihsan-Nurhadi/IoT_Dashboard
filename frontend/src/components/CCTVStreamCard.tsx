@@ -7,14 +7,16 @@ interface CCTVStreamCardProps {
   streamId?: string;
   cameraName?: string;
   subTitle?: string;
+  fallbackPhotoUrl?: string;
 }
 
 const CCTVStreamCard: React.FC<CCTVStreamCardProps> = ({
   streamId = 'cctv',
   cameraName = 'Kamera #1',
-  subTitle = ''
+  subTitle = '',
+  fallbackPhotoUrl
 }) => {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(fallbackPhotoUrl || null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [timestamp, setTimestamp] = useState<string>('-');
   const [loading, setLoading] = useState<boolean>(false);

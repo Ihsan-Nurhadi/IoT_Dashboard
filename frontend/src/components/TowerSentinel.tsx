@@ -36,9 +36,10 @@ const TowerSentinel: React.FC = () => {
   const labelNmsRef = useRef<HTMLDivElement | null>(null);
   const labelAqmsRef = useRef<HTMLDivElement | null>(null);
   const labelVertiRef = useRef<HTMLDivElement | null>(null);
+  const labelAssetRef = useRef<HTMLDivElement | null>(null);
 
   // States
-  const [activeModal, setActiveModal] = useState<'nms' | 'aqms' | 'verti' | null>(null);
+  const [activeModal, setActiveModal] = useState<'nms' | 'aqms' | 'verti' | 'asset' | null>(null);
   const [activeFeed, setActiveFeed] = useState<number>(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [mobileView, setMobileView] = useState<'tower' | 'data' | 'alerts' | 'feeds' | 'settings'>('tower');
@@ -57,7 +58,7 @@ const TowerSentinel: React.FC = () => {
   });
 
   // Reference functions for canvas zoom resets
-  const zoomToSystemRef = useRef<((key: 'nms' | 'aqms' | 'verti') => void) | null>(null);
+  const zoomToSystemRef = useRef<((key: 'nms' | 'aqms' | 'verti' | 'asset') => void) | null>(null);
   const resetViewRef = useRef<(() => void) | null>(null);
   const toggleAutoRotateRef = useRef<((val?: boolean) => void) | null>(null);
   const toggleWireframeRef = useRef<(() => void) | null>(null);
@@ -561,8 +562,8 @@ const TowerSentinel: React.FC = () => {
     if (!canvas) return;
 
     const isDark = theme === 'dark';
-    const fogColor = isDark ? 0x0d1020 : 0xfaf6ee;
-    const groundColor = isDark ? 0x050a05 : 0x8da190;
+    const fogColor = isDark ? 0x0a1122 : 0xfaf6ee;
+    const groundColor = isDark ? 0x0c250c : 0x8da190;
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -895,6 +896,67 @@ const TowerSentinel: React.FC = () => {
     addFenceLine(xMax, zMin, xMax, zMax); // Right
     towerGroup.add(fenceGroup);
 
+    // --- 3D Vegetation Helpers (Earth Environment) ---
+    const addTree = (x: number, z: number, scale = 1.0) => {
+      const treeGroup = new THREE.Group();
+      treeGroup.position.set(x, -0.01, z);
+
+      // Brown trunk
+      const trunkGeo = new THREE.CylinderGeometry(0.06 * scale, 0.1 * scale, 1.2 * scale, 5);
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9, metalness: 0.1 });
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = 0.6 * scale;
+      trunk.castShadow = true;
+      treeGroup.add(trunk);
+
+      // Stacked dark green pine foliage
+      const foliageMat = new THREE.MeshStandardMaterial({ color: 0x1b4d3e, roughness: 0.8, metalness: 0.1 });
+      for (let i = 0; i < 3; i++) {
+        const coneGeo = new THREE.ConeGeometry(0.5 * (1 - i * 0.25) * scale, 1.0 * scale, 5);
+        const cone = new THREE.Mesh(coneGeo, foliageMat);
+        cone.position.y = (1.1 + i * 0.5) * scale;
+        cone.castShadow = true;
+        treeGroup.add(cone);
+      }
+
+      towerGroup.add(treeGroup);
+    };
+
+    const addBush = (x: number, z: number, scale = 1.0) => {
+      const bushGeo = new THREE.SphereGeometry(0.35 * scale, 6, 5);
+      const bushMat = new THREE.MeshStandardMaterial({ color: 0x27663e, roughness: 0.9, metalness: 0.1 });
+      const bush = new THREE.Mesh(bushGeo, bushMat);
+      bush.position.set(x, 0.15 * scale, z);
+      bush.castShadow = true;
+      towerGroup.add(bush);
+    };
+
+    // Scatter Trees outside the fenced facility
+    const treePositions = [
+      { x: -7, z: -8 }, { x: -8, z: -3 }, { x: -6, z: 4 }, { x: -9, z: 8 },
+      { x: 7, z: -8 }, { x: 8, z: -2 }, { x: 6, z: 5 }, { x: 9, z: 9 },
+      { x: -3, z: -10 }, { x: 3, z: -9 }, { x: -12, z: -2 }, { x: 12, z: 2 },
+      { x: -10, z: -12 }, { x: 10, z: -11 }, { x: -14, z: -6 }, { x: 14, z: -5 }
+    ];
+
+    treePositions.forEach(pos => {
+      const jitterX = (Math.random() - 0.5) * 1.5;
+      const jitterZ = (Math.random() - 0.5) * 1.5;
+      const scale = 0.7 + Math.random() * 0.6;
+      addTree(pos.x + jitterX, pos.z + jitterZ, scale);
+    });
+
+    // Scatter Bushes around fence corners
+    const bushPositions = [
+      { x: -5, z: 3.5 }, { x: 5, z: 3.5 },
+      { x: -5, z: -6.5 }, { x: 5, z: -6.5 },
+      { x: -1.5, z: 3.5 }, { x: 1.5, z: 3.5 }
+    ];
+    bushPositions.forEach(pos => {
+      if (Math.abs(pos.x) === 1.5 && Math.random() > 0.5) return; // leave gate clear
+      addBush(pos.x, pos.z, 0.8 + Math.random() * 0.4);
+    });
+
     // Warning light
     const warnGeo = new THREE.SphereGeometry(0.18, 8, 8);
     const warnMat = new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xff2200, emissiveIntensity: 2 });
@@ -967,6 +1029,9 @@ const TowerSentinel: React.FC = () => {
     };
     makeCCTV(1.6, 8.5, 1.2, 0.5);
     makeCCTV(-1.6, 8.5, -1.2, -2.2);
+    // Two high-altitude CCTVs pointing at the antennas
+    makeCCTV(1.2, 19.5, 1.2, 2.5);
+    makeCCTV(-1.2, 19.5, -1.2, -0.6);
 
     // AQMS Anemometer/Weather Module
     const aqmsGroup = new THREE.Group();
@@ -1093,11 +1158,13 @@ const TowerSentinel: React.FC = () => {
     const hotspotNMS = makeHotspot(0xf59e0b, 3.5, 7.0, 0);
     const hotspotAQMS = makeHotspot(0x22d3ee, 2.0, 11.5, 0.5);
     const hotspotVerti = makeHotspot(0xc084fc, 0.6, 19.0, 0.6);
+    const hotspotAsset = makeHotspot(0x10b981, 0, 20.2, 0.5);
 
     const allHotspots = [
       { key: 'nms' as const, hs: hotspotNMS, lookAtY: 7, dist: 14, rotX: 0.06, rotY: 0.6, labelRef: labelNmsRef },
       { key: 'aqms' as const, hs: hotspotAQMS, lookAtY: 11.5, dist: 14, rotX: 0.08, rotY: 0.4, labelRef: labelAqmsRef },
       { key: 'verti' as const, hs: hotspotVerti, lookAtY: 19, dist: 12, rotX: 0.05, rotY: -0.3, labelRef: labelVertiRef },
+      { key: 'asset' as const, hs: hotspotAsset, lookAtY: 20.2, dist: 12, rotX: 0.05, rotY: 0.1, labelRef: labelAssetRef },
     ];
 
     // Raycaster for clicking hotspots
@@ -1129,7 +1196,7 @@ const TowerSentinel: React.FC = () => {
     let camDist = 38, targetDist = 38;
     let isDragging = false, lastX = 0, lastY = 0;
 
-    const zoomToSystem = (key: 'nms' | 'aqms' | 'verti') => {
+    const zoomToSystem = (key: 'nms' | 'aqms' | 'verti' | 'asset') => {
       const info = allHotspots.find(h => h.key === key);
       if (!info) return;
       autoRotate = false;
@@ -1484,6 +1551,16 @@ const TowerSentinel: React.FC = () => {
           >
             🌤️
           </div>
+          <div
+            className={`s-icon ${activeModal === 'asset' ? 'active' : ''}`}
+            title="Asset Monitoring"
+            onClick={() => {
+              setActiveModal('asset');
+              zoomToSystemRef.current?.('asset');
+            }}
+          >
+            🏷️
+          </div>
           <div className="s-icon" title="Settings" style={{ marginTop: 'auto' }}>⚙️</div>
         </div>
 
@@ -1605,7 +1682,7 @@ const TowerSentinel: React.FC = () => {
 
             {/* Big Status Indicator */}
             <div className={`verti-indicator-badge ${vertiStatus.indikator === 'critical' ? 'critical' :
-                vertiStatus.indikator === 'warning' ? 'warning' : 'normal'
+              vertiStatus.indikator === 'warning' ? 'warning' : 'normal'
               }`}>
               <span className="verti-indicator-icon">
                 {vertiStatus.indikator === 'critical' ? '🔴' :
@@ -1658,6 +1735,35 @@ const TowerSentinel: React.FC = () => {
                         : 'linear-gradient(to right,#22c55e,#22d3ee)'
                   }}
                 />
+              </div>
+            </div>
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
+
+          {/* ASSET MONITORING — RFID Counting */}
+          <div className="asset-sidebar-panel">
+            <div className="panel-section-title">
+              Asset Monitoring
+              <span className="view-all" style={{ color: 'var(--accent-green)' }}>● Live</span>
+            </div>
+
+            <div className="asset-indicator-badge">
+              <span className="asset-indicator-icon">🏷️</span>
+              <div className="asset-indicator-text">
+                <span className="asset-indicator-label">Antena Terhitung</span>
+                <span className="asset-indicator-value">6 / 6 Antena Aktif</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem', marginTop: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-sub)' }}>
+                <span>RFID Status:</span>
+                <span style={{ color: 'var(--accent-green)', fontWeight: '600' }}>CONNECTED</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-sub)' }}>
+                <span>Total Asset:</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>6 Antena Terpasang</span>
               </div>
             </div>
           </div>
@@ -1800,6 +1906,22 @@ const TowerSentinel: React.FC = () => {
               <div className="sys-content">
                 <div className="sys-title">Verticality</div>
                 <div className="sys-sub">Tilt Sensor</div>
+              </div>
+            </div>
+
+            <div
+              ref={labelAssetRef}
+              id="label-asset"
+              className="system-label"
+              onClick={() => {
+                setActiveModal('asset');
+                zoomToSystemRef.current?.('asset');
+              }}
+            >
+              <div className="sys-dot" style={{ background: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
+              <div className="sys-content">
+                <div className="sys-title">Asset Monitoring</div>
+                <div className="sys-sub">RFID &middot; 2 CCTV</div>
               </div>
             </div>
           </div>
@@ -2320,6 +2442,81 @@ const TowerSentinel: React.FC = () => {
                       <span>Intensitas Cahaya:</span>
                       <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{aqmsData.cahaya} lux</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeModal === 'asset' && (
+            <div className="nms-drawer" onClick={(e) => e.stopPropagation()}>
+              <div className="nms-drawer-header">
+                <div className="nms-header-left">
+                  <div className="nms-title-row">
+                    <h2>NAYAKA WS</h2>
+                    <span className="status-badge-inline green">COMPLETE</span>
+                  </div>
+                  <p className="nms-subtitle">
+                    20TS10B1529 &middot; SST 42m &middot; antenna asset monitoring management
+                  </p>
+                </div>
+                <div className="nms-header-actions">
+                  <button
+                    className="nms-action-btn border primary"
+                    onClick={() => {
+                      setActiveModal(null);
+                      if (resetViewRef.current) resetViewRef.current();
+                      navigate('/asset-monitoring');
+                    }}
+                  >
+                    Lihat Detail
+                  </button>
+                  <button className="nms-close-btn" onClick={handleCloseModal}>&times;</button>
+                </div>
+              </div>
+
+              <div className="nms-drawer-body">
+                {/* RFID STATUS */}
+                <div className="nms-section">
+                  <h3 className="nms-section-title">RFID TELEMETRY</h3>
+                  <div className="nms-status-grid">
+                    <div className="nms-status-card" style={{
+                      gridColumn: '1 / -1',
+                      border: '1px var(--accent-green)',
+                      boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)',
+                      padding: '24px',
+                      background: 'rgba(16, 185, 129, 0.05)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <span style={{ fontSize: '2rem' }}>🏷️</span>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 350, color: '#ffffff' }}>Active Antennas</h4>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-sub)' }}>Antenna Counting</span>
+                          </div>
+                        </div>
+                        <div style={{
+                          color: 'var(--accent-green)',
+                          fontSize: '1.2rem',
+                          fontWeight: 'bold',
+                          textShadow: '0 0 12px rgba(16, 185, 129, 0.6)'
+                        }}>
+                          Completed (6 / 6)
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CCTV */}
+                <div className="nms-section">
+                  <h3 className="nms-section-title">ANTENNA MONITORING CCTV</h3>
+                  <div className="nms-cctv-grid">
+                    <CCTVStreamCard streamId="cctv_asset_1" cameraName="Antenna CCTV #1" fallbackPhotoUrl="/camera_4.jpeg" />
+                    <CCTVStreamCard streamId="cctv_asset_2" cameraName="Antenna CCTV #2" fallbackPhotoUrl="/contoh cctv.jpg" />
                   </div>
                 </div>
               </div>

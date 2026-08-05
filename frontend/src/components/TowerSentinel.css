@@ -1796,6 +1796,50 @@
     transition: width 0.6s ease, background 0.4s;
     min-width: 2px;
   }
+
+  /* ===== ASSET MONITORING SIDEBAR PANEL ===== */
+  .asset-sidebar-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .asset-indicator-badge {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: all 0.4s;
+  }
+
+  .asset-indicator-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .asset-indicator-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .asset-indicator-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .asset-indicator-value {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent-green);
+  }
 }
+
 
 
