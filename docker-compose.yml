@@ -70,6 +70,24 @@ services:
     networks:
       - nms_network
 
+  # 2d. BLE Listener (Worker Background)
+  ble_listener:
+    build: ./backend
+    container_name: nms_ble_worker
+    restart: always
+    command: python manage.py ble_listener
+    environment:
+      - TZ=Asia/Jakarta
+    env_file: .env
+    depends_on:
+      - backend
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    networks:
+      - nms_network
+
   # 3. Frontend (React)
   frontend:
     build: ./frontend

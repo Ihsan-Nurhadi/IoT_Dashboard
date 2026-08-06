@@ -457,3 +457,199 @@
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+
+/* ===== LIGHT MODE OVERRIDES ===== */
+[data-theme="light"] .asset-detail-page,
+.light .asset-detail-page {
+  background: var(--bg-primary, #f8fafc);
+  color: var(--text-primary, #0f172a);
+}
+
+[data-theme="light"] .glass-card,
+.light .glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .glass-card:hover,
+.light .glass-card:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .asset-title,
+.light .asset-title {
+  background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme="light"] .asset-meta-row,
+.light .asset-meta-row {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .card-section-title-row,
+.light .card-section-title-row {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .asset-table th,
+.light .asset-table th {
+  color: #475569;
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .asset-table td,
+.light .asset-table td {
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+  color: #334155;
+}
+
+[data-theme="light"] .asset-table tr:hover td,
+.light .asset-table tr:hover td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .mono-text,
+.light .mono-text {
+  color: #0f766e; /* Nice teal for monospace in light mode */
+}
+
+[data-theme="light"] .cctv-container-with-info,
+.light .cctv-container-with-info {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .cctv-count-badge,
+.light .cctv-count-badge {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #475569;
+}
+
+[data-theme="light"] .cctv-count-value,
+.light .cctv-count-value {
+  color: #0f172a;
+}
+
+[data-theme="light"] .cctv-info-footer,
+.light .cctv-info-footer {
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .asset-chart-container,
+.light .asset-chart-container {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+/* Modals */
+[data-theme="light"] .asset-modal-overlay,
+.light .asset-modal-overlay {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+[data-theme="light"] .asset-modal-content,
+.light .asset-modal-content {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .asset-modal-title,
+.light .asset-modal-title {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+  color: #0f172a;
+}
+
+[data-theme="light"] .asset-modal-image-wrapper,
+.light .asset-modal-image-wrapper {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .info-row,
+.light .info-row {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .info-label,
+.light .info-label {
+  color: #475569;
+}
+
+[data-theme="light"] .info-value,
+.light .info-value {
+  color: #0f172a;
+}
+
+
+/* ===== RESPONSIVE MOBILE ADJUSTMENTS ===== */
+@media (max-width: 768px) {
+  .asset-detail-page {
+    padding: 12px;
+    gap: 16px;
+  }
+  
+  .glass-card {
+    padding: 14px;
+  }
+  
+  .asset-title {
+    font-size: 1.4rem;
+  }
+
+  .asset-status-badge {
+    padding: 3px 10px;
+    font-size: 0.7rem;
+  }
+  
+  .asset-meta-row {
+    gap: 12px;
+    padding-top: 10px;
+  }
+  
+  .metric-value {
+    font-size: 1.6rem;
+  }
+
+  .asset-table th, 
+  .asset-table td {
+    padding: 8px;
+    font-size: 0.72rem;
+  }
+  
+  .cctv-container-with-info {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .cctv-description-box {
+    padding-left: 0;
+    gap: 8px;
+  }
+
+  .cctv-count-value {
+    font-size: 1.25rem;
+  }
+  
+  .asset-modal-content {
+    width: 95%;
+    padding: 16px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .info-row {
+    font-size: 0.78rem;
+    padding-bottom: 6px;
+  }
+}

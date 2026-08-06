@@ -127,6 +127,8 @@ const TowerSentinel: React.FC = () => {
     timestamp: '-'
   });
 
+  const [bleActiveCount, setBleActiveCount] = useState<number>(0);
+  const [bleTotalCount, setBleTotalCount] = useState<number>(1);
 
   const [isLampuOn, setIsLampuOn] = useState<boolean>(false);
   const [isLampuLoading, setIsLampuLoading] = useState<boolean>(false);
@@ -314,6 +316,27 @@ const TowerSentinel: React.FC = () => {
 
     fetchAqmsStatus();
     const interval = setInterval(fetchAqmsStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Poll BLE Status
+  useEffect(() => {
+    const fetchBleStatus = async () => {
+      try {
+        const res = await fetch('/api/ble/latest/');
+        if (res.ok) {
+          const data = await res.json();
+          const detected = data.filter((t: any) => t.status === 'Detected').length;
+          setBleActiveCount(detected);
+          setBleTotalCount(data.length || 1);
+        }
+      } catch (err) {
+        console.error("Error fetching BLE status:", err);
+      }
+    };
+
+    fetchBleStatus();
+    const interval = setInterval(fetchBleStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1752,18 +1775,20 @@ const TowerSentinel: React.FC = () => {
               <span className="asset-indicator-icon">🏷️</span>
               <div className="asset-indicator-text">
                 <span className="asset-indicator-label">Antena Terhitung</span>
-                <span className="asset-indicator-value">6 / 6 Antena Aktif</span>
+                <span className="asset-indicator-value">{bleActiveCount} / {bleTotalCount} Antena Aktif</span>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem', marginTop: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-sub)' }}>
-                <span>RFID Status:</span>
-                <span style={{ color: 'var(--accent-green)', fontWeight: '600' }}>CONNECTED</span>
+                <span>BLE Status:</span>
+                <span style={{ color: bleActiveCount > 0 ? 'var(--accent-green)' : '#ef4444', fontWeight: '600' }}>
+                  {bleActiveCount > 0 ? 'CONNECTED' : 'DISCONNECTED'}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-sub)' }}>
                 <span>Total Asset:</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>6 Antena Terpasang</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{bleTotalCount} Antena Terpasang</span>
               </div>
             </div>
           </div>
@@ -2504,7 +2529,7 @@ const TowerSentinel: React.FC = () => {
                           fontWeight: 'bold',
                           textShadow: '0 0 12px rgba(16, 185, 129, 0.6)'
                         }}>
-                          Completed (6 / 6)
+                          {bleActiveCount === bleTotalCount ? 'Completed' : 'Scanning'} ({bleActiveCount} / {bleTotalCount})
                         </div>
                       </div>
                     </div>

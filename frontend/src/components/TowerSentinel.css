@@ -304,7 +304,7 @@
 }
 .aqms-row-icon { font-size: 0.78rem; width: 18px; text-align: center; flex-shrink: 0; }
 .aqms-row-label { color: #64748b; flex: 1; }
-.aqms-row-val { color: #f1f5f9; font-weight: 500; text-align: right; display: flex; gap: 4px; align-items: center; }
+.aqms-row-val { color: #7286a1; font-weight: 500; text-align: right; display: flex; gap: 4px; align-items: center; }
 .aqms-dir {
   font-size: 0.62rem; color: #22d3ee;
   background: rgba(34,211,238,0.1); border-radius: 4px;

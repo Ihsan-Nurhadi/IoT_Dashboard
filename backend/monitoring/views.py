@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db.models import Max, Subquery, OuterRef
 from django.utils import timezone
-from .models import SensorData, SiteVisibility, Site, SensorReading
+from .models import SensorData, SiteVisibility, Site, SensorReading, BLEScan
 from .serializers import SensorDataSerializer, SiteVisibilitySerializer, SiteSerializer, SensorReadingSerializer
 
 
@@ -335,5 +335,85 @@ class IngestSensorReadingView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def ble_latest_scans(request):
+    """
+    Returns the latest scan for the single target BLE antenna (MAC: 7C:D9:F4:03:32:47).
+    If no scans exist, returns default missing record.
+    """
+    mac_target = "7C:D9:F4:03:32:47"
+    name_target = "BTSID TII"
+    
+    latest_scan = BLEScan.objects.filter(mac=mac_target).first()
+    
+    if latest_scan:
+        scan_time = latest_scan.timestamp
+        if timezone.is_naive(scan_time):
+            scan_time = timezone.make_aware(scan_time)
+            
+        time_diff = timezone.now() - scan_time
+        # Active if scanned within the last 15 seconds
+        is_active = time_diff.total_seconds() < 15
+        
+        status_val = 'Detected' if is_active else 'Missing'
+        rssi = latest_scan.rssi
+        timestamp_str = latest_scan.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        uuid = latest_scan.uuid or "AAFE"
+        namespace_id = latest_scan.namespace_id or "E157A01861C755AA8C02"
+        instance_id = latest_scan.instance_id or "4BC30C720055"
+        power = latest_scan.power or "226"
+    else:
+        status_val = 'Missing'
+        rssi = -100
+        timestamp_str = None
+        uuid = "AAFE"
+        namespace_id = "E157A01861C755AA8C02"
+        instance_id = "4BC30C720055"
+        power = "226"
+        
+    return Response([{
+        'mac': mac_target,
+        'name': name_target,
+        'rssi': rssi,
+        'timestamp': timestamp_str,
+        'status': status_val,
+        'uuid': uuid,
+        'namespace_id': namespace_id,
+        'instance_id': instance_id,
+        'power': power,
+    }])
+
+
+@api_view(['GET'])
+def ble_history_chart(request):
+    """
+    Returns the real-time detection trend (0 or 1) of the target BLE antenna for the last 15 intervals (10 seconds each).
+    """
+    import datetime
+    mac_target = "7C:D9:F4:03:32:47"
+    now = timezone.now()
+    results = []
+    
+    for i in range(14, -1, -1):
+        time_point = now - datetime.timedelta(seconds=i * 10)
+        start_time = time_point - datetime.timedelta(seconds=10)
+        
+        scanned = BLEScan.objects.filter(
+            mac=mac_target,
+            timestamp__gte=start_time,
+            timestamp__lte=time_point
+        ).exists()
+        
+        count = 1 if scanned else 0
+        time_label = time_point.strftime('%H:%M:%S')
+        
+        results.append({
+            'date': time_label,
+            'count': count
+        })
+        
+    return Response(results)
 
 

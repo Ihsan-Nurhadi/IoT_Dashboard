@@ -181,3 +181,22 @@ class SensorReading(models.Model):
         return f"{self.node_id} @ {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
 
 
+class BLEScan(models.Model):
+    timestamp = models.DateTimeField(db_index=True)
+    mac = models.CharField(max_length=50, db_index=True)
+    name = models.CharField(max_length=100)
+    rssi = models.IntegerField()
+    uuid = models.CharField(max_length=50, blank=True, null=True)
+    namespace_id = models.CharField(max_length=50, blank=True, null=True)
+    instance_id = models.CharField(max_length=50, blank=True, null=True)
+    power = models.CharField(max_length=10, blank=True, null=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'BLE Scan'
+        verbose_name_plural = 'BLE Scans'
+
+    def __str__(self):
+        return f"{self.name} ({self.mac}) - RSSI: {self.rssi} at {self.timestamp}"
+
+
