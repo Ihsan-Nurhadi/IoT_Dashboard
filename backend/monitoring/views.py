@@ -343,44 +343,53 @@ def ble_latest_scans(request):
     Returns the latest scan for the single target BLE antenna (MAC: 7C:D9:F4:03:32:47).
     If no scans exist, returns default missing record.
     """
-    import pytz
     mac_target = "7C:D9:F4:03:32:47"
     name_target = "BTSID TII"
-    local_tz = pytz.timezone('Asia/Jakarta')
     
     latest_scan = BLEScan.objects.filter(mac=mac_target).first()
     
     if latest_scan:
+        from datetime import timezone as dt_timezone
+        from zoneinfo import ZoneInfo
+        jakarta_tz = ZoneInfo('Asia/Jakarta')
+        
         scan_time = latest_scan.timestamp
-        if timezone.is_naive(scan_time):
-            scan_time = timezone.make_aware(scan_time)
+        # Force conversion to UTC to prevent any timezone mismatch/offset bugs
+        if timezone.is_aware(scan_time):
+            scan_time = scan_time.astimezone(dt_timezone.utc)
+        else:
+            scan_time = timezone.make_aware(scan_time, dt_timezone.utc)
             
         time_diff = timezone.now() - scan_time
         # Active if scanned within the last 15 seconds
         is_active = time_diff.total_seconds() < 15
-        rssi = latest_scan.rssi
         
-        if not is_active:
-            status_val = 'Missing'
-        elif rssi > -60:
-            status_val = 'Anomaly'
-        else:
-            status_val = 'Detected'
-            
-        local_dt = latest_scan.timestamp.astimezone(local_tz)
-        timestamp_str = local_dt.strftime('%Y-%m-%d %H:%M:%S')
+        status_val = 'Detected' if is_active else 'Missing'
+        rssi = latest_scan.rssi
+        # Display timestamp in Jakarta timezone (UTC+7)
+        timestamp_str = latest_scan.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S')
         uuid = latest_scan.uuid or "AAFE"
         namespace_id = latest_scan.namespace_id or "E157A01861C755AA8C02"
         instance_id = latest_scan.instance_id or "4BC30C720055"
         power = latest_scan.power or "226"
+        
+        # Theft detection: normal RSSI at ~20m is around -40 to -65 dBm
+        # If RSSI drops below -75 dBm, antenna may have been moved/stolen
+        if is_active and rssi >= -75:
+            theft_alert = 'Suspicious'
+        elif not is_active:
+            theft_alert = 'No Signal'
+        else:
+            theft_alert = 'Normal'
     else:
         status_val = 'Missing'
-        rssi = -100
+        rssi = -1
         timestamp_str = None
         uuid = "AAFE"
         namespace_id = "E157A01861C755AA8C02"
         instance_id = "4BC30C720055"
         power = "226"
+        theft_alert = 'No Signal'
         
     return Response([{
         'mac': mac_target,
@@ -392,6 +401,7 @@ def ble_latest_scans(request):
         'namespace_id': namespace_id,
         'instance_id': instance_id,
         'power': power,
+        'theft_alert': theft_alert,
     }])
 
 
@@ -401,10 +411,11 @@ def ble_history_chart(request):
     Returns the real-time detection trend (0 or 1) of the target BLE antenna for the last 15 intervals (10 seconds each).
     """
     import datetime
-    import pytz
+    from zoneinfo import ZoneInfo
+    jakarta_tz = ZoneInfo('Asia/Jakarta')
+    
     mac_target = "7C:D9:F4:03:32:47"
     now = timezone.now()
-    local_tz = pytz.timezone('Asia/Jakarta')
     results = []
     
     for i in range(14, -1, -1):
@@ -418,8 +429,8 @@ def ble_history_chart(request):
         ).exists()
         
         count = 1 if scanned else 0
-        local_time_point = time_point.astimezone(local_tz)
-        time_label = local_time_point.strftime('%H:%M:%S')
+        # Display time labels in Jakarta timezone (UTC+7)
+        time_label = time_point.astimezone(jakarta_tz).strftime('%H:%M:%S')
         
         results.append({
             'date': time_label,
@@ -429,3 +440,101 @@ def ble_history_chart(request):
     return Response(results)
 
 
+@api_view(['GET'])
+def ble_alerts(request):
+    """
+    Returns recent BLE theft alert events for the notification panel.
+    Checks the last 10 minutes of scans and generates alerts for:
+    - Suspicious: RSSI >= -75 (user-defined threshold, means signal too strong = anomaly per user's config)
+    - No Signal: No scans received in last 15 seconds
+    """
+    import datetime
+    from zoneinfo import ZoneInfo
+    jakarta_tz = ZoneInfo('Asia/Jakarta')
+    
+    mac_target = "7C:D9:F4:03:32:47"
+    name_target = "BTSID TII"
+    now = timezone.now()
+    alerts = []
+    
+    # Check current status
+    latest_scan = BLEScan.objects.filter(mac=mac_target).order_by('-timestamp').first()
+    
+    if latest_scan:
+        from datetime import timezone as dt_timezone
+        scan_time = latest_scan.timestamp
+        if timezone.is_aware(scan_time):
+            scan_time = scan_time.astimezone(dt_timezone.utc)
+        else:
+            scan_time = timezone.make_aware(scan_time, dt_timezone.utc)
+        
+        time_diff = (now - scan_time).total_seconds()
+        is_active = time_diff < 15
+        rssi = latest_scan.rssi
+        
+        # Current No Signal alert
+        if not is_active:
+            alerts.append({
+                'id': f'ble_nosignal_{int(now.timestamp())}',
+                'type': 'ble',
+                'title': '⚠️ Antena Tidak Terdeteksi',
+                'subtitle': f'{name_target} ({mac_target}) &middot; BLE Scanner',
+                'timestamp': now.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
+                'raw_time': now.isoformat(),
+                'severity': 'warning'
+            })
+        # Current Suspicious RSSI alert  
+        elif is_active and rssi >= -75:
+            alerts.append({
+                'id': f'ble_suspicious_{int(now.timestamp())}',
+                'type': 'ble',
+                'title': '🚨 Alert: Antena Dicurigai Dicuri!',
+                'subtitle': f'{name_target} ({mac_target}) &middot; RSSI: {rssi} dBm',
+                'timestamp': latest_scan.timestamp.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
+                'raw_time': latest_scan.timestamp.isoformat(),
+                'severity': 'critical'
+            })
+    else:
+        # No data at all
+        alerts.append({
+            'id': f'ble_nosignal_{int(now.timestamp())}',
+            'type': 'ble',
+            'title': '⚠️ Antena Tidak Terdeteksi',
+            'subtitle': f'{name_target} ({mac_target}) &middot; BLE Scanner',
+            'timestamp': now.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
+            'raw_time': now.isoformat(),
+            'severity': 'warning'
+        })
+    
+    # Also check recent suspicious scans in the last 10 minutes
+    ten_min_ago = now - datetime.timedelta(minutes=10)
+    suspicious_scans = BLEScan.objects.filter(
+        mac=mac_target,
+        rssi__gte=-75,
+        timestamp__gte=ten_min_ago
+    ).order_by('-timestamp')[:20]
+    
+    seen_minutes = set()
+    for scan in suspicious_scans:
+        # Group by minute to avoid flooding notifications
+        minute_key = scan.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M')
+        if minute_key in seen_minutes:
+            continue
+        seen_minutes.add(minute_key)
+        
+        alert_id = f'ble_suspicious_{int(scan.timestamp.timestamp())}'
+        # Avoid duplicating the current alert
+        if any(a['id'] == alert_id for a in alerts):
+            continue
+            
+        alerts.append({
+            'id': alert_id,
+            'type': 'ble',
+            'title': '🚨 Alert: RSSI Anomali Terdeteksi',
+            'subtitle': f'{name_target} ({mac_target}) &middot; RSSI: {scan.rssi} dBm',
+            'timestamp': scan.timestamp.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
+            'raw_time': scan.timestamp.isoformat(),
+            'severity': 'critical'
+        })
+    
+    return Response(alerts)

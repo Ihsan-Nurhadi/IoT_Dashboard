@@ -52,19 +52,13 @@ class Command(BaseCommand):
                         continue
                     
                     for scan in scans:
-                        date_str = scan.get('date')
                         mac = scan.get('mac')
                         name = scan.get('name')
                         rssi = scan.get('rssi', 0)
                         raw_data = scan.get('data', '{}')
                         
-                        try:
-                            import pytz
-                            local_tz = pytz.timezone('Asia/Jakarta')
-                            naive_dt = datetime.strptime(date_str, "%d/%m/%Y %H:%M:%S")
-                            timestamp = timezone.make_aware(naive_dt, timezone=local_tz)
-                        except ValueError:
-                            timestamp = timezone.now()
+                        # Use server time to prevent gateway clock sync issues
+                        timestamp = timezone.now()
                             
                         # Parse Eddystone nested data
                         uuid = None

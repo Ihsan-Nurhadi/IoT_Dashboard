@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/sensor-readings/ingest/', monitoring_views.IngestSensorReadingView.as_view(), name='sensor-ingest'),
     path('api/ble/latest/', monitoring_views.ble_latest_scans, name='ble-latest'),
     path('api/ble/history/', monitoring_views.ble_history_chart, name='ble-history'),
+    path('api/ble/alerts/', monitoring_views.ble_alerts, name='ble-alerts'),
     # path('', include('gps_tracer.urls')),
 ]
 if settings.DEBUG:

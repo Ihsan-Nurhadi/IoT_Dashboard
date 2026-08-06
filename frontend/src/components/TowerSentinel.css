@@ -569,19 +569,10 @@
     color: var(--accent-cyan);
   }
 
-  .notif-icon-circle.ble_anomaly {
+  .notif-icon-circle.ble {
     background-color: rgba(239, 68, 68, 0.15);
     color: #ef4444;
-  }
-
-  .notif-item-card.ble_anomaly {
-    border-color: rgba(239, 68, 68, 0.2);
-    background-color: rgba(239, 68, 68, 0.02);
-  }
-  
-  .notif-item-card.ble_anomaly:hover {
-    border-color: rgba(239, 68, 68, 0.4);
-    background-color: rgba(239, 68, 68, 0.04);
+    border: 1px solid rgba(239, 68, 68, 0.3);
   }
 
   .notif-item-details {

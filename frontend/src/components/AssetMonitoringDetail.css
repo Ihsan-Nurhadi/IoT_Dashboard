@@ -232,13 +232,7 @@
 }
 .green-pill { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
 .red-pill { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
-.anomaly-pill { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
-.text-red { color: #ef4444 !important; }
-.blinking { animation: blink 1.2s infinite ease-in-out; }
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
-}
+.yellow-pill { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
 
 /* ===== CLICKABLE ASSET NAME ===== */
 .asset-table td.asset-clickable-name {

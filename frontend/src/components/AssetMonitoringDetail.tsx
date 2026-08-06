@@ -22,6 +22,7 @@ interface RFIDTag {
   namespaceId?: string;
   instanceId?: string;
   power?: string;
+  theftAlert?: string;
 }
 
 const AssetMonitoringDetail: React.FC = () => {
@@ -63,7 +64,8 @@ const AssetMonitoringDetail: React.FC = () => {
               uuid: item.uuid,
               namespaceId: item.namespace_id,
               instanceId: item.instance_id,
-              power: item.power
+              power: item.power,
+              theftAlert: item.theft_alert || 'Normal'
             };
           });
           setTags(mappedTags);
@@ -168,17 +170,18 @@ const AssetMonitoringDetail: React.FC = () => {
                   <th>Frekuensi</th>
                   <th>RSSI</th>
                   <th>Status</th>
+                  <th>Keamanan</th>
                   <th>Scan Terakhir</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="text-center text-muted">Memuat data sensor...</td>
+                    <td colSpan={8} className="text-center text-muted">Memuat data sensor...</td>
                   </tr>
                 ) : tags.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center text-muted">Belum ada data sensor BLE diterima.</td>
+                    <td colSpan={8} className="text-center text-muted">Belum ada data sensor BLE diterima.</td>
                   </tr>
                 ) : (
                   tags.map((tag) => (
@@ -193,24 +196,17 @@ const AssetMonitoringDetail: React.FC = () => {
                       </td>
                       <td className="mono-text">{tag.tagId}</td>
                       <td>{tag.frequency}</td>
-                      <td className={
-                        tag.status === 'Anomaly'
-                          ? 'text-red font-bold blinking'
-                          : tag.rssi > -75
-                            ? 'text-green font-bold'
-                            : 'text-yellow font-bold'
-                      }>
+                      <td className={tag.rssi > -75 ? 'text-green font-bold' : 'text-yellow font-bold'}>
                         {tag.rssi !== -100 ? `${tag.rssi} dBm` : 'N/A'}
                       </td>
                       <td>
-                        <span className={`status-pill ${
-                          tag.status === 'Detected' 
-                            ? 'green-pill' 
-                            : tag.status === 'Anomaly' 
-                              ? 'anomaly-pill blinking' 
-                              : 'red-pill'
-                        }`}>
-                          {tag.status === 'Anomaly' ? 'ANOMALY (Stolen Alert)' : tag.status}
+                        <span className={`status-pill ${tag.status === 'Detected' ? 'green-pill' : 'red-pill'}`}>
+                          {tag.status}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status-pill ${tag.theftAlert === 'Normal' ? 'green-pill' : tag.theftAlert === 'Suspicious' ? 'red-pill' : 'yellow-pill'}`}>
+                          {tag.theftAlert === 'Normal' ? '✅ Aman' : tag.theftAlert === 'Suspicious' ? '🚨 Alert' : '⚠️ No Signal'}
                         </span>
                       </td>
                       <td className="text-muted">{tag.lastScanned}</td>
@@ -357,29 +353,20 @@ const AssetMonitoringDetail: React.FC = () => {
                 </div>
                 <div className="info-row">
                   <span className="info-label">RSSI Terakhir:</span>
-                  <span 
-                    className={`info-value font-bold ${selectedAsset.status === 'Anomaly' ? 'blinking' : ''}`}
-                    style={{ 
-                      color: selectedAsset.status === 'Anomaly' 
-                        ? '#ef4444' 
-                        : selectedAsset.rssi > -75 
-                          ? '#10b981' 
-                          : '#f59e0b' 
-                    }}
-                  >
+                  <span className="info-value font-bold" style={{ color: selectedAsset.rssi > -75 ? '#10b981' : '#f59e0b' }}>
                     {selectedAsset.rssi !== -100 ? `${selectedAsset.rssi} dBm` : 'N/A'}
                   </span>
                 </div>
                 <div className="info-row">
                   <span className="info-label">Status Aset:</span>
-                  <span className={`status-pill ${
-                    selectedAsset.status === 'Detected' 
-                      ? 'green-pill' 
-                      : selectedAsset.status === 'Anomaly' 
-                        ? 'anomaly-pill blinking' 
-                        : 'red-pill'
-                  }`}>
-                    {selectedAsset.status === 'Anomaly' ? 'ANOMALY (Stolen Alert)' : selectedAsset.status}
+                  <span className={`status-pill ${selectedAsset.status === 'Detected' ? 'green-pill' : 'red-pill'}`}>
+                    {selectedAsset.status}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Keamanan Antena:</span>
+                  <span className={`status-pill ${selectedAsset.theftAlert === 'Normal' ? 'green-pill' : selectedAsset.theftAlert === 'Suspicious' ? 'red-pill' : 'yellow-pill'}`}>
+                    {selectedAsset.theftAlert === 'Normal' ? '✅ Aman' : selectedAsset.theftAlert === 'Suspicious' ? '🚨 Alert Stolen' : '⚠️ No Signal'}
                   </span>
                 </div>
               </div>
