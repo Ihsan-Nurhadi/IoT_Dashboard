@@ -16,13 +16,15 @@ class Command(BaseCommand):
         broker_pass = "ws"
         topic = "BLE-TEST"
 
+        import random
+        client_uniq_id = f"ble_asset_subscriber_{random.randint(1000, 9999)}"
         try:
             client = mqtt.Client(
                 callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-                client_id="ble_asset_subscriber"
+                client_id=client_uniq_id
             )
         except AttributeError:
-            client = mqtt.Client(client_id="ble_asset_subscriber")
+            client = mqtt.Client(client_id=client_uniq_id)
 
         client.username_pw_set(broker_user, broker_pass)
 

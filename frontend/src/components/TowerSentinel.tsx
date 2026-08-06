@@ -401,16 +401,17 @@ const TowerSentinel: React.FC = () => {
           const latestNotif = combined[0];
           const latestNotifId = latestNotif.id;
           if (lastKnownNotifIdRef.current !== null && lastKnownNotifIdRef.current !== latestNotifId) {
-            try {
-              // Use distinct sound for BLE theft alarm
-              const soundUrl = latestNotif.type === 'ble' ? '/alert-alarm.wav' : '/notification.wav';
-              const audio = new Audio(soundUrl);
-              audio.volume = latestNotif.type === 'ble' ? 1.0 : 0.7;
-              audio.play().catch(err => {
-                console.log("Audio autoplay waiting for user interaction:", err);
-              });
-            } catch (soundErr) {
-              console.error("Error playing notification sound:", soundErr);
+            // Do not play notification sound for BLE alerts
+            if (latestNotif.type !== 'ble') {
+              try {
+                const audio = new Audio('/notification.wav');
+                audio.volume = 0.7;
+                audio.play().catch(err => {
+                  console.log("Audio autoplay waiting for user interaction:", err);
+                });
+              } catch (soundErr) {
+                console.error("Error playing notification sound:", soundErr);
+              }
             }
           }
           lastKnownNotifIdRef.current = latestNotifId;
