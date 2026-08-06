@@ -59,8 +59,10 @@ class Command(BaseCommand):
                         raw_data = scan.get('data', '{}')
                         
                         try:
+                            import pytz
+                            local_tz = pytz.timezone('Asia/Jakarta')
                             naive_dt = datetime.strptime(date_str, "%d/%m/%Y %H:%M:%S")
-                            timestamp = timezone.make_aware(naive_dt)
+                            timestamp = timezone.make_aware(naive_dt, timezone=local_tz)
                         except ValueError:
                             timestamp = timezone.now()
                             

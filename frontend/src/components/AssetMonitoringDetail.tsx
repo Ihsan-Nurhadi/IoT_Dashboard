@@ -193,12 +193,24 @@ const AssetMonitoringDetail: React.FC = () => {
                       </td>
                       <td className="mono-text">{tag.tagId}</td>
                       <td>{tag.frequency}</td>
-                      <td className={tag.rssi > -75 ? 'text-green font-bold' : 'text-yellow font-bold'}>
+                      <td className={
+                        tag.status === 'Anomaly'
+                          ? 'text-red font-bold blinking'
+                          : tag.rssi > -75
+                            ? 'text-green font-bold'
+                            : 'text-yellow font-bold'
+                      }>
                         {tag.rssi !== -100 ? `${tag.rssi} dBm` : 'N/A'}
                       </td>
                       <td>
-                        <span className={`status-pill ${tag.status === 'Detected' ? 'green-pill' : 'red-pill'}`}>
-                          {tag.status}
+                        <span className={`status-pill ${
+                          tag.status === 'Detected' 
+                            ? 'green-pill' 
+                            : tag.status === 'Anomaly' 
+                              ? 'anomaly-pill blinking' 
+                              : 'red-pill'
+                        }`}>
+                          {tag.status === 'Anomaly' ? 'ANOMALY (Stolen Alert)' : tag.status}
                         </span>
                       </td>
                       <td className="text-muted">{tag.lastScanned}</td>
@@ -345,14 +357,29 @@ const AssetMonitoringDetail: React.FC = () => {
                 </div>
                 <div className="info-row">
                   <span className="info-label">RSSI Terakhir:</span>
-                  <span className="info-value font-bold" style={{ color: selectedAsset.rssi > -75 ? '#10b981' : '#f59e0b' }}>
+                  <span 
+                    className={`info-value font-bold ${selectedAsset.status === 'Anomaly' ? 'blinking' : ''}`}
+                    style={{ 
+                      color: selectedAsset.status === 'Anomaly' 
+                        ? '#ef4444' 
+                        : selectedAsset.rssi > -75 
+                          ? '#10b981' 
+                          : '#f59e0b' 
+                    }}
+                  >
                     {selectedAsset.rssi !== -100 ? `${selectedAsset.rssi} dBm` : 'N/A'}
                   </span>
                 </div>
                 <div className="info-row">
                   <span className="info-label">Status Aset:</span>
-                  <span className={`status-pill ${selectedAsset.status === 'Detected' ? 'green-pill' : 'red-pill'}`}>
-                    {selectedAsset.status}
+                  <span className={`status-pill ${
+                    selectedAsset.status === 'Detected' 
+                      ? 'green-pill' 
+                      : selectedAsset.status === 'Anomaly' 
+                        ? 'anomaly-pill blinking' 
+                        : 'red-pill'
+                  }`}>
+                    {selectedAsset.status === 'Anomaly' ? 'ANOMALY (Stolen Alert)' : selectedAsset.status}
                   </span>
                 </div>
               </div>

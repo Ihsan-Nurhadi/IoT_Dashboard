@@ -326,7 +326,7 @@ const TowerSentinel: React.FC = () => {
         const res = await fetch('/api/ble/latest/');
         if (res.ok) {
           const data = await res.json();
-          const detected = data.filter((t: any) => t.status === 'Detected').length;
+          const detected = data.filter((t: any) => t.status === 'Detected' || t.status === 'Anomaly').length;
           setBleActiveCount(detected);
           setBleTotalCount(data.length || 1);
         }
@@ -354,6 +354,22 @@ const TowerSentinel: React.FC = () => {
         const doorJson = doorRes.ok ? await doorRes.json() : { logs: [] };
         const doorData = doorJson.logs || [];
 
+        // 2b. Fetch BLE scan status
+        const bleRes = await fetch('/api/ble/latest/');
+        const bleData = bleRes.ok ? await bleRes.json() : [];
+        const bleAnomalyMapped = bleData
+          .filter((item: any) => item.status === 'Anomaly')
+          .map((item: any) => ({
+            id: `ble_anomaly_${item.mac}_${item.timestamp}`,
+            type: 'ble_anomaly' as 'ble_anomaly',
+            title: `Anomali Antena: Terlalu Dekat (Stolen Alert)`,
+            subtitle: `Antena: ${item.name} (${item.mac}) &middot; RSSI: ${item.rssi} dBm`,
+            timestamp: item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
+            rawTime: item.timestamp || new Date().toISOString(),
+            imageUrl: undefined,
+            status: 'ANOMALY'
+          }));
+
         // 3. Map CCTV/PIR alerts
         const cctvMapped = cctvData.map((item: any) => ({
           id: item.id,
@@ -378,7 +394,7 @@ const TowerSentinel: React.FC = () => {
         }));
 
         // 5. Combine and Sort
-        const combined = [...cctvMapped, ...doorMapped];
+        const combined = [...cctvMapped, ...doorMapped, ...bleAnomalyMapped];
         combined.sort((a, b) => new Date(b.rawTime).getTime() - new Date(a.rawTime).getTime());
 
         // Play notification sound if a new notification arrives
@@ -411,8 +427,8 @@ const TowerSentinel: React.FC = () => {
 
   // Filtered Notifications based on tab and search query
   const filteredNotifications = notifications.filter(item => {
-    if (activeTab === 'gerakan' && item.type === 'door') return false;
-    if (activeTab === 'sensor' && item.type !== 'door') return false;
+    if (activeTab === 'gerakan' && (item.type === 'door' || item.type === 'ble_anomaly')) return false;
+    if (activeTab === 'sensor' && (item.type !== 'door' && item.type !== 'ble_anomaly')) return false;
 
     if (searchQuery.trim() === '') return true;
     const query = searchQuery.toLowerCase();
@@ -2010,6 +2026,7 @@ const TowerSentinel: React.FC = () => {
                       {item.type === 'camera' && <FaCamera />}
                       {item.type === 'pir' && <PiSiren />}
                       {item.type === 'door' && (item.status === 'OPEN' ? <FaDoorOpen /> : <FaDoorClosed />)}
+                      {item.type === 'ble_anomaly' && <PiSiren className="blinking" />}
                     </div>
                     <div className="notif-item-details">
                       <span className="notif-item-title">{item.title}</span>

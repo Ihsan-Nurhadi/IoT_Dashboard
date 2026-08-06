@@ -343,8 +343,10 @@ def ble_latest_scans(request):
     Returns the latest scan for the single target BLE antenna (MAC: 7C:D9:F4:03:32:47).
     If no scans exist, returns default missing record.
     """
+    import pytz
     mac_target = "7C:D9:F4:03:32:47"
     name_target = "BTSID TII"
+    local_tz = pytz.timezone('Asia/Jakarta')
     
     latest_scan = BLEScan.objects.filter(mac=mac_target).first()
     
@@ -356,10 +358,17 @@ def ble_latest_scans(request):
         time_diff = timezone.now() - scan_time
         # Active if scanned within the last 15 seconds
         is_active = time_diff.total_seconds() < 15
-        
-        status_val = 'Detected' if is_active else 'Missing'
         rssi = latest_scan.rssi
-        timestamp_str = latest_scan.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        
+        if not is_active:
+            status_val = 'Missing'
+        elif rssi > -60:
+            status_val = 'Anomaly'
+        else:
+            status_val = 'Detected'
+            
+        local_dt = latest_scan.timestamp.astimezone(local_tz)
+        timestamp_str = local_dt.strftime('%Y-%m-%d %H:%M:%S')
         uuid = latest_scan.uuid or "AAFE"
         namespace_id = latest_scan.namespace_id or "E157A01861C755AA8C02"
         instance_id = latest_scan.instance_id or "4BC30C720055"
@@ -392,8 +401,10 @@ def ble_history_chart(request):
     Returns the real-time detection trend (0 or 1) of the target BLE antenna for the last 15 intervals (10 seconds each).
     """
     import datetime
+    import pytz
     mac_target = "7C:D9:F4:03:32:47"
     now = timezone.now()
+    local_tz = pytz.timezone('Asia/Jakarta')
     results = []
     
     for i in range(14, -1, -1):
@@ -407,7 +418,8 @@ def ble_history_chart(request):
         ).exists()
         
         count = 1 if scanned else 0
-        time_label = time_point.strftime('%H:%M:%S')
+        local_time_point = time_point.astimezone(local_tz)
+        time_label = local_time_point.strftime('%H:%M:%S')
         
         results.append({
             'date': time_label,
