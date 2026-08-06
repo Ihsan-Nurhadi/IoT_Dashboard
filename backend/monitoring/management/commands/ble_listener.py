@@ -1,6 +1,7 @@
 import json
 import paho.mqtt.client as mqtt
 from datetime import datetime
+from django.utils import timezone
 from django.core.management.base import BaseCommand
 from monitoring.models import BLEScan
 
@@ -58,9 +59,10 @@ class Command(BaseCommand):
                         raw_data = scan.get('data', '{}')
                         
                         try:
-                            timestamp = datetime.strptime(date_str, "%d/%m/%Y %H:%M:%S")
+                            naive_dt = datetime.strptime(date_str, "%d/%m/%Y %H:%M:%S")
+                            timestamp = timezone.make_aware(naive_dt)
                         except ValueError:
-                            timestamp = datetime.now()
+                            timestamp = timezone.now()
                             
                         # Parse Eddystone nested data
                         uuid = None
