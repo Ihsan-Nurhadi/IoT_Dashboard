@@ -362,7 +362,7 @@ def ble_latest_scans(request):
             
         time_diff = timezone.now() - scan_time
         # Active if scanned within the last 15 seconds
-        is_active = time_diff.total_seconds() < 25
+        is_active = time_diff.total_seconds() < 10
         
         status_val = 'Detected' if is_active else 'Missing'
         rssi = latest_scan.rssi
@@ -469,7 +469,7 @@ def ble_alerts(request):
             scan_time = timezone.make_aware(scan_time, dt_timezone.utc)
         
         time_diff = (now - scan_time).total_seconds()
-        is_active = time_diff < 25
+        is_active = time_diff < 10
         rssi = latest_scan.rssi
         
         # Current No Signal alert
@@ -510,7 +510,7 @@ def ble_alerts(request):
     ten_min_ago = now - datetime.timedelta(minutes=10)
     suspicious_scans = BLEScan.objects.filter(
         mac=mac_target,
-        rssi__gte=-75,
+        rssi__lte=-75,
         timestamp__gte=ten_min_ago
     ).order_by('-timestamp')[:20]
     
@@ -538,3 +538,62 @@ def ble_alerts(request):
         })
     
     return Response(alerts)
+
+
+@api_view(['GET'])
+def ble_history_logs(request):
+    """
+    Returns historical BLE scan logs for a given date range.
+    Expected query parameters:
+    - start_date: 'YYYY-MM-DD'
+    - end_date: 'YYYY-MM-DD'
+    """
+    import datetime
+    from zoneinfo import ZoneInfo
+    jakarta_tz = ZoneInfo('Asia/Jakarta')
+    
+    mac_target = "7C:D9:F4:03:32:47"
+    name_target = "BTSID TII"
+    
+    start_date_str = request.query_params.get('start_date')
+    end_date_str = request.query_params.get('end_date')
+    
+    try:
+        if start_date_str:
+            start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        else:
+            start_date = timezone.now().astimezone(jakarta_tz).date()
+            
+        if end_date_str:
+            end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        else:
+            end_date = timezone.now().astimezone(jakarta_tz).date()
+    except ValueError:
+        return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=400)
+
+    # Convert local dates to timezone aware datetime objects in Jakarta timezone
+    start_datetime = datetime.datetime.combine(start_date, datetime.time.min).replace(tzinfo=jakarta_tz)
+    end_datetime = datetime.datetime.combine(end_date, datetime.time.max).replace(tzinfo=jakarta_tz)
+    
+    scans = BLEScan.objects.filter(
+        mac=mac_target,
+        timestamp__gte=start_datetime,
+        timestamp__lte=end_datetime
+    ).order_by('-timestamp')
+    
+    results = []
+    for s in scans:
+        theft_alert = 'Suspicious' if s.rssi <= -75 else 'Normal'
+        timestamp_str = s.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S')
+        
+        results.append({
+            'timestamp': timestamp_str,
+            'rssi': s.rssi,
+            'status': 'Detected',
+            'theft_alert': theft_alert,
+            'uuid': s.uuid or "AAFE",
+            'namespace_id': s.namespace_id or "E157A01861C755AA8C02",
+            'instance_id': s.instance_id or "4BC30C720055"
+        })
+        
+    return Response(results)

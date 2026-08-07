@@ -3,6 +3,8 @@ import { FaBoxes } from 'react-icons/fa';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import CCTVStreamCard from './CCTVStreamCard';
 import './AssetMonitoringDetail.css';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface RFIDTag {
   no: number;
@@ -31,6 +33,19 @@ const AssetMonitoringDetail: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<RFIDTag | null>(null);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Date picker and PDF export states
+  const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [startDate, setStartDate] = useState<string>(getTodayDateString());
+  const [endDate, setEndDate] = useState<string>(getTodayDateString());
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // Set formatted dynamic timestamp
   useEffect(() => {
@@ -112,6 +127,144 @@ const AssetMonitoringDetail: React.FC = () => {
       return date.toLocaleString();
     } catch (e) {
       return timestampStr;
+    }
+  };
+
+  const generatePDFReport = (logs: any[]) => {
+    const doc = new jsPDF();
+    const totalRecords = logs.length;
+    
+    const totalDetected = logs.filter(l => l.status === 'Detected').length;
+    const totalSuspicious = logs.filter(l => l.theft_alert === 'Suspicious').length;
+    const suspiciousPercentage = totalRecords > 0 ? ((totalSuspicious / totalRecords) * 100).toFixed(1) : '0.0';
+
+    doc.setFillColor(17,25,45); 
+    doc.rect(0, 0, 210, 38, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('TOWER SENTINEL - ASSET SECURITY SYSTEM', 14, 16);
+    
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184); 
+    doc.text('Dokumen: Laporan Log Audit Keamanan Antena (BLE)', 14, 23);
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleString('id-ID')}`, 14, 28);
+    
+    doc.setFillColor(34, 197, 94); 
+    doc.rect(162, 12, 34, 6, 'F');
+    doc.setFontSize(8);
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('STATUS: AKTIF', 167, 16.2);
+
+    doc.setFontSize(11);
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(30, 41, 59); 
+    doc.text('LAPORAN LOG MONITORING BEACON BLE', 14, 52);
+    
+    doc.setDrawColor(226, 232, 240); 
+    doc.line(14, 55, 196, 55);
+    
+    doc.setFontSize(9);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(71, 85, 105); 
+    doc.text(`Periode Laporan : ${new Date(startDate).toLocaleDateString('id-ID')} s.d ${new Date(endDate).toLocaleDateString('id-ID')}`, 14, 62);
+    doc.text('Lokasi Site     : NAYAKA WS (PRR-01-004) - Sector A', 14, 67);
+    doc.text('Target Beacon   : BTSID TII (7C:D9:F4:03:32:47)', 14, 72);
+    doc.text(`Total Baris     : ${totalRecords} data scan`, 14, 77);
+    
+    const tableColumns = [
+      'No',
+      'Waktu (WIB)',
+      'ID Tag BLE (MAC)',
+      'RSSI',
+      'Status',
+      'Kondisi Keamanan',
+      'UUID Eddystone'
+    ];
+    
+    const tableRows = logs.map((l: any, index: number) => [
+      index + 1,
+      l.timestamp,
+      '7C:D9:F4:03:32:47',
+      `${l.rssi} dBm`,
+      l.status,
+      l.theft_alert === 'Suspicious' ? '- CURIGA' : '- AMAN',
+      l.uuid
+    ]);
+    
+    autoTable(doc, {
+      startY: 83,
+      head: [tableColumns],
+      body: tableRows,
+      theme: 'striped',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: 14, right: 14 },
+    });
+    
+    let finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : 180;
+    if (finalY > 230) {
+      doc.addPage();
+      finalY = 20;
+    }
+    
+    doc.setFillColor(241, 245, 249); 
+    doc.rect(14, finalY, 182, 26, 'F');
+    
+    doc.setFontSize(9);
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text('Rangkuman Analisis & Keamanan:', 18, finalY + 6);
+    
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Total Deteksi Terbaca : ${totalDetected} kali`, 18, finalY + 14);
+    doc.text(`Total Indikasi Curiga : ${totalSuspicious} kali (${suspiciousPercentage}%)`, 18, finalY + 20);
+    
+    const signY = finalY + 40;
+    const baseSignY = signY > 270 ? 25 : signY;
+    if (signY > 270) {
+      doc.addPage();
+    }
+    
+    doc.setFontSize(9);
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text('Dibuat Oleh:', 14, baseSignY);
+    doc.line(14, baseSignY + 15, 60, baseSignY + 15);
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Tower Sentinel Operator', 14, baseSignY + 20);
+    
+    doc.save(`BLE_Security_Report_${startDate}_to_${endDate}.pdf`);
+  };
+
+  const handleExportPDF = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isExporting) return;
+    setIsExporting(true);
+    
+    try {
+      const res = await fetch(`/api/ble/history-logs/?start_date=${startDate}&end_date=${endDate}`);
+      if (!res.ok) {
+        throw new Error('Gagal mengambil data log BLE dari server.');
+      }
+      const data = await res.json();
+      if (data.length === 0) {
+        alert('Tidak ada data log BLE ditemukan untuk rentang tanggal yang dipilih.');
+        setIsExporting(false);
+        return;
+      }
+      generatePDFReport(data);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Terjadi kesalahan saat memproses laporan PDF.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -275,6 +428,40 @@ const AssetMonitoringDetail: React.FC = () => {
         <div className="card-section-title-row">
           <h3 className="card-section-title">Tren Kuantitas Antena Terdeteksi (BLE)</h3>
           <span className="badge-green">Parameter: Tanggal</span>
+        </div>
+        
+        <div className="chart-filter-row">
+          <form className="chart-filter-form" onSubmit={handleExportPDF}>
+            <div className="filter-inputs">
+              <div className="filter-field">
+                <label className="filter-label">Mulai Tanggal:</label>
+                <input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={(e) => setStartDate(e.target.value)} 
+                  className="filter-input-date"
+                  required 
+                />
+              </div>
+              <div className="filter-field">
+                <label className="filter-label">Sampai Tanggal:</label>
+                <input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={(e) => setEndDate(e.target.value)} 
+                  className="filter-input-date"
+                  required 
+                />
+              </div>
+            </div>
+            <button 
+              type="submit" 
+              className="btn-export-pdf"
+              disabled={isExporting}
+            >
+              {isExporting ? 'Mengekspor...' : '📄 Ekspor Log ke PDF'}
+            </button>
+          </form>
         </div>
         <div className="asset-chart-container" style={{ height: '260px', width: '100%', marginTop: '16px' }}>
           <ResponsiveContainer width="100%" height="100%">
