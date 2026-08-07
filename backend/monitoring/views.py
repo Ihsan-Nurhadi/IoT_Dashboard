@@ -362,7 +362,7 @@ def ble_latest_scans(request):
             
         time_diff = timezone.now() - scan_time
         # Active if scanned within the last 15 seconds
-        is_active = time_diff.total_seconds() < 15
+        is_active = time_diff.total_seconds() < 25
         
         status_val = 'Detected' if is_active else 'Missing'
         rssi = latest_scan.rssi
@@ -375,7 +375,7 @@ def ble_latest_scans(request):
         
         # Theft detection: normal RSSI at ~20m is around -40 to -65 dBm
         # If RSSI drops below -75 dBm, antenna may have been moved/stolen
-        if is_active and rssi >= -75:
+        if is_active and rssi <= -75:
             theft_alert = 'Suspicious'
         elif not is_active:
             theft_alert = 'No Signal'
@@ -469,7 +469,7 @@ def ble_alerts(request):
             scan_time = timezone.make_aware(scan_time, dt_timezone.utc)
         
         time_diff = (now - scan_time).total_seconds()
-        is_active = time_diff < 15
+        is_active = time_diff < 25
         rssi = latest_scan.rssi
         
         # Current No Signal alert
@@ -484,7 +484,7 @@ def ble_alerts(request):
                 'severity': 'warning'
             })
         # Current Suspicious RSSI alert  
-        elif is_active and rssi >= -75:
+        elif is_active and rssi <= -75:
             alerts.append({
                 'id': f'ble_suspicious_{int(now.timestamp())}',
                 'type': 'ble',
