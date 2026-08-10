@@ -249,7 +249,7 @@ const AdminDashboard: React.FC = () => {
         fetchUnregistered();
       } else {
         const errData = await res.json().catch(() => ({}));
-        setError(errData.error || errData.detail || 'Gagal menyimpan konfigurasi BLE Device');
+        setError(errData.error || errData.detail || `Gagal menyimpan konfigurasi BLE Device (HTTP Status: ${res.status})`);
       }
     } catch (err) {
       console.error(err);

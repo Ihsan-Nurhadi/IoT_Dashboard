@@ -705,12 +705,21 @@ def ble_devices_list(request):
             return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
         
         mac = request.data.get('mac')
+        if mac:
+            mac = mac.strip().upper()
+            
         name = request.data.get('name')
         location = request.data.get('location', 'Sector A - Upper Level')
         installation_date_str = request.data.get('installation_date')
         vendor = request.data.get('vendor', 'Huawei')
         height = request.data.get('height', '38 Meter')
-        rssi_threshold = request.data.get('rssi_threshold', -75)
+        rssi_threshold_val = request.data.get('rssi_threshold', -75)
+        
+        try:
+            rssi_threshold = int(rssi_threshold_val) if rssi_threshold_val not in (None, '', 'null') else -75
+        except (ValueError, TypeError):
+            rssi_threshold = -75
+            
         is_active_str = request.data.get('is_active', 'true')
         is_active = is_active_str.lower() == 'true' if isinstance(is_active_str, str) else bool(is_active_str)
         image = request.FILES.get('image')
@@ -734,7 +743,7 @@ def ble_devices_list(request):
                 installation_date=installation_date,
                 vendor=vendor,
                 height=height,
-                rssi_threshold=int(rssi_threshold),
+                rssi_threshold=rssi_threshold,
                 is_active=is_active,
                 image=image
             )
