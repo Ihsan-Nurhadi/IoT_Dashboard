@@ -340,81 +340,89 @@ class IngestSensorReadingView(APIView):
 @api_view(['GET'])
 def ble_latest_scans(request):
     """
-    Returns the latest scan for the single target BLE antenna (MAC: 7C:D9:F4:03:32:47).
-    If no scans exist, returns default missing record.
+    Returns the latest scans for all active registered BLE devices.
+    If no devices are registered, returns an empty list.
     """
-    mac_target = "7C:D9:F4:03:32:47"
-    name_target = "BTSID TII"
+    from datetime import timezone as dt_timezone
+    from zoneinfo import ZoneInfo
+    jakarta_tz = ZoneInfo('Asia/Jakarta')
     
-    latest_scan = BLEScan.objects.filter(mac=mac_target).first()
-    
-    if latest_scan:
-        from datetime import timezone as dt_timezone
-        from zoneinfo import ZoneInfo
-        jakarta_tz = ZoneInfo('Asia/Jakarta')
+    devices = BLEDevice.objects.filter(is_active=True)
+    if not devices.exists():
+        return Response([])
+
+    results = []
+    for device in devices:
+        latest_scan = BLEScan.objects.filter(mac=device.mac).first()
+        image_url = device.image.url if device.image else None
         
-        scan_time = latest_scan.timestamp
-        # Force conversion to UTC to prevent any timezone mismatch/offset bugs
-        if timezone.is_aware(scan_time):
-            scan_time = scan_time.astimezone(dt_timezone.utc)
-        else:
-            scan_time = timezone.make_aware(scan_time, dt_timezone.utc)
+        if latest_scan:
+            scan_time = latest_scan.timestamp
+            if timezone.is_aware(scan_time):
+                scan_time = scan_time.astimezone(dt_timezone.utc)
+            else:
+                scan_time = timezone.make_aware(scan_time, dt_timezone.utc)
+                
+            time_diff = timezone.now() - scan_time
+            is_active = time_diff.total_seconds() < 10
             
-        time_diff = timezone.now() - scan_time
-        # Active if scanned within the last 15 seconds
-        is_active = time_diff.total_seconds() < 10
-        
-        status_val = 'Detected' if is_active else 'Missing'
-        rssi = latest_scan.rssi
-        # Display timestamp in Jakarta timezone (UTC+7)
-        timestamp_str = latest_scan.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S')
-        uuid = latest_scan.uuid or "AAFE"
-        namespace_id = latest_scan.namespace_id or "E157A01861C755AA8C02"
-        instance_id = latest_scan.instance_id or "4BC30C720055"
-        power = latest_scan.power or "226"
-        
-        # Theft detection: normal RSSI at ~20m is around -40 to -65 dBm
-        # If RSSI drops below -75 dBm, antenna may have been moved/stolen
-        if is_active and rssi <= -75:
-            theft_alert = 'Suspicious'
-        elif not is_active:
-            theft_alert = 'No Signal'
+            status_val = 'Detected' if is_active else 'Missing'
+            rssi = latest_scan.rssi
+            timestamp_str = latest_scan.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S')
+            uuid = latest_scan.uuid or "AAFE"
+            namespace_id = latest_scan.namespace_id or "E157A01861C755AA8C02"
+            instance_id = latest_scan.instance_id or "4BC30C720055"
+            power = latest_scan.power or "226"
+            
+            threshold = device.rssi_threshold
+            if is_active and rssi <= threshold:
+                theft_alert = 'Suspicious'
+            elif not is_active:
+                theft_alert = 'No Signal'
+            else:
+                theft_alert = 'Normal'
         else:
-            theft_alert = 'Normal'
-    else:
-        status_val = 'Missing'
-        rssi = -1
-        timestamp_str = None
-        uuid = "AAFE"
-        namespace_id = "E157A01861C755AA8C02"
-        instance_id = "4BC30C720055"
-        power = "226"
-        theft_alert = 'No Signal'
+            status_val = 'Missing'
+            rssi = -100
+            timestamp_str = None
+            uuid = "AAFE"
+            namespace_id = "E157A01861C755AA8C02"
+            instance_id = "4BC30C720055"
+            power = "226"
+            theft_alert = 'No Signal'
+            
+        results.append({
+            'mac': device.mac,
+            'name': device.name,
+            'location': device.location,
+            'installation_date': device.installation_date.strftime('%d %B %Y') if device.installation_date else 'Never',
+            'vendor': device.vendor,
+            'height': device.height,
+            'image': image_url,
+            'rssi': rssi,
+            'timestamp': timestamp_str,
+            'status': status_val,
+            'uuid': uuid,
+            'namespace_id': namespace_id,
+            'instance_id': instance_id,
+            'power': power,
+            'theft_alert': theft_alert,
+        })
         
-    return Response([{
-        'mac': mac_target,
-        'name': name_target,
-        'rssi': rssi,
-        'timestamp': timestamp_str,
-        'status': status_val,
-        'uuid': uuid,
-        'namespace_id': namespace_id,
-        'instance_id': instance_id,
-        'power': power,
-        'theft_alert': theft_alert,
-    }])
+    return Response(results)
 
 
 @api_view(['GET'])
 def ble_history_chart(request):
     """
-    Returns the real-time detection trend (0 or 1) of the target BLE antenna for the last 15 intervals (10 seconds each).
+    Returns the real-time detection trend (total count of active registered antennas) 
+    for the last 15 intervals (10 seconds each).
     """
     import datetime
     from zoneinfo import ZoneInfo
     jakarta_tz = ZoneInfo('Asia/Jakarta')
     
-    mac_target = "7C:D9:F4:03:32:47"
+    active_devices = BLEDevice.objects.filter(is_active=True)
     now = timezone.now()
     results = []
     
@@ -422,19 +430,21 @@ def ble_history_chart(request):
         time_point = now - datetime.timedelta(seconds=i * 10)
         start_time = time_point - datetime.timedelta(seconds=10)
         
-        scanned = BLEScan.objects.filter(
-            mac=mac_target,
-            timestamp__gte=start_time,
-            timestamp__lte=time_point
-        ).exists()
-        
-        count = 1 if scanned else 0
-        # Display time labels in Jakarta timezone (UTC+7)
+        active_count = 0
+        for device in active_devices:
+            scanned = BLEScan.objects.filter(
+                mac=device.mac,
+                timestamp__gte=start_time,
+                timestamp__lte=time_point
+            ).exists()
+            if scanned:
+                active_count += 1
+                
         time_label = time_point.astimezone(jakarta_tz).strftime('%H:%M:%S')
         
         results.append({
             'date': time_label,
-            'count': count
+            'count': active_count
         })
         
     return Response(results)
@@ -443,117 +453,118 @@ def ble_history_chart(request):
 @api_view(['GET'])
 def ble_alerts(request):
     """
-    Returns recent BLE theft alert events for the notification panel.
-    Checks the last 10 minutes of scans and generates alerts for:
-    - Suspicious: RSSI >= -75 (user-defined threshold, means signal too strong = anomaly per user's config)
-    - No Signal: No scans received in last 15 seconds
+    Returns recent BLE theft alert events for the notification panel for all registered BLE devices.
     """
     import datetime
     from zoneinfo import ZoneInfo
     jakarta_tz = ZoneInfo('Asia/Jakarta')
+    from datetime import timezone as dt_timezone
     
-    mac_target = "7C:D9:F4:03:32:47"
-    name_target = "BTSID TII"
+    devices = BLEDevice.objects.filter(is_active=True)
     now = timezone.now()
     alerts = []
     
-    # Check current status
-    latest_scan = BLEScan.objects.filter(mac=mac_target).order_by('-timestamp').first()
-    
-    if latest_scan:
-        from datetime import timezone as dt_timezone
-        scan_time = latest_scan.timestamp
-        if timezone.is_aware(scan_time):
-            scan_time = scan_time.astimezone(dt_timezone.utc)
+    for device in devices:
+        mac_target = device.mac
+        name_target = device.name
+        threshold = device.rssi_threshold
+        
+        latest_scan = BLEScan.objects.filter(mac=mac_target).order_by('-timestamp').first()
+        
+        if latest_scan:
+            scan_time = latest_scan.timestamp
+            if timezone.is_aware(scan_time):
+                scan_time = scan_time.astimezone(dt_timezone.utc)
+            else:
+                scan_time = timezone.make_aware(scan_time, dt_timezone.utc)
+            
+            time_diff = (now - scan_time).total_seconds()
+            is_active = time_diff < 10
+            rssi = latest_scan.rssi
+            
+            if not is_active:
+                alerts.append({
+                    'id': f'ble_nosignal_{mac_target.replace(":", "")}_{int(now.timestamp())}',
+                    'type': 'ble',
+                    'title': f'⚠️ Antena {name_target} Tidak Terdeteksi',
+                    'subtitle': f'{name_target} ({mac_target}) &middot; BLE Scanner',
+                    'timestamp': now.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
+                    'raw_time': now.isoformat(),
+                    'severity': 'warning'
+                })
+            elif is_active and rssi <= threshold:
+                alerts.append({
+                    'id': f'ble_suspicious_{mac_target.replace(":", "")}_{int(now.timestamp())}',
+                    'type': 'ble',
+                    'title': f'🚨 Alert: Antena {name_target} Dicurigai Dicuri!',
+                    'subtitle': f'{name_target} ({mac_target}) &middot; RSSI: {rssi} dBm (Threshold: {threshold} dBm)',
+                    'timestamp': latest_scan.timestamp.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
+                    'raw_time': latest_scan.timestamp.isoformat(),
+                    'severity': 'critical'
+                })
         else:
-            scan_time = timezone.make_aware(scan_time, dt_timezone.utc)
-        
-        time_diff = (now - scan_time).total_seconds()
-        is_active = time_diff < 10
-        rssi = latest_scan.rssi
-        
-        # Current No Signal alert
-        if not is_active:
             alerts.append({
-                'id': f'ble_nosignal_{int(now.timestamp())}',
+                'id': f'ble_nosignal_{mac_target.replace(":", "")}_{int(now.timestamp())}',
                 'type': 'ble',
-                'title': '⚠️ Antena Tidak Terdeteksi',
+                'title': f'⚠️ Antena {name_target} Tidak Terdeteksi',
                 'subtitle': f'{name_target} ({mac_target}) &middot; BLE Scanner',
                 'timestamp': now.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
                 'raw_time': now.isoformat(),
                 'severity': 'warning'
             })
-        # Current Suspicious RSSI alert  
-        elif is_active and rssi <= -75:
+        
+        ten_min_ago = now - datetime.timedelta(minutes=10)
+        suspicious_scans = BLEScan.objects.filter(
+            mac=mac_target,
+            rssi__lte=threshold,
+            timestamp__gte=ten_min_ago
+        ).order_by('-timestamp')[:10]
+        
+        seen_minutes = set()
+        for scan in suspicious_scans:
+            minute_key = scan.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M')
+            if minute_key in seen_minutes:
+                continue
+            seen_minutes.add(minute_key)
+            
+            alert_id = f'ble_suspicious_{mac_target.replace(":", "")}_{int(scan.timestamp.timestamp())}'
+            if any(a['id'] == alert_id for a in alerts):
+                continue
+                
             alerts.append({
-                'id': f'ble_suspicious_{int(now.timestamp())}',
+                'id': alert_id,
                 'type': 'ble',
-                'title': '🚨 Alert: Antena Dicurigai Dicuri!',
-                'subtitle': f'{name_target} ({mac_target}) &middot; RSSI: {rssi} dBm',
-                'timestamp': latest_scan.timestamp.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
-                'raw_time': latest_scan.timestamp.isoformat(),
+                'title': f'🚨 Alert: RSSI Anomali {name_target} Terdeteksi',
+                'subtitle': f'{name_target} ({mac_target}) &middot; RSSI: {scan.rssi} dBm (Threshold: {threshold} dBm)',
+                'timestamp': scan.timestamp.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
+                'raw_time': scan.timestamp.isoformat(),
                 'severity': 'critical'
             })
-    else:
-        # No data at all
-        alerts.append({
-            'id': f'ble_nosignal_{int(now.timestamp())}',
-            'type': 'ble',
-            'title': '⚠️ Antena Tidak Terdeteksi',
-            'subtitle': f'{name_target} ({mac_target}) &middot; BLE Scanner',
-            'timestamp': now.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
-            'raw_time': now.isoformat(),
-            'severity': 'warning'
-        })
-    
-    # Also check recent suspicious scans in the last 10 minutes
-    ten_min_ago = now - datetime.timedelta(minutes=10)
-    suspicious_scans = BLEScan.objects.filter(
-        mac=mac_target,
-        rssi__lte=-75,
-        timestamp__gte=ten_min_ago
-    ).order_by('-timestamp')[:20]
-    
-    seen_minutes = set()
-    for scan in suspicious_scans:
-        # Group by minute to avoid flooding notifications
-        minute_key = scan.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M')
-        if minute_key in seen_minutes:
-            continue
-        seen_minutes.add(minute_key)
-        
-        alert_id = f'ble_suspicious_{int(scan.timestamp.timestamp())}'
-        # Avoid duplicating the current alert
-        if any(a['id'] == alert_id for a in alerts):
-            continue
             
-        alerts.append({
-            'id': alert_id,
-            'type': 'ble',
-            'title': '🚨 Alert: RSSI Anomali Terdeteksi',
-            'subtitle': f'{name_target} ({mac_target}) &middot; RSSI: {scan.rssi} dBm',
-            'timestamp': scan.timestamp.astimezone(jakarta_tz).strftime('%b %d, %I:%M %p'),
-            'raw_time': scan.timestamp.isoformat(),
-            'severity': 'critical'
-        })
-    
+    severity_order = {'critical': 0, 'warning': 1}
+    alerts.sort(key=lambda x: (severity_order.get(x['severity'], 2), x['raw_time']), reverse=True)
     return Response(alerts)
 
 
 @api_view(['GET'])
 def ble_history_logs(request):
     """
-    Returns historical BLE scan logs for a given date range.
-    Expected query parameters:
-    - start_date: 'YYYY-MM-DD'
-    - end_date: 'YYYY-MM-DD'
+    Returns historical BLE scan logs for a given date range and optional MAC address.
     """
     import datetime
     from zoneinfo import ZoneInfo
     jakarta_tz = ZoneInfo('Asia/Jakarta')
     
-    mac_target = "7C:D9:F4:03:32:47"
-    name_target = "BTSID TII"
+    mac_target = request.query_params.get('mac')
+    if not mac_target:
+        first_device = BLEDevice.objects.filter(is_active=True).first()
+        if first_device:
+            mac_target = first_device.mac
+        else:
+            mac_target = "7C:D9:F4:03:32:47"
+            
+    device = BLEDevice.objects.filter(mac=mac_target).first()
+    threshold = device.rssi_threshold if device else -75
     
     start_date_str = request.query_params.get('start_date')
     end_date_str = request.query_params.get('end_date')
@@ -571,7 +582,6 @@ def ble_history_logs(request):
     except ValueError:
         return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=400)
 
-    # Convert local dates to timezone aware datetime objects in Jakarta timezone
     start_datetime = datetime.datetime.combine(start_date, datetime.time.min).replace(tzinfo=jakarta_tz)
     end_datetime = datetime.datetime.combine(end_date, datetime.time.max).replace(tzinfo=jakarta_tz)
     
@@ -583,7 +593,7 @@ def ble_history_logs(request):
     
     results = []
     for s in scans:
-        theft_alert = 'Suspicious' if s.rssi <= -75 else 'Normal'
+        theft_alert = 'Suspicious' if s.rssi <= threshold else 'Normal'
         timestamp_str = s.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S')
         
         results.append({
@@ -597,3 +607,309 @@ def ble_history_logs(request):
         })
         
     return Response(results)
+
+
+# ==========================================
+# AUTHENTICATION & BLE DEVICE CRUD APIS
+# ==========================================
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from django.shortcuts import get_object_or_404
+from .models import BLEDevice
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def api_login(request):
+    """
+    Authenticates user and logs them in using Django's session system.
+    """
+    username = request.data.get('username')
+    password = request.data.get('password')
+    user = authenticate(request, username=username, password=password)
+    if user is not None:
+        auth_login(request, user)
+        return Response({
+            'success': True,
+            'username': user.username
+        })
+    else:
+        return Response({
+            'success': False,
+            'message': 'Username atau password salah.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def api_logout(request):
+    """
+    Logs out the user.
+    """
+    auth_logout(request)
+    return Response({'success': True})
+
+
+@api_view(['GET'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def api_auth_status(request):
+    """
+    Checks if session is authenticated.
+    """
+    if request.user.is_authenticated:
+        return Response({
+            'authenticated': True,
+            'username': request.user.username
+        })
+    return Response({
+        'authenticated': False
+    })
+
+
+@api_view(['GET', 'POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def ble_devices_list(request):
+    """
+    List all configured BLE devices (public) or register a new BLE device (admin only).
+    """
+    if request.method == 'GET':
+        devices = BLEDevice.objects.all()
+        data = []
+        for d in devices:
+            image_url = d.image.url if d.image else None
+            data.append({
+                'mac': d.mac,
+                'name': d.name,
+                'location': d.location,
+                'installation_date': d.installation_date,
+                'vendor': d.vendor,
+                'height': d.height,
+                'rssi_threshold': d.rssi_threshold,
+                'image': image_url,
+                'is_active': d.is_active,
+            })
+        return Response(data)
+
+    elif request.method == 'POST':
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        mac = request.data.get('mac')
+        name = request.data.get('name')
+        location = request.data.get('location', 'Sector A - Upper Level')
+        installation_date_str = request.data.get('installation_date')
+        vendor = request.data.get('vendor', 'Huawei')
+        height = request.data.get('height', '38 Meter')
+        rssi_threshold = request.data.get('rssi_threshold', -75)
+        is_active_str = request.data.get('is_active', 'true')
+        is_active = is_active_str.lower() == 'true' if isinstance(is_active_str, str) else bool(is_active_str)
+        image = request.FILES.get('image')
+
+        if not mac or not name:
+            return Response({'error': 'MAC and Name are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        installation_date = None
+        if installation_date_str and installation_date_str != 'null' and installation_date_str != '':
+            try:
+                from django.utils.dateparse import parse_date
+                installation_date = parse_date(installation_date_str)
+            except Exception:
+                pass
+
+        try:
+            device = BLEDevice.objects.create(
+                mac=mac,
+                name=name,
+                location=location,
+                installation_date=installation_date,
+                vendor=vendor,
+                height=height,
+                rssi_threshold=int(rssi_threshold),
+                is_active=is_active,
+                image=image
+            )
+            image_url = device.image.url if device.image else None
+            return Response({
+                'mac': device.mac,
+                'name': device.name,
+                'location': device.location,
+                'installation_date': device.installation_date,
+                'vendor': device.vendor,
+                'height': device.height,
+                'rssi_threshold': device.rssi_threshold,
+                'image': image_url,
+                'is_active': device.is_active,
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def ble_device_detail(request, mac):
+    """
+    Get (public), Update (admin only), or Delete (admin only) a specific BLE device configuration.
+    """
+    device = get_object_or_404(BLEDevice, mac=mac)
+
+    if request.method == 'GET':
+        image_url = device.image.url if device.image else None
+        return Response({
+            'mac': device.mac,
+            'name': device.name,
+            'location': device.location,
+            'installation_date': device.installation_date,
+            'vendor': device.vendor,
+            'height': device.height,
+            'rssi_threshold': device.rssi_threshold,
+            'image': image_url,
+            'is_active': device.is_active,
+        })
+
+    if not request.user.is_authenticated:
+        return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if request.method == 'PUT':
+        name = request.data.get('name')
+        location = request.data.get('location')
+        installation_date_str = request.data.get('installation_date')
+        vendor = request.data.get('vendor')
+        height = request.data.get('height')
+        rssi_threshold = request.data.get('rssi_threshold')
+        is_active_str = request.data.get('is_active')
+        
+        if name:
+            device.name = name
+        if location:
+            device.location = location
+        
+        if installation_date_str is not None:
+            if installation_date_str in ('', 'null', 'None'):
+                device.installation_date = None
+            else:
+                try:
+                    from django.utils.dateparse import parse_date
+                    device.installation_date = parse_date(installation_date_str)
+                except Exception:
+                    pass
+        if vendor:
+            device.vendor = vendor
+        if height:
+            device.height = height
+        if rssi_threshold is not None:
+            try:
+                device.rssi_threshold = int(rssi_threshold)
+            except ValueError:
+                pass
+        if is_active_str is not None:
+            device.is_active = is_active_str.lower() == 'true' if isinstance(is_active_str, str) else bool(is_active_str)
+
+        # Handle image file upload or clearing
+        if 'image' in request.FILES:
+            if device.image:
+                try:
+                    device.image.delete(save=False)
+                except Exception:
+                    pass
+            device.image = request.FILES['image']
+        elif request.data.get('image') == 'null' or request.data.get('clear_image') == 'true':
+            if device.image:
+                try:
+                    device.image.delete(save=False)
+                except Exception:
+                    pass
+            device.image = None
+
+        device.save()
+        image_url = device.image.url if device.image else None
+        return Response({
+            'mac': device.mac,
+            'name': device.name,
+            'location': device.location,
+            'installation_date': device.installation_date,
+            'vendor': device.vendor,
+            'height': device.height,
+            'rssi_threshold': device.rssi_threshold,
+            'image': image_url,
+            'is_active': device.is_active,
+        })
+
+    elif request.method == 'DELETE':
+        if device.image:
+            try:
+                device.image.delete(save=False)
+            except Exception:
+                pass
+        device.delete()
+        return Response({'success': True}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def ble_device_delete_post(request, mac):
+    """
+    Delete a specific BLE device configuration using POST method (to bypass firewalls/proxies blocking DELETE).
+    """
+    if not request.user.is_authenticated:
+        return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+    device = get_object_or_404(BLEDevice, mac=mac)
+    if device.image:
+        try:
+            device.image.delete(save=False)
+        except Exception:
+            pass
+    device.delete()
+    return Response({'success': True}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def ble_unregistered_list(request):
+    """
+    Returns unique MAC addresses seen by MQTT recently that are not registered.
+    """
+    if not request.user.is_authenticated:
+        return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    from django.db.models import Max
+    import datetime
+    
+    time_limit = timezone.now() - datetime.timedelta(hours=24)
+    registered_macs = BLEDevice.objects.values_list('mac', flat=True)
+    
+    recent_scans = BLEScan.objects.filter(
+        timestamp__gte=time_limit
+    ).exclude(
+        mac__in=registered_macs
+    ).values('mac').annotate(
+        latest_time=Max('timestamp')
+    ).order_by('-latest_time')[:50]
+    
+    results = []
+    for item in recent_scans:
+        mac = item['mac']
+        last_scan = BLEScan.objects.filter(mac=mac, timestamp=item['latest_time']).first()
+        if last_scan:
+            results.append({
+                'mac': mac,
+                'name': last_scan.name,
+                'rssi': last_scan.rssi,
+                'last_seen': last_scan.timestamp
+            })
+            
+    return Response(results)
+

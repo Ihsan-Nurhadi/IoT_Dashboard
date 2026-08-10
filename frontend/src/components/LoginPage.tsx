@@ -9,20 +9,37 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulasi autentikasi sederhana
-    setTimeout(() => {
-      if (username === 'nyk_nms' && password === 'admin123') {
-        navigate('/dashboard');
+    try {
+      const res = await fetch('/api/auth/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          navigate('/admin');
+        } else {
+          setError(data.message || 'Username atau password salah');
+        }
       } else {
-        setError('Username atau password salah');
-        setIsLoading(false);
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || 'Username atau password salah');
       }
-    }, 800);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Gagal terhubung ke server');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

@@ -9,6 +9,10 @@ import VerticalityDetail from './components/VerticalityDetail';
 import AqmsDetail from './components/AqmsDetail';
 import AssetMonitoringDetail from './components/AssetMonitoringDetail';
 
+import LoginPage from './components/LoginPage';
+import AdminDashboard from './components/AdminDashboard';
+import { Navigate } from 'react-router-dom';
+
 // Layout wrapper untuk NMS views agar menyertakan Header & Footer
 const NmsLayout = () => {
   return (
@@ -20,12 +24,78 @@ const NmsLayout = () => {
   );
 };
 
+// Helper component to protect routes requiring authentication
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    fetch('/api/auth/status/')
+      .then((res) => {
+        if (res.ok) return res.json();
+        throw new Error('Not authenticated');
+      })
+      .then((data) => {
+        setIsAuthenticated(data.authenticated);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+      });
+  }, []);
+
+  if (isAuthenticated === null) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#0a0f1d',
+        color: '#94a3b8',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: '4px solid rgba(255,255,255,0.1)',
+          borderTopColor: '#3b82f6',
+          borderRadius: '50%',
+          animation: 'spinApp 1s linear infinite',
+          marginBottom: '16px'
+        }} />
+        <span style={{ fontSize: '14px', letterSpacing: '0.05em' }}>Loading Session...</span>
+        <style>{`
+          @keyframes spinApp {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 const App: React.FC = () => {
   return (
     <Router>
       <Routes>
         {/* Landing Page Portal (Tower Sentinel) */}
         <Route path="/" element={<TowerSentinel />} />
+        
+        {/* Public Login Route */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* Protected Admin Route */}
+        <Route path="/admin" element={
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
         
         {/* NMS Site Views */}
         <Route element={<NmsLayout />}>

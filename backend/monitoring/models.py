@@ -181,6 +181,28 @@ class SensorReading(models.Model):
         return f"{self.node_id} @ {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
 
 
+class BLEDevice(models.Model):
+    mac = models.CharField(max_length=50, unique=True, primary_key=True, help_text="MAC Address BLE Beacon")
+    name = models.CharField(max_length=100, help_text="Nama unik perangkat (contoh: BTSID TII)")
+    location = models.CharField(max_length=100, default="Sector A - Upper Level", help_text="Deskripsi lokasi pemasangan")
+    installation_date = models.DateField(null=True, blank=True, help_text="Tanggal pemasangan perangkat")
+    vendor = models.CharField(max_length=50, default="Huawei", help_text="Vendor perangkat")
+    height = models.CharField(max_length=50, default="38 Meter", help_text="Tinggi pemasangan di tower")
+    rssi_threshold = models.IntegerField(default=-75, help_text="Ambang batas RSSI untuk deteksi pencurian (default: -75 dBm)")
+    image = models.FileField(upload_to='ble_devices/', null=True, blank=True, help_text="Gambar/Foto Antena")
+    is_active = models.BooleanField(default=True, help_text="Status pemantauan aktif")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'BLE Device Config'
+        verbose_name_plural = 'BLE Device Configs'
+
+    def __str__(self):
+        return f"{self.name} ({self.mac})"
+
+
 class BLEScan(models.Model):
     timestamp = models.DateTimeField(db_index=True)
     mac = models.CharField(max_length=50, db_index=True)

@@ -33,6 +33,7 @@ const AssetMonitoringDetail: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<RFIDTag | null>(null);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeMac, setActiveMac] = useState<string>('');
 
   // Date picker and PDF export states
   const getTodayDateString = () => {
@@ -71,12 +72,12 @@ const AssetMonitoringDetail: React.FC = () => {
               rssi: item.rssi,
               status: item.status,
               lastScanned: item.timestamp ? formatLastScanned(item.timestamp) : 'Never',
-              installationDate: '12 Maret 2024',
+              installationDate: item.installation_date || 'Never',
               serialNumber: `SN-BLE-${item.mac.replace(/:/g, '')}`,
-              location: 'Sector A - Upper Level',
-              vendor: 'Huawei',
-              height: '38 Meter',
-              photoUrl: '/contoh cctv.jpg',
+              location: item.location || 'Unknown',
+              vendor: item.vendor || 'Unknown',
+              height: item.height || 'Unknown',
+              photoUrl: item.image ? item.image : '/contoh cctv.jpg',
               uuid: item.uuid,
               namespaceId: item.namespace_id,
               instanceId: item.instance_id,
@@ -85,6 +86,9 @@ const AssetMonitoringDetail: React.FC = () => {
             };
           });
           setTags(mappedTags);
+          if (mappedTags.length > 0) {
+            setActiveMac(prev => prev || mappedTags[0].tagId);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch BLE scans:", err);
@@ -171,9 +175,14 @@ const AssetMonitoringDetail: React.FC = () => {
     doc.setFontSize(9);
     doc.setFont('Helvetica', 'normal');
     doc.setTextColor(71, 85, 105); 
+    const activeDevice = tags.find(t => t.tagId === activeMac) || tags[0];
+    const activeName = activeDevice ? activeDevice.assetName : 'BTSID TII';
+    const activeMacAddress = activeDevice ? activeDevice.tagId : '7C:D9:F4:03:32:47';
+    const activeLocation = activeDevice ? activeDevice.location : 'Sector A - Upper Level';
+
     doc.text(`Periode Laporan : ${new Date(startDate).toLocaleDateString('id-ID')} s.d ${new Date(endDate).toLocaleDateString('id-ID')}`, 14, 62);
-    doc.text('Lokasi Site     : NAYAKA WS (PRR-01-004) - Sector A', 14, 67);
-    doc.text('Target Beacon   : BTSID TII (7C:D9:F4:03:32:47)', 14, 72);
+    doc.text(`Lokasi Site     : NAYAKA WS (PRR-01-004) - ${activeLocation}`, 14, 67);
+    doc.text(`Target Beacon   : ${activeName} (${activeMacAddress})`, 14, 72);
     doc.text(`Total Baris     : ${totalRecords} data scan`, 14, 77);
     
     const tableColumns = [
@@ -189,7 +198,7 @@ const AssetMonitoringDetail: React.FC = () => {
     const tableRows = logs.map((l: any, index: number) => [
       index + 1,
       l.timestamp,
-      '7C:D9:F4:03:32:47',
+      activeMacAddress,
       `${l.rssi} dBm`,
       l.status,
       l.theft_alert === 'Suspicious' ? '- CURIGA' : '- AMAN',
@@ -257,10 +266,13 @@ const AssetMonitoringDetail: React.FC = () => {
       'Instance ID'
     ];
 
+    const activeDevice = tags.find(t => t.tagId === activeMac) || tags[0];
+    const activeMacAddress = activeDevice ? activeDevice.tagId : '7C:D9:F4:03:32:47';
+
     const rows = logs.map((l: any, index: number) => [
       index + 1,
       l.timestamp,
-      '7C:D9:F4:03:32:47',
+      activeMacAddress,
       l.rssi,
       l.status,
       l.theft_alert === 'Suspicious' ? '🚨 CURIGA' : '✅ AMAN',
@@ -291,7 +303,7 @@ const AssetMonitoringDetail: React.FC = () => {
     setIsExporting(true);
     
     try {
-      const res = await fetch(`/api/ble/history-logs/?start_date=${startDate}&end_date=${endDate}`);
+      const res = await fetch(`/api/ble/history-logs/?start_date=${startDate}&end_date=${endDate}&mac=${activeMac}`);
       if (!res.ok) {
         throw new Error('Gagal mengambil data log BLE dari server.');
       }
@@ -346,12 +358,14 @@ const AssetMonitoringDetail: React.FC = () => {
                 <span className="metric-icon green-icon"><FaBoxes /></span>
                 <span className="metric-label">Antenna Inventory Count</span>
               </div>
-              <div className="metric-value">{detectedCount} / 1</div>
+              <div className="metric-value">{detectedCount} / {tags.length || 1}</div>
               <div className="metric-footer">
-                {detectedCount === 1 ? (
+                {detectedCount === tags.length ? (
                   <span className="text-green">✓ 100% Accounted For</span>
                 ) : (
-                  <span className="text-red">✗ 0% Detected (Missing)</span>
+                  <span className="text-red">
+                    ✗ {tags.length - detectedCount} Missing ({Math.round((detectedCount / (tags.length || 1)) * 100)}% Detected)
+                  </span>
                 )}
               </div>
             </div>
@@ -436,7 +450,7 @@ const AssetMonitoringDetail: React.FC = () => {
                 </div>
                 <div className="cctv-info-body">
                   <div className="cctv-count-value">
-                    {detectedCount} / 1 antennas
+                    {detectedCount} / {tags.length || 1} antennas
                   </div>
                   <div className="cctv-time-sub">{currentTime}</div>
                 </div>
@@ -457,7 +471,7 @@ const AssetMonitoringDetail: React.FC = () => {
                 </div>
                 <div className="cctv-info-body">
                   <div className="cctv-count-value">
-                    {detectedCount} / 1 antennas
+                    {detectedCount} / {tags.length || 1} antennas
                   </div>
                   <div className="cctv-time-sub">{currentTime}</div>
                 </div>
@@ -480,6 +494,24 @@ const AssetMonitoringDetail: React.FC = () => {
         <div className="chart-filter-row">
           <form className="chart-filter-form" onSubmit={handleExportPDF}>
             <div className="filter-inputs">
+              <div className="filter-field">
+                <label className="filter-label">Pilih Antena:</label>
+                <select
+                  value={activeMac}
+                  onChange={(e) => setActiveMac(e.target.value)}
+                  className="filter-input-select"
+                  style={{ color: '#fff', background: 'rgba(15, 23, 42, 0.45)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  {tags.map(t => (
+                    <option key={t.tagId} value={t.tagId} style={{ background: '#0f172a' }}>
+                      {t.assetName} ({t.tagId})
+                    </option>
+                  ))}
+                  {tags.length === 0 && (
+                    <option value="">Tidak ada antena aktif</option>
+                  )}
+                </select>
+              </div>
               <div className="filter-field">
                 <label className="filter-label">Mulai Tanggal:</label>
                 <input 
@@ -532,7 +564,7 @@ const AssetMonitoringDetail: React.FC = () => {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis dataKey="date" stroke="var(--text-muted, #94a3b8)" fontSize={10} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.05)' }} tickMargin={8} />
-              <YAxis stroke="var(--text-muted, #94a3b8)" fontSize={10} tickLine={false} axisLine={false} domain={[0, 1.2]} allowDecimals={false} />
+              <YAxis stroke="var(--text-muted, #94a3b8)" fontSize={10} tickLine={false} axisLine={false} domain={[0, Math.max(tags.length, 1)]} allowDecimals={false} />
               <Tooltip 
                 contentStyle={{
                   backgroundColor: 'rgba(15, 23, 42, 0.95)',

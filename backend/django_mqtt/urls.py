@@ -30,6 +30,17 @@ urlpatterns = [
     path('api/ble/history/', monitoring_views.ble_history_chart, name='ble-history'),
     path('api/ble/alerts/', monitoring_views.ble_alerts, name='ble-alerts'),
     path('api/ble/history-logs/', monitoring_views.ble_history_logs, name='ble-history-logs'),
+    
+    # Auth endpoints
+    path('api/auth/login/', monitoring_views.api_login, name='api-login'),
+    path('api/auth/logout/', monitoring_views.api_logout, name='api-logout'),
+    path('api/auth/status/', monitoring_views.api_auth_status, name='api-auth-status'),
+
+    # BLE Devices config endpoints
+    path('api/ble/devices/', monitoring_views.ble_devices_list, name='ble-devices-list'),
+    path('api/ble/devices/<str:mac>/', monitoring_views.ble_device_detail, name='ble-device-detail'),
+    path('api/ble/devices/<str:mac>/delete/', monitoring_views.ble_device_delete_post, name='ble-device-delete-post'),
+    path('api/ble/devices/scanned-unregistered/', monitoring_views.ble_unregistered_list, name='ble-unregistered-list'),
     # path('', include('gps_tracer.urls')),
 ]
 if settings.DEBUG:
