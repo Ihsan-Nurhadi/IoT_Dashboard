@@ -273,12 +273,6 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
         <div className="header-actions">
-          <button className="btn-secondary" onClick={() => navigate('/')}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="btn-icon">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-            Kembali ke Portal
-          </button>
           <button className="btn-danger" onClick={handleLogout}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="btn-icon">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
