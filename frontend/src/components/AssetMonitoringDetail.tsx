@@ -46,6 +46,7 @@ const AssetMonitoringDetail: React.FC = () => {
   const [startDate, setStartDate] = useState<string>(getTodayDateString());
   const [endDate, setEndDate] = useState<string>(getTodayDateString());
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportFormat, setExportFormat] = useState<string>('PDF');
 
   // Set formatted dynamic timestamp
   useEffect(() => {
@@ -243,6 +244,47 @@ const AssetMonitoringDetail: React.FC = () => {
     doc.save(`BLE_Security_Report_${startDate}_to_${endDate}.pdf`);
   };
 
+  const generateCSVReport = (logs: any[]) => {
+    const headers = [
+      'No',
+      'Waktu (WIB)',
+      'ID Tag BLE (MAC)',
+      'RSSI (dBm)',
+      'Status',
+      'Kondisi Keamanan',
+      'UUID Eddystone',
+      'Namespace ID',
+      'Instance ID'
+    ];
+
+    const rows = logs.map((l: any, index: number) => [
+      index + 1,
+      l.timestamp,
+      '7C:D9:F4:03:32:47',
+      l.rssi,
+      l.status,
+      l.theft_alert === 'Suspicious' ? '🚨 CURIGA' : '✅ AMAN',
+      l.uuid,
+      l.namespace_id || '',
+      l.instance_id || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${val}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `BLE_Security_Report_${startDate}_to_${endDate}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleExportPDF = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isExporting) return;
@@ -259,10 +301,15 @@ const AssetMonitoringDetail: React.FC = () => {
         setIsExporting(false);
         return;
       }
-      generatePDFReport(data);
+      
+      if (exportFormat === 'CSV') {
+        generateCSVReport(data);
+      } else {
+        generatePDFReport(data);
+      }
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Terjadi kesalahan saat memproses laporan PDF.');
+      alert(err.message || 'Terjadi kesalahan saat memproses laporan.');
     } finally {
       setIsExporting(false);
     }
@@ -453,13 +500,24 @@ const AssetMonitoringDetail: React.FC = () => {
                   required 
                 />
               </div>
+              <div className="filter-field">
+                <label className="filter-label">Format:</label>
+                <select
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  className="filter-input-select"
+                >
+                  <option value="PDF">PDF Document</option>
+                  <option value="CSV">CSV Spreadsheet</option>
+                </select>
+              </div>
             </div>
             <button 
               type="submit" 
               className="btn-export-pdf"
               disabled={isExporting}
             >
-              {isExporting ? 'Mengekspor...' : '📄 Ekspor Log ke PDF'}
+              {isExporting ? 'Mengekspor...' : exportFormat === 'PDF' ? '📄 Ekspor Log ke PDF' : '📊 Ekspor Log ke CSV'}
             </button>
           </form>
         </div>
