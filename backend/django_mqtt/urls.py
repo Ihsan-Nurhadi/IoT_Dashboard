@@ -41,6 +41,14 @@ urlpatterns = [
     path('api/ble/devices/<str:mac>/', monitoring_views.ble_device_detail, name='ble-device-detail'),
     path('api/ble/devices/<str:mac>/delete/', monitoring_views.ble_device_delete_post, name='ble-device-delete-post'),
     path('api/ble/devices/scanned-unregistered/', monitoring_views.ble_unregistered_list, name='ble-unregistered-list'),
+
+    # CCTV Cameras config endpoints
+    path('api/cameras/', dorlock_views.cameras_list, name='cameras-list'),
+    path('api/cameras/create/', dorlock_views.camera_create, name='camera-create'),
+    path('api/cameras/<str:camera_id>/', dorlock_views.camera_detail, name='camera-detail'),
+    path('api/cameras/<str:camera_id>/update/', dorlock_views.camera_update, name='camera-update'),
+    path('api/cameras/<str:camera_id>/delete/', dorlock_views.camera_delete, name='camera-delete'),
+    path('api/cameras/<str:camera_id>/snapshot/', dorlock_views.camera_snapshot, name='camera-snapshot'),
     # path('', include('gps_tracer.urls')),
 ]
 if settings.DEBUG:

@@ -35,6 +35,14 @@ const AssetMonitoringDetail: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeMac, setActiveMac] = useState<string>('');
 
+  interface CCTVCamera {
+    camera_id: string;
+    camera_name: string;
+    is_active: boolean;
+    detection_zones: { name: string; points: [number, number][] }[];
+  }
+  const [cameras, setCameras] = useState<CCTVCamera[]>([]);
+
   // Date picker and PDF export states
   const getTodayDateString = () => {
     const today = new Date();
@@ -117,6 +125,24 @@ const AssetMonitoringDetail: React.FC = () => {
     };
     fetchChartData();
     const interval = setInterval(fetchChartData, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch CCTV Cameras dynamically
+  useEffect(() => {
+    const fetchCams = async () => {
+      try {
+        const res = await fetch('/api/cameras/');
+        if (res.ok) {
+          const data = await res.json();
+          setCameras(data.filter((c: CCTVCamera) => c.is_active));
+        }
+      } catch (err) {
+        console.error("Failed to fetch cameras:", err);
+      }
+    };
+    fetchCams();
+    const interval = setInterval(fetchCams, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -439,47 +465,40 @@ const AssetMonitoringDetail: React.FC = () => {
             <span className="badge-blue">Antenna Stream</span>
           </div>
           <div className="asset-cctv-column">
-            {/* Camera 3 */}
-            <div className="cctv-container-with-info">
-              <div className="cctv-stream-box">
-                <CCTVStreamCard streamId="cctv_asset_1" cameraName="Camera 3" fallbackPhotoUrl="/camera_4.jpeg" />
+            {cameras.length === 0 ? (
+              <div className="cctv-placeholder" style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                <p>Belum ada kamera CCTV aktif terpasang</p>
               </div>
-              <div className="cctv-description-box">
-                <div className="cctv-info-header">
-                  <span className="cctv-count-badge">Antenna count</span>
-                </div>
-                <div className="cctv-info-body">
-                  <div className="cctv-count-value">
-                    {detectedCount} / {tags.length || 1} antennas
+            ) : (
+              cameras.map((cam) => {
+                const antennaCount = cam.detection_zones?.length || 0;
+                return (
+                  <div className="cctv-container-with-info" key={cam.camera_id}>
+                    <div className="cctv-stream-box">
+                      <CCTVStreamCard 
+                        streamId={cam.camera_id} 
+                        cameraName={cam.camera_name} 
+                        fallbackPhotoUrl="/contoh cctv.jpg" 
+                      />
+                    </div>
+                    <div className="cctv-description-box">
+                      <div className="cctv-info-header">
+                        <span className="cctv-count-badge">Antenna count</span>
+                      </div>
+                      <div className="cctv-info-body">
+                        <div className="cctv-count-value">
+                          {antennaCount} / {antennaCount} antennas
+                        </div>
+                        <div className="cctv-time-sub">{currentTime}</div>
+                      </div>
+                      <div className="cctv-info-footer">
+                        Updated daily at 09:00 local time
+                      </div>
+                    </div>
                   </div>
-                  <div className="cctv-time-sub">{currentTime}</div>
-                </div>
-                <div className="cctv-info-footer">
-                  Updated daily at 09:00 local time
-                </div>
-              </div>
-            </div>
-
-            {/* Camera 4 */}
-            <div className="cctv-container-with-info">
-              <div className="cctv-stream-box">
-                <CCTVStreamCard streamId="cctv_asset_2" cameraName="Camera 4" fallbackPhotoUrl="/contoh cctv.jpg" />
-              </div>
-              <div className="cctv-description-box">
-                <div className="cctv-info-header">
-                  <span className="cctv-count-badge">Antenna count</span>
-                </div>
-                <div className="cctv-info-body">
-                  <div className="cctv-count-value">
-                    {detectedCount} / {tags.length || 1} antennas
-                  </div>
-                  <div className="cctv-time-sub">{currentTime}</div>
-                </div>
-                <div className="cctv-info-footer">
-                  Updated daily at 09:00 local time
-                </div>
-              </div>
-            </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

@@ -575,6 +575,13 @@
     border: 1px solid rgba(239, 68, 68, 0.3);
   }
 
+  .notif-icon-circle.stolen {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    animation: ring 1.5s ease infinite;
+  }
+
   .notif-item-details {
     display: flex;
     flex-direction: column;

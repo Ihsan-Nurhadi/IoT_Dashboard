@@ -805,3 +805,273 @@
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* Tabs Navigation styling */
+.admin-tabs-nav {
+  display: flex;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 8px;
+}
+
+.tab-nav-item {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-nav-item:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tab-nav-item.active {
+  color: #ffffff;
+  background: #1e293b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.portal-link-btn {
+  margin-left: auto;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  color: #60a5fa !important;
+}
+
+.portal-link-btn:hover {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #ffffff !important;
+}
+
+/* Cameras grid & list */
+.cameras-grid-section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cameras-card {
+  width: 100%;
+}
+
+.badge-count {
+  display: inline-block;
+}
+
+/* CCTV Camera Modal - Wide layout for editor side-by-side */
+.camera-modal-container {
+  max-width: 1080px !important;
+  width: 95vw;
+}
+
+.camera-modal-grid {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 24px;
+  min-height: 500px;
+}
+
+@media (max-width: 900px) {
+  .camera-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.camera-form-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Interactive Zone Editor */
+.camera-zone-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.zone-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.zone-editor-header h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: #22d3ee;
+}
+
+.canvas-editor-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #020617;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.canvas-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cctv-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  z-index: 10;
+}
+
+.canvas-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 20;
+}
+
+.zone-editor-controls-bar {
+  display: flex;
+  gap: 12px;
+}
+
+.drawn-zones-list {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drawn-zones-list h5 {
+  margin: 0;
+  font-size: 13.5px;
+  color: #e2e8f0;
+}
+
+.no-zones-msg {
+  font-size: 12.5px;
+  color: #64748b;
+  margin: 8px 0;
+}
+
+.zones-scroll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.zone-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zone-list-item:hover, .zone-list-item.active {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(34, 211, 238, 0.3);
+}
+
+.zone-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.zone-color-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.zone-name-input {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px dashed rgba(255,255,255,0.2) !important;
+  border-radius: 0 !important;
+  padding: 2px 4px !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  max-width: 140px;
+}
+
+.zone-name-input:focus {
+  outline: none !important;
+  border-bottom-color: #22d3ee !important;
+  box-shadow: none !important;
+}
+
+.points-count {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.delete-zone-btn {
+  background: none;
+  border: none;
+  color: #f43f5e;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.8;
+  padding: 4px 8px;
+}
+
+.delete-zone-btn:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.drag-vertex-hint {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 4px;
+}

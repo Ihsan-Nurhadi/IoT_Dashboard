@@ -11,11 +11,12 @@ import {
   FaSpinner,
   FaSignal
 } from 'react-icons/fa';
+import { PiSiren } from 'react-icons/pi';
 import './DetectionLogsTable.css';
 
 interface DetectionLogItem {
   id: string;
-  type: 'person' | 'motion';
+  type: 'person' | 'motion' | 'stolen';
   type_label: string;
   camera: string;
   video_src: string;
@@ -35,7 +36,7 @@ interface PaginatedResponse {
 const ITEMS_PER_PAGE = 10;
 
 const DetectionLogsTable: React.FC = () => {
-  const [category, setCategory] = useState<'all' | 'gerakan' | 'orang'>('all');
+  const [category, setCategory] = useState<'all' | 'gerakan' | 'orang' | 'stolen'>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [page, setPage] = useState<number>(1);
@@ -76,7 +77,7 @@ const DetectionLogsTable: React.FC = () => {
     fetchLogs();
   }, [category, page, startDate, endDate]);
 
-  const handleCategoryChange = (newCat: 'all' | 'gerakan' | 'orang') => {
+  const handleCategoryChange = (newCat: 'all' | 'gerakan' | 'orang' | 'stolen') => {
     if (category !== newCat) {
       setCategory(newCat);
       setPage(1);
@@ -162,6 +163,12 @@ const DetectionLogsTable: React.FC = () => {
           >
             Orang
           </button>
+          <button 
+            className={`tab-btn ${category === 'stolen' ? 'active' : ''}`}
+            onClick={() => handleCategoryChange('stolen')}
+          >
+            Antena
+          </button>
         </div>
 
         {/* Data Table */}
@@ -201,6 +208,11 @@ const DetectionLogsTable: React.FC = () => {
                           <>
                             <FaUser className="type-badge-icon" />
                             <span>{item.type_label}</span>
+                          </>
+                        ) : item.type === 'stolen' ? (
+                          <>
+                            <PiSiren className="type-badge-icon" style={{ color: '#ef4444' }} />
+                            <span style={{ color: '#ef4444', fontWeight: 600 }}>{item.type_label}</span>
                           </>
                         ) : (
                           <>

@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.utils import timezone  # <--- PENTING: Tambahkan import ini
-from .models import DeviceState, DoorStatusLog
+from .models import DeviceState, DoorStatusLog, CCTVCamera
 import os
 import shutil
 import imageio
@@ -150,6 +150,7 @@ def get_motion4_status(request):
 # --- View untuk Streaming CCTV RTSP (Integrasi Lokal) ---
 import cv2
 import time
+import numpy as np
 from django.http import StreamingHttpResponse
 
 _yolo_model = None
@@ -166,15 +167,52 @@ def get_yolo_model():
             return None
     return _yolo_model
 
+def get_camera_config_for_src(src):
+    try:
+        cam = CCTVCamera.objects.filter(camera_id=src).first()
+    except Exception:
+        cam = None
+
+    if cam and cam.is_active:
+        rtsp_url = cam.rtsp_url
+        if cam.username and cam.password and "@" not in rtsp_url and "rtsp://" in rtsp_url:
+            rtsp_url = rtsp_url.replace("rtsp://", f"rtsp://{cam.username}:{cam.password}@")
+        return rtsp_url, cam
+    else:
+        if src == "cctv2":
+            rtsp_url = "rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1"
+        else:
+            rtsp_url = "rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1"
+        return rtsp_url, None
+
+def draw_detection_zones_on_frame(frame, cam):
+    if not cam:
+        return
+    try:
+        h, w = frame.shape[:2]
+        zones = json.loads(cam.detection_zones or '[]')
+        for zone in zones:
+            points = zone.get('points', [])
+            name = zone.get('name', 'Antenna')
+            if len(points) >= 3:
+                pts = np.array([[int(p[0] * w), int(p[1] * h)] for p in points], dtype=np.int32)
+                pts = pts.reshape((-1, 1, 2))
+                # Draw cyan/yellow polygon
+                cv2.polylines(frame, [pts], isClosed=True, color=(255, 255, 0), thickness=2)
+                # Draw label text
+                label_x = pts[0][0][0]
+                label_y = pts[0][0][1] - 8
+                cv2.putText(frame, name, (label_x, max(label_y, 15)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+    except Exception as e:
+        print(f"Error drawing detection zones: {e}")
+
 def gen_cctv(src="cctv", detect=False):
     import os
     # Paksa RTSP menggunakan TCP (bukan UDP) agar tidak ada packet loss di jalur VPN
     os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
     
-    if src == "cctv2":
-        rtsp_url = "rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1"
-    else:
-        rtsp_url = "rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1"
+    rtsp_url, cam = get_camera_config_for_src(src)
         
     cap = cv2.VideoCapture(rtsp_url)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -199,6 +237,8 @@ def gen_cctv(src="cctv", detect=False):
                 frame = cv2.resize(frame, (1280, int(h * (1280 / w))))
                 # recalculate width/height if resized
                 h, w = frame.shape[:2]
+            
+            draw_detection_zones_on_frame(frame, cam)
             
             # Deteksi orang dengan YOLO jika diaktifkan
             if detect:
@@ -247,10 +287,7 @@ def capture_photo(request):
         return JsonResponse({"error": "POST only"}, status=405)
     
     src = request.GET.get("src", "cctv")
-    if src == "cctv2":
-        rtsp_url = "rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1"
-    else:
-        rtsp_url = "rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1"
+    rtsp_url, cam = get_camera_config_for_src(src)
 
     try:
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
@@ -271,6 +308,8 @@ def capture_photo(request):
         # Ensure output directory exists
         output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
         os.makedirs(output_dir, exist_ok=True)
+
+        draw_detection_zones_on_frame(frame, cam)
 
         # Draw YOLO detection on captured image if detect parameter is true
         detect = request.GET.get("detect", "false").lower() == "true"
@@ -310,10 +349,7 @@ def capture_video(request):
         return JsonResponse({"error": "POST only"}, status=405)
 
     src = request.GET.get("src", "cctv")
-    if src == "cctv2":
-        rtsp_url = "rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1"
-    else:
-        rtsp_url = "rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1"
+    rtsp_url, cam = get_camera_config_for_src(src)
 
     output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "videos")
     os.makedirs(output_dir, exist_ok=True)
@@ -357,6 +393,7 @@ def capture_video(request):
                     ret, first_frame = cap_vid.read()
                     cap_vid.release()
                     if ret:
+                        draw_detection_zones_on_frame(first_frame, cam)
                         photo_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
                         os.makedirs(photo_dir, exist_ok=True)
                         photo_filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
@@ -404,6 +441,8 @@ def capture_video(request):
                 if fw != width or fh != height:
                     frame = cv2.resize(frame, (width, height))
 
+                draw_detection_zones_on_frame(frame, cam)
+
                 if detect and model is not None:
                     if frame_count % 3 == 0 or len(last_boxes) == 0:
                         results = model(frame, classes=[0], conf=0.4, verbose=False)
@@ -441,7 +480,6 @@ def capture_video(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     formatted_time = now.strftime("%b %d, %I:%M %p")
-
     return JsonResponse({
         "status": "success",
         "url": f"/media/cctv/videos/{filename}",
@@ -640,6 +678,31 @@ def cctv_alerts(request):
                 "raw_time": dt.isoformat()
             })
         
+    # 3. Camera Stolen Alerts (_stolen_)
+    if category in ["all", "stolen", "camera"]:
+        stolen_files = [f for f in all_files if f.endswith(".jpg") and "_stolen_" in f]
+        for f in stolen_files:
+            filepath = os.path.join(directory, f)
+            mtime = os.path.getmtime(filepath)
+            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+            
+            parts = f.replace(".jpg", "").split("_stolen_")
+            cam_id = parts[0] if len(parts) > 0 else "cctv"
+            zone_name = parts[1].split("_")[0] if len(parts) > 1 else "Antenna"
+            
+            cam_label = cam_id.upper()
+            formatted_time = dt.strftime("%d %b %I:%M %p")
+            
+            alerts.append({
+                "id": f,
+                "type": "stolen",
+                "camera": cam_label,
+                "title": f"Antena {zone_name} Hilang / Dicuri di {cam_label}!",
+                "url": f"/media/cctv/photos/{f}",
+                "timestamp": formatted_time,
+                "raw_time": dt.isoformat()
+            })
+        
     # Sort descending by timestamp (newest first)
     alerts.sort(key=lambda x: x["raw_time"], reverse=True)
     
@@ -830,6 +893,39 @@ def cctv_detection_logs(request):
                 "mtime": data["mtime"]
             })
 
+    # 3. Camera Stolen Logs (_stolen_)
+    if category in ["all", "stolen", "camera"]:
+        stolen_files = [f for f in all_files if f.endswith(".jpg") and "_stolen_" in f]
+        for f in stolen_files:
+            filepath = os.path.join(directory, f)
+            mtime = os.path.getmtime(filepath)
+            dt = timezone.datetime.fromtimestamp(mtime, tz=timezone.get_current_timezone())
+
+            if start_dt and dt < start_dt:
+                continue
+            if end_dt and dt > end_dt:
+                continue
+
+            parts = f.replace(".jpg", "").split("_stolen_")
+            cam_id = parts[0] if len(parts) > 0 else "cctv"
+            zone_name = parts[1].split("_")[0] if len(parts) > 1 else "Antenna"
+            
+            cam_label = cam_id.upper()
+            formatted_time = dt.strftime("%d %b %Y, %I:%M %p")
+
+            items.append({
+                "id": f,
+                "type": "stolen",
+                "type_label": f"Antena {zone_name} Hilang",
+                "camera": cam_label,
+                "video_src": cam_id,
+                "photo_url": f"/media/cctv/photos/{f}",
+                "video_url": None,
+                "timestamp": formatted_time,
+                "raw_time": dt.isoformat(),
+                "mtime": mtime
+            })
+
     # Sort descending by mtime (newest detection first)
     items.sort(key=lambda x: x["mtime"], reverse=True)
 
@@ -846,3 +942,251 @@ def cctv_detection_logs(request):
         "total_pages": total_pages,
         "current_page": page
     })
+
+
+from django.shortcuts import get_object_or_404
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import AllowAny
+from monitoring.views import CsrfExemptSessionAuthentication
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def cameras_list(request):
+    cameras = CCTVCamera.objects.all().order_by('camera_id')
+    results = []
+    for cam in cameras:
+        results.append({
+            'camera_id': cam.camera_id,
+            'camera_name': cam.camera_name,
+            'rtsp_url': cam.rtsp_url,
+            'onvif_url': cam.onvif_url,
+            'username': cam.username,
+            'password': cam.password,
+            'width': cam.width,
+            'height': cam.height,
+            'is_active': cam.is_active,
+            'detection_zones': json.loads(cam.detection_zones or '[]')
+        })
+    return JsonResponse(results, safe=False)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def camera_detail(request, camera_id):
+    cam = get_object_or_404(CCTVCamera, camera_id=camera_id)
+    return JsonResponse({
+        'camera_id': cam.camera_id,
+        'camera_name': cam.camera_name,
+        'rtsp_url': cam.rtsp_url,
+        'onvif_url': cam.onvif_url,
+        'username': cam.username,
+        'password': cam.password,
+        'width': cam.width,
+        'height': cam.height,
+        'is_active': cam.is_active,
+        'detection_zones': json.loads(cam.detection_zones or '[]')
+    })
+
+def extract_baseline_templates(camera):
+    import cv2
+    import os
+    import json
+    from django.conf import settings
+    
+    zones = []
+    try:
+        zones = json.loads(camera.detection_zones or '[]')
+    except Exception:
+        return
+        
+    if not zones:
+        return
+        
+    # Look for current camera snapshot
+    snapshot_path = os.path.join(settings.MEDIA_ROOT, "cctv", "snapshots", f"snapshot_{camera.camera_id}.jpg")
+    frame = None
+    
+    if os.path.exists(snapshot_path):
+        frame = cv2.imread(snapshot_path)
+        
+    # If snapshot doesn't exist, try capturing from RTSP
+    if frame is None:
+        rtsp_url = camera.rtsp_url
+        if camera.username and camera.password and "@" not in rtsp_url and "rtsp://" in rtsp_url:
+            rtsp_url = rtsp_url.replace("rtsp://", f"rtsp://{camera.username}:{camera.password}@")
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+        cap = cv2.VideoCapture(rtsp_url)
+        if cap.isOpened():
+            for _ in range(5):
+                cap.grab()
+            ret, frame = cap.retrieve()
+            cap.release()
+            
+    if frame is None:
+        return
+        
+    height, width = frame.shape[:2]
+    baseline_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "baselines")
+    os.makedirs(baseline_dir, exist_ok=True)
+    
+    for zone in zones:
+        name = zone.get('name', 'Zone').strip().replace(' ', '_')
+        points = zone.get('points', [])
+        if len(points) < 3:
+            continue
+            
+        x_coords = [float(p[0]) for p in points]
+        y_coords = [float(p[1]) for p in points]
+        
+        xmin = max(0, int(min(x_coords) * width))
+        xmax = min(width, int(max(x_coords) * width))
+        ymin = max(0, int(min(y_coords) * height))
+        ymax = min(height, int(max(y_coords) * height))
+        
+        if xmax - xmin > 5 and ymax - ymin > 5:
+            crop = frame[ymin:ymax, xmin:xmax]
+            
+            # Determine Time of Day (TOD)
+            from django.utils import timezone
+            hour = timezone.localtime().hour
+            if 6 <= hour < 12:
+                tod = "morning"
+            elif 12 <= hour < 18:
+                tod = "afternoon"
+            else:
+                tod = "night"
+                
+            # Save standard baseline
+            filename = f"baseline_{camera.camera_id}_{name}.jpg"
+            filepath = os.path.join(baseline_dir, filename)
+            cv2.imwrite(filepath, crop)
+            
+            # Save time-of-day specific baseline to handle daylight/shadow shifts
+            tod_filename = f"baseline_{camera.camera_id}_{name}_{tod}.jpg"
+            tod_filepath = os.path.join(baseline_dir, tod_filename)
+            cv2.imwrite(tod_filepath, crop)
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def camera_update(request, camera_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Not authenticated'}, status=401)
+        
+    cam = get_object_or_404(CCTVCamera, camera_id=camera_id)
+    data = json.loads(request.body.decode('utf-8'))
+    
+    cam.camera_name = data.get('camera_name', cam.camera_name)
+    cam.rtsp_url = data.get('rtsp_url', cam.rtsp_url)
+    cam.onvif_url = data.get('onvif_url', cam.onvif_url)
+    cam.username = data.get('username', cam.username)
+    
+    new_pass = data.get('password')
+    if new_pass is not None and new_pass.strip() != "":
+        cam.password = new_pass
+        
+    cam.width = int(data.get('width', cam.width))
+    cam.height = int(data.get('height', cam.height))
+    cam.is_active = bool(data.get('is_active', cam.is_active))
+    
+    zones = data.get('detection_zones', [])
+    cam.detection_zones = json.dumps(zones)
+    cam.save()
+    
+    # Extract baseline crop templates for CV matching
+    extract_baseline_templates(cam)
+    
+    return JsonResponse({
+        'success': True,
+        'camera_id': cam.camera_id,
+        'detection_zones': zones
+    })
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def camera_snapshot(request, camera_id):
+    cam = get_object_or_404(CCTVCamera, camera_id=camera_id)
+    
+    rtsp_url = cam.rtsp_url
+    if cam.username and cam.password and "@" not in rtsp_url and "rtsp://" in rtsp_url:
+        rtsp_url = rtsp_url.replace("rtsp://", f"rtsp://{cam.username}:{cam.password}@")
+        
+    import cv2
+    import os
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+    cap = cv2.VideoCapture(rtsp_url)
+    
+    if not cap.isOpened():
+        return JsonResponse({
+            'status': 'error',
+            'url': '/contoh cctv.jpg',
+            'message': 'Failed to connect to RTSP stream'
+        })
+        
+    for _ in range(5):
+        cap.grab()
+    ret, frame = cap.retrieve()
+    cap.release()
+    
+    if not ret:
+        return JsonResponse({
+            'status': 'error',
+            'url': '/contoh cctv.jpg',
+            'message': 'Failed to retrieve frame from camera'
+        })
+        
+    output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "snapshots")
+    os.makedirs(output_dir, exist_ok=True)
+    filename = f"snapshot_{cam.camera_id}.jpg"
+    filepath = os.path.join(output_dir, filename)
+    cv2.imwrite(filepath, frame)
+    
+    return JsonResponse({
+        'status': 'success',
+        'url': f'/media/cctv/snapshots/{filename}?t={int(time.time())}'
+    })
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def camera_create(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Not authenticated'}, status=401)
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        camera_id = data.get('camera_id', '').strip()
+        if not camera_id:
+            return JsonResponse({'error': 'Camera ID must not be empty'}, status=400)
+            
+        if CCTVCamera.objects.filter(camera_id=camera_id).exists():
+            return JsonResponse({'error': f'Camera with ID {camera_id} already exists'}, status=400)
+            
+        cam = CCTVCamera.objects.create(
+            camera_id=camera_id,
+            camera_name=data.get('camera_name', camera_id),
+            rtsp_url=data.get('rtsp_url', ''),
+            onvif_url=data.get('onvif_url'),
+            username=data.get('username'),
+            password=data.get('password'),
+            width=int(data.get('width', 1920)),
+            height=int(data.get('height', 1080)),
+            is_active=bool(data.get('is_active', True)),
+            detection_zones=json.dumps(data.get('detection_zones', []))
+        )
+        # Extract baseline crop templates for CV matching
+        extract_baseline_templates(cam)
+        return JsonResponse({'success': True, 'camera_id': cam.camera_id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def camera_delete(request, camera_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Not authenticated'}, status=401)
+    cam = get_object_or_404(CCTVCamera, camera_id=camera_id)
+    cam.delete()
+    return JsonResponse({'success': True})

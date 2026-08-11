@@ -358,11 +358,11 @@ const TowerSentinel: React.FC = () => {
         const bleRes = await fetch('/api/ble/alerts/');
         const bleData = bleRes.ok ? await bleRes.json() : [];
 
-        // 4. Map CCTV/PIR alerts
+        // 4. Map CCTV/PIR/Stolen alerts
         const cctvMapped = cctvData.map((item: any) => ({
           id: item.id,
-          type: item.type as 'camera' | 'pir',
-          title: item.title || (item.type === 'camera' ? `Orang terdeteksi` : `Gerakan terdeteksi`),
+          type: item.type as 'camera' | 'pir' | 'stolen',
+          title: item.title || (item.type === 'stolen' ? `Antena Hilang / Dicuri` : item.type === 'camera' ? `Orang terdeteksi` : `Gerakan terdeteksi`),
           subtitle: `NAYAKA WS (PRR-01-004) &middot; ${item.camera}`,
           timestamp: item.timestamp,
           rawTime: item.raw_time,
@@ -604,8 +604,8 @@ const TowerSentinel: React.FC = () => {
     if (!canvas) return;
 
     const isDark = theme === 'dark';
-    const fogColor = isDark ? 0x0a1122 : 0xfaf6ee;
-    const groundColor = isDark ? 0x0c250c : 0x8da190;
+    const fogColor = isDark ? 0x16223d : 0xfaf6ee;
+    const groundColor = isDark ? 0x103210 : 0x8da190;
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -2026,6 +2026,7 @@ const TowerSentinel: React.FC = () => {
                 >
                   <div className="notif-item-left">
                     <div className={`notif-icon-circle ${item.type}`}>
+                      {item.type === 'stolen' && <PiSiren />}
                       {item.type === 'camera' && <FaCamera />}
                       {item.type === 'pir' && <PiSiren />}
                       {item.type === 'door' && (item.status === 'OPEN' ? <FaDoorOpen /> : <FaDoorClosed />)}

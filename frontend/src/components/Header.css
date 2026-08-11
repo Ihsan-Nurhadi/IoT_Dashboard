@@ -313,6 +313,15 @@
   background-color: rgba(255, 255, 255, 0.03);
 }
 
+.alert-stolen-item {
+  border-left: 3px solid #ef4444;
+  background-color: rgba(239, 68, 68, 0.04);
+}
+
+.alert-stolen-item:hover {
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
 .dropdown-item-thumb {
   width: 54px;
   height: 36px;

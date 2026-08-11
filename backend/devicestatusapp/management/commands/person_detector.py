@@ -241,6 +241,168 @@ class CameraMonitorThread(threading.Thread):
             except Exception:
                 raise  # Re-raise other exceptions to caller
 
+    def verify_antennas_integrity(self):
+        import cv2
+        import os
+        import json
+        from devicestatusapp.models import CCTVCamera
+        
+        try:
+            cam = CCTVCamera.objects.filter(camera_id=self.camera_id, is_active=True).first()
+        except Exception as e:
+            self.log_message(f"[Visual Check] Database error loading camera: {e}")
+            return
+            
+        if not cam:
+            return
+            
+        try:
+            zones = json.loads(cam.detection_zones or '[]')
+        except Exception:
+            return
+            
+        if not zones:
+            return
+            
+        # Check if baselines exist for any of the zones (standard or time-of-day specific)
+        import glob
+        baselines_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "baselines")
+        zones_to_check = []
+        for zone in zones:
+            name = zone.get('name', '').strip().replace(' ', '_')
+            if not name:
+                continue
+            pattern = os.path.join(baselines_dir, f"baseline_{self.camera_id}_{name}*.jpg")
+            matching_paths = glob.glob(pattern)
+            if matching_paths:
+                zones_to_check.append((zone, name, matching_paths))
+                
+        if not zones_to_check:
+            return
+            
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+        cap = cv2.VideoCapture(self.rtsp_url)
+        if not cap.isOpened():
+            self.log_message("[Visual Check] Failed to open RTSP stream.")
+            return
+            
+        for _ in range(5):
+            cap.grab()
+        ret, frame = cap.retrieve()
+        cap.release()
+        
+        if not ret or frame is None:
+            self.log_message("[Visual Check] Failed to retrieve frame.")
+            return
+            
+        height, width = frame.shape[:2]
+        
+        for zone, name, baseline_paths in zones_to_check:
+            points = zone.get('points', [])
+            if len(points) < 3:
+                continue
+                
+            x_coords = [float(p[0]) for p in points]
+            y_coords = [float(p[1]) for p in points]
+            
+            xmin_ratio, xmax_ratio = min(x_coords), max(x_coords)
+            ymin_ratio, ymax_ratio = min(y_coords), max(y_coords)
+            
+            xmin = int(xmin_ratio * width)
+            xmax = int(xmax_ratio * width)
+            ymin = int(ymin_ratio * height)
+            ymax = int(ymax_ratio * height)
+            
+            w_px = xmax - xmin
+            h_px = ymax - ymin
+            
+            pad_x = max(25, int(w_px * 0.15))
+            pad_y = max(25, int(h_px * 0.15))
+            
+            s_xmin = max(0, xmin - pad_x)
+            s_xmax = min(width, xmax + pad_x)
+            s_ymin = max(0, ymin - pad_y)
+            s_ymax = min(height, ymax + pad_y)
+            
+            search_region = frame[s_ymin:s_ymax, s_xmin:s_xmax]
+            sr_h, sr_w = search_region.shape[:2]
+            
+            best_score = -1.0
+            
+            for b_path in baseline_paths:
+                baseline_img = cv2.imread(b_path)
+                if baseline_img is None:
+                    continue
+                tb_h, tb_w = baseline_img.shape[:2]
+                if tb_h < 5 or tb_w < 5:
+                    continue
+                    
+                local_search = search_region.copy()
+                local_sr_h, local_sr_w = sr_h, sr_w
+                
+                if tb_h > local_sr_h or tb_w > local_sr_w:
+                    target_w = max(5, xmax - xmin)
+                    target_h = max(5, ymax - ymin)
+                    baseline_img = cv2.resize(baseline_img, (target_w, target_h))
+                    tb_h, tb_w = baseline_img.shape[:2]
+                    
+                if local_sr_h < tb_h or local_sr_w < tb_w:
+                    local_search = frame[ymin:ymax, xmin:xmax]
+                    local_sr_h, local_sr_w = local_search.shape[:2]
+                    if local_sr_h < tb_h or local_sr_w < tb_w:
+                        continue
+                        
+                try:
+                    res = cv2.matchTemplate(local_search, baseline_img, cv2.TM_CCOEFF_NORMED)
+                    _, max_val, _, _ = cv2.minMaxLoc(res)
+                    if max_val > best_score:
+                        best_score = max_val
+                except Exception as match_err:
+                    self.log_message(f"[Visual Check] Match template error for {name} on {os.path.basename(b_path)}: {match_err}")
+                    continue
+            
+            # Lower the similarity threshold to 0.55 to make it highly robust against compression artifacts,
+            # night transition noise, wind vibrations, heat haze, and sky color backdrop fluctuations.
+            threshold = 0.55
+            self.log_message(f"[Visual Check] Zone '{name}': Max match score = {best_score:.3f} (Threshold: {threshold})")
+            
+            if best_score < threshold:
+                self.log_message(f"[Visual Check] ALARM! Zone '{name}' best similarity {best_score:.3f} is below threshold!", self.style.ERROR)
+                
+                cooldown_key = f"last_alarm_{name}"
+                last_alarm = getattr(self, cooldown_key, 0.0)
+                if time.time() - last_alarm < 300:
+                    continue
+                setattr(self, cooldown_key, time.time())
+                
+                alert_frame = frame.copy()
+                
+                poly_pts = []
+                for pt in points:
+                    poly_pts.append([int(float(pt[0]) * width), int(float(pt[1]) * height)])
+                import numpy as np
+                cv2.polylines(alert_frame, [np.array(poly_pts, dtype=np.int32)], isClosed=True, color=(0, 0, 255), thickness=3)
+                
+                label_y = ymin - 15 if ymin - 15 > 20 else ymin + 25
+                cv2.putText(
+                    alert_frame, 
+                    f"STOLEN ALERT: {name} (Match: {best_score*100:.1f}%)", 
+                    (xmin, label_y), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 
+                    0.8, 
+                    (0, 0, 255), 
+                    2
+                )
+                
+                photos_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
+                os.makedirs(photos_dir, exist_ok=True)
+                timestamp_str = timezone.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"{self.camera_id}_stolen_{name}_{timestamp_str}.jpg"
+                filepath = os.path.join(photos_dir, filename)
+                cv2.imwrite(filepath, alert_frame)
+                
+                self.log_message(f"[Visual Check] Saved alert photo: {filename}", self.style.SUCCESS)
+
     def run_onvif_loop(self, model, output_dir):
         self.log_message("Running in EVENT-DRIVEN ONVIF mode...", self.style.SUCCESS)
 
@@ -265,6 +427,15 @@ class CameraMonitorThread(threading.Thread):
         last_heartbeat_time = time.time()
 
         while self.running:
+
+            # ── Antenna Visual Integrity Check ──────────────────────────────
+            now_time = time.time()
+            if not hasattr(self, 'last_antenna_check_time') or now_time - self.last_antenna_check_time >= 60:
+                self.last_antenna_check_time = now_time
+                try:
+                    self.verify_antennas_integrity()
+                except Exception as ve:
+                    self.log_message(f"Error in verify_antennas_integrity: {ve}", self.style.ERROR)
 
             # ── Heartbeat ──────────────────────────────────────────────────
             now = time.time()
@@ -665,25 +836,62 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.WARNING("Starting CCTV Person Detection Monitor Service (ONVIF Triggered)..."))
 
-        # Camera configurations — credentials only, no live thread refs here
-        cameras_config = [
-            {
-                'camera_id': 'cctv',
-                'rtsp_url': 'rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1',
-                'onvif_ip': '10.10.0.5',
-                'onvif_port': 2020,
-                'onvif_user': 'nykws1',
-                'onvif_password': 'nykworkshop',
-            },
-            {
-                'camera_id': 'cctv2',
-                'rtsp_url': 'rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1',
-                'onvif_ip': '10.10.0.5',
-                'onvif_port': 2021,
-                'onvif_user': 'nykws2',
-                'onvif_password': 'nykworkshop',
-            },
-        ]
+        from devicestatusapp.models import CCTVCamera
+        import urllib.parse
+        
+        cameras_config = []
+        try:
+            db_cameras = CCTVCamera.objects.filter(is_active=True)
+            for dc in db_cameras:
+                onvif_ip = '10.10.0.5'
+                onvif_port = 2020
+                if dc.onvif_url:
+                    try:
+                        parsed = urllib.parse.urlparse(dc.onvif_url)
+                        netloc = parsed.netloc
+                        if ":" in netloc:
+                            onvif_ip, port_str = netloc.split(":")
+                            onvif_port = int(port_str)
+                        else:
+                            onvif_ip = netloc
+                            onvif_port = 80
+                    except Exception:
+                        pass
+                
+                rtsp_url = dc.rtsp_url
+                if dc.username and dc.password and "@" not in rtsp_url and "rtsp://" in rtsp_url:
+                    rtsp_url = rtsp_url.replace("rtsp://", f"rtsp://{dc.username}:{dc.password}@")
+                    
+                cameras_config.append({
+                    'camera_id': dc.camera_id,
+                    'rtsp_url': rtsp_url,
+                    'onvif_ip': onvif_ip,
+                    'onvif_port': onvif_port,
+                    'onvif_user': dc.username or '',
+                    'onvif_password': dc.password or '',
+                })
+        except Exception as db_err:
+            self.stdout.write(self.style.ERROR(f"Error loading cameras from DB: {db_err}"))
+
+        if not cameras_config:
+            cameras_config = [
+                {
+                    'camera_id': 'cctv',
+                    'rtsp_url': 'rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1',
+                    'onvif_ip': '10.10.0.5',
+                    'onvif_port': 2020,
+                    'onvif_user': 'nykws1',
+                    'onvif_password': 'nykworkshop',
+                },
+                {
+                    'camera_id': 'cctv2',
+                    'rtsp_url': 'rtsp://nykws2:nykworkshop@10.10.0.5:555/stream1',
+                    'onvif_ip': '10.10.0.5',
+                    'onvif_port': 2021,
+                    'onvif_user': 'nykws2',
+                    'onvif_password': 'nykworkshop',
+                },
+            ]
 
         # Build managed thread list and start all camera threads
         managed_list = []

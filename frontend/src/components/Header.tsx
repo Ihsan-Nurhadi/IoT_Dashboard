@@ -6,7 +6,7 @@ import { PiSiren } from 'react-icons/pi';
 
 interface AlertItem {
   id: string;
-  type?: 'camera' | 'pir';
+  type?: 'camera' | 'pir' | 'stolen';
   camera: string;
   title?: string;
   url: string;
@@ -198,7 +198,7 @@ const Header: React.FC = () => {
                   alerts.map((item) => (
                     <div 
                       key={item.id} 
-                      className="dropdown-item"
+                      className={`dropdown-item ${item.type === 'stolen' ? 'alert-stolen-item' : ''}`}
                       onClick={() => {
                         setFullscreenPhotoUrl(item.url);
                         setFullscreenPhotoTitle(`${item.title || item.camera} - ${item.timestamp}`);
@@ -209,7 +209,9 @@ const Header: React.FC = () => {
                         <img src={item.url} alt="thumbnail" />
                       </div>
                       <div className="dropdown-item-details">
-                        <span className="item-text">{item.title || `Orang terdeteksi di ${item.camera}`}</span>
+                        <span className="item-text" style={{ color: item.type === 'stolen' ? '#ef4444' : 'inherit', fontWeight: item.type === 'stolen' ? 600 : 'normal' }}>
+                          {item.title || `Orang terdeteksi di ${item.camera}`}
+                        </span>
                         <span className="item-time">{item.timestamp}</span>
                       </div>
                     </div>
