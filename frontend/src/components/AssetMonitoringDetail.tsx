@@ -42,6 +42,7 @@ const AssetMonitoringDetail: React.FC = () => {
     detection_zones: { name: string; points: [number, number][] }[];
   }
   const [cameras, setCameras] = useState<CCTVCamera[]>([]);
+  const [verifiedCounts, setVerifiedCounts] = useState<{ [camId: string]: { total: number; present: number } }>({});
 
   // Date picker and PDF export states
   const getTodayDateString = () => {
@@ -479,6 +480,15 @@ const AssetMonitoringDetail: React.FC = () => {
                         streamId={cam.camera_id} 
                         cameraName={cam.camera_name} 
                         fallbackPhotoUrl="/contoh cctv.jpg" 
+                        onVerifyResult={(result) => {
+                          setVerifiedCounts(prev => ({
+                            ...prev,
+                            [cam.camera_id]: {
+                              total: result.total,
+                              present: result.present
+                            }
+                          }));
+                        }}
                       />
                     </div>
                     <div className="cctv-description-box">
@@ -486,13 +496,23 @@ const AssetMonitoringDetail: React.FC = () => {
                         <span className="cctv-count-badge">Antenna count</span>
                       </div>
                       <div className="cctv-info-body">
-                        <div className="cctv-count-value">
-                          {antennaCount} / {antennaCount} antennas
-                        </div>
+                        {(() => {
+                          const verified = verifiedCounts[cam.camera_id];
+                          if (verified) {
+                            const isStolen = verified.present < verified.total;
+                            return (
+                              <div className="cctv-count-value" style={{ color: isStolen ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>
+                                {verified.present} / {verified.total} antennas {isStolen ? '🚨 ALERT' : '✅'}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="cctv-count-value">
+                              {antennaCount} / {antennaCount} antennas
+                            </div>
+                          );
+                        })()}
                         <div className="cctv-time-sub">{currentTime}</div>
-                      </div>
-                      <div className="cctv-info-footer">
-                        Updated daily at 09:00 local time
                       </div>
                     </div>
                   </div>

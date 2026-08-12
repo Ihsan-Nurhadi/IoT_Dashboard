@@ -66,6 +66,11 @@ const AdminDashboard: React.FC = () => {
   const [zones, setZones] = useState<{ name: string; points: [number, number][] }[]>([]);
   const [activeZoneIndex, setActiveZoneIndex] = useState<number | null>(null);
   const [snapshotUrl, setSnapshotUrl] = useState<string>('/contoh cctv.jpg');
+  const [baselinesStatus, setBaselinesStatus] = useState<{ morning: boolean; afternoon: boolean; night: boolean }>({
+    morning: false,
+    afternoon: false,
+    night: false
+  });
   const [loadingSnapshot, setLoadingSnapshot] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -167,6 +172,7 @@ const AdminDashboard: React.FC = () => {
     setZones([]);
     setActiveZoneIndex(null);
     setSnapshotUrl('/contoh cctv.jpg');
+    setBaselinesStatus({ morning: false, afternoon: false, night: false });
     setIsCameraModalOpen(true);
   };
 
@@ -184,6 +190,8 @@ const AdminDashboard: React.FC = () => {
     setCamActive(cam.is_active);
     setZones(cam.detection_zones || []);
     setActiveZoneIndex(null);
+    setBaselinesStatus({ morning: false, afternoon: false, night: false });
+    fetchBaselinesStatus(cam.camera_id);
     setIsCameraModalOpen(true);
     
     // Load snapshot
@@ -224,6 +232,77 @@ const AdminDashboard: React.FC = () => {
     } catch (err) {
       console.error(err);
       alert('Error saat merefresh snapshot');
+    } finally {
+      setLoadingSnapshot(false);
+    }
+  };
+
+  const fetchBaselinesStatus = async (camId: string) => {
+    try {
+      const res = await fetch(`/api/cctv/baselines-status/?camera_id=${camId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBaselinesStatus(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch baselines status:", err);
+    }
+  };
+
+  const handleCaptureBaselineSlot = async (tod: 'morning' | 'afternoon' | 'night') => {
+    const camId = isCameraEditMode ? selectedCamera?.camera_id : formCamId.trim();
+    if (!camId) {
+      alert("Simpan kamera terlebih dahulu sebelum merekam baseline.");
+      return;
+    }
+    setLoadingSnapshot(true);
+    try {
+      const res = await fetch(`/api/cctv/capture-baseline/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ camera_id: camId, tod })
+      });
+      if (res.ok) {
+        alert(`Baseline ${tod === 'morning' ? 'Pagi' : tod === 'afternoon' ? 'Siang' : 'Malam'} berhasil direkam untuk semua zona!`);
+        fetchBaselinesStatus(camId);
+      } else {
+        const data = await res.json();
+        alert(`Gagal merekam baseline: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error capturing baseline.");
+    } finally {
+      setLoadingSnapshot(false);
+    }
+  };
+
+  const handleDeleteBaselineSlot = async (tod: 'morning' | 'afternoon' | 'night') => {
+    const camId = isCameraEditMode ? selectedCamera?.camera_id : formCamId.trim();
+    if (!camId) return;
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus baseline ${tod === 'morning' ? 'Pagi' : tod === 'afternoon' ? 'Siang' : 'Malam'} untuk semua zona kamera ini?`)) {
+      return;
+    }
+    setLoadingSnapshot(true);
+    try {
+      const res = await fetch(`/api/cctv/delete-baseline/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ camera_id: camId, tod })
+      });
+      if (res.ok) {
+        alert(`Baseline ${tod === 'morning' ? 'Pagi' : tod === 'afternoon' ? 'Siang' : 'Malam'} berhasil dihapus.`);
+        fetchBaselinesStatus(camId);
+      } else {
+        alert("Gagal menghapus baseline.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting baseline.");
     } finally {
       setLoadingSnapshot(false);
     }
@@ -1270,6 +1349,81 @@ const AdminDashboard: React.FC = () => {
                       <span>Kamera Aktif & Pantau Sinyal</span>
                     </label>
                   </div>
+
+                  {/* Baseline Slots configuration (M, A, N) */}
+                  {isCameraEditMode && (
+                    <div className="baseline-config-container" style={{ marginTop: '24px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
+                      <h5 style={{ color: '#fff', fontSize: '0.95rem', margin: '0 0 12px 0', fontWeight: 500 }}>BaseLine</h5>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        {(['morning', 'afternoon', 'night'] as const).map((tod) => {
+                          const hasBaseline = baselinesStatus[tod];
+                          const labelMap = { morning: 'M', afternoon: 'A', night: 'N' };
+                          const nameMap = { morning: 'Pagi', afternoon: 'Siang', night: 'Malam' };
+                          
+                          return (
+                            <div key={tod} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => !hasBaseline && handleCaptureBaselineSlot(tod)}
+                                  style={{
+                                    width: '42px',
+                                    height: '42px',
+                                    borderRadius: '50%',
+                                    border: hasBaseline ? 'none' : '2px dashed rgba(255,255,255,0.25)',
+                                    backgroundColor: hasBaseline ? '#10b981' : 'rgba(255,255,255,0.05)',
+                                    color: '#fff',
+                                    fontWeight: 'bold',
+                                    fontSize: '1.1rem',
+                                    cursor: hasBaseline ? 'default' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s ease',
+                                  }}
+                                  title={hasBaseline ? `Baseline ${nameMap[tod]} sudah terekam` : `Klik untuk rekam baseline ${nameMap[tod]}`}
+                                >
+                                  {labelMap[tod]}
+                                </button>
+                                
+                                {hasBaseline && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteBaselineSlot(tod)}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-4px',
+                                      right: '-4px',
+                                      backgroundColor: '#ef4444',
+                                      color: '#fff',
+                                      border: 'none',
+                                      borderRadius: '50%',
+                                      width: '18px',
+                                      height: '18px',
+                                      fontSize: '11px',
+                                      fontWeight: 'bold',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                                      padding: 0,
+                                    }}
+                                    title={`Hapus baseline ${nameMap[tod]}`}
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>
+                                {nameMap[tod]}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Side: Interactive Zone Editor Canvas */}

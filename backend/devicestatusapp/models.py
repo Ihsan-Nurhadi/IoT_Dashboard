@@ -28,6 +28,14 @@ class CCTVCamera(models.Model):
     height = models.IntegerField(default=1080)
     is_active = models.BooleanField(default=True)
     detection_zones = models.TextField(default='[]') # JSON string stores list of zones with points & labels
+    
+    # Baseline hour configuration (Time of Day ranges)
+    morning_start = models.IntegerField(default=6, help_text="Jam mulai baseline pagi (0-23)")
+    morning_end = models.IntegerField(default=12, help_text="Jam selesai baseline pagi (0-23)")
+    afternoon_start = models.IntegerField(default=12, help_text="Jam mulai baseline siang (0-23)")
+    afternoon_end = models.IntegerField(default=18, help_text="Jam selesai baseline siang (0-23)")
+    night_start = models.IntegerField(default=18, help_text="Jam mulai baseline malam (0-23)")
+    night_end = models.IntegerField(default=6, help_text="Jam selesai baseline malam (0-23)")
 
     def __str__(self):
         return f"{self.camera_name} ({self.camera_id})"

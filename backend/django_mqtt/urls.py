@@ -49,6 +49,9 @@ urlpatterns = [
     path('api/cameras/<str:camera_id>/update/', dorlock_views.camera_update, name='camera-update'),
     path('api/cameras/<str:camera_id>/delete/', dorlock_views.camera_delete, name='camera-delete'),
     path('api/cameras/<str:camera_id>/snapshot/', dorlock_views.camera_snapshot, name='camera-snapshot'),
+    path('api/cctv/baselines-status/', dorlock_views.get_baselines_status, name='baselines_status'),
+    path('api/cctv/capture-baseline/', dorlock_views.capture_baseline, name='capture_baseline'),
+    path('api/cctv/delete-baseline/', dorlock_views.delete_baseline, name='delete_baseline'),
     # path('', include('gps_tracer.urls')),
 ]
 if settings.DEBUG:

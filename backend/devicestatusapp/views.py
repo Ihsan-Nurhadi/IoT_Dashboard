@@ -185,7 +185,7 @@ def get_camera_config_for_src(src):
             rtsp_url = "rtsp://nykws1:nykworkshop@10.10.0.5:554/stream1"
         return rtsp_url, None
 
-def draw_detection_zones_on_frame(frame, cam):
+def draw_detection_zones_on_frame(frame, cam, scores=None):
     if not cam:
         return
     try:
@@ -194,16 +194,40 @@ def draw_detection_zones_on_frame(frame, cam):
         for zone in zones:
             points = zone.get('points', [])
             name = zone.get('name', 'Antenna')
+            
+            score = None
+            if scores and name in scores:
+                score = scores[name]
+                
             if len(points) >= 3:
                 pts = np.array([[int(p[0] * w), int(p[1] * h)] for p in points], dtype=np.int32)
                 pts = pts.reshape((-1, 1, 2))
-                # Draw cyan/yellow polygon
-                cv2.polylines(frame, [pts], isClosed=True, color=(255, 255, 0), thickness=2)
-                # Draw label text
+                
+                # Default cyan/yellow colors
+                poly_color = (255, 255, 0)
+                text_color = (255, 255, 0)
+                
+                if score is not None:
+                    # Red color for stolen zones
+                    if score < 0.55:
+                        poly_color = (0, 0, 255)
+                        text_color = (0, 0, 255)
+                    else:
+                        poly_color = (255, 255, 0)
+                        text_color = (255, 255, 0)
+                
+                cv2.polylines(frame, [pts], isClosed=True, color=poly_color, thickness=2)
+                
+                display_name = name
+                if score is not None:
+                    # Format as 2 decimal places (e.g. 0,99) to show precise match values
+                    score_str = f"{score:.2f}".replace(".", ",")
+                    display_name += f" ({score_str})"
+                    
                 label_x = pts[0][0][0]
                 label_y = pts[0][0][1] - 8
-                cv2.putText(frame, name, (label_x, max(label_y, 15)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                cv2.putText(frame, display_name, (label_x, max(label_y, 15)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 2)
     except Exception as e:
         print(f"Error drawing detection zones: {e}")
 
@@ -309,7 +333,111 @@ def capture_photo(request):
         output_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "photos")
         os.makedirs(output_dir, exist_ok=True)
 
-        draw_detection_zones_on_frame(frame, cam)
+        # 1. Run Template Matching Verification against Baselines
+        import glob
+        zones = []
+        if cam:
+            try:
+                zones = json.loads(cam.detection_zones or '[]')
+            except Exception:
+                pass
+
+        baselines_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "baselines")
+        scores = {}
+        antenna_details = []
+        stolen_detected = False
+        first_stolen_name = None
+
+        h, w = frame.shape[:2]
+
+        for zone in zones:
+            name = zone.get('name', '').strip()
+            name_slug = name.replace(' ', '_')
+            points = zone.get('points', [])
+            if not name or len(points) < 3:
+                continue
+
+            # Load all baselines for this zone
+            pattern = os.path.join(baselines_dir, f"baseline_{src}_{name_slug}*.jpg")
+            baseline_paths = glob.glob(pattern)
+
+            best_score = -1.0
+            if baseline_paths:
+                x_coords = [float(p[0]) for p in points]
+                y_coords = [float(p[1]) for p in points]
+
+                xmin = int(min(x_coords) * w)
+                xmax = int(max(x_coords) * w)
+                ymin = int(min(y_coords) * h)
+                ymax = int(max(y_coords) * h)
+
+                w_px = xmax - xmin
+                h_px = ymax - ymin
+
+                pad_x = max(25, int(w_px * 0.15))
+                pad_y = max(25, int(h_px * 0.15))
+
+                s_xmin = max(0, xmin - pad_x)
+                s_xmax = min(w, xmax + pad_x)
+                s_ymin = max(0, ymin - pad_y)
+                s_ymax = min(h, ymax + pad_y)
+
+                search_region = frame[s_ymin:s_ymax, s_xmin:s_xmax]
+                sr_h, sr_w = search_region.shape[:2]
+
+                for b_path in baseline_paths:
+                    baseline_img = cv2.imread(b_path)
+                    if baseline_img is None:
+                        continue
+                    tb_h, tb_w = baseline_img.shape[:2]
+                    if tb_h < 5 or tb_w < 5:
+                        continue
+
+                    local_search = search_region.copy()
+                    local_sr_h, local_sr_w = sr_h, sr_w
+
+                    if tb_h > local_sr_h or tb_w > local_sr_w:
+                        target_w = max(5, xmax - xmin)
+                        target_h = max(5, ymax - ymin)
+                        baseline_img = cv2.resize(baseline_img, (target_w, target_h))
+                        tb_h, tb_w = baseline_img.shape[:2]
+
+                    if local_sr_h < tb_h or local_sr_w < tb_w:
+                        local_search = frame[ymin:ymax, xmin:xmax]
+                        local_sr_h, local_sr_w = local_search.shape[:2]
+                        if local_sr_h < tb_h or local_sr_w < tb_w:
+                            continue
+
+                    try:
+                        res = cv2.matchTemplate(local_search, baseline_img, cv2.TM_CCOEFF_NORMED)
+                        _, max_val, _, _ = cv2.minMaxLoc(res)
+                        if max_val > best_score:
+                            best_score = max_val
+                    except Exception:
+                        continue
+
+            if best_score >= 0:
+                scores[name] = best_score
+                is_stolen = best_score < 0.55
+                if is_stolen:
+                    stolen_detected = True
+                    if first_stolen_name is None:
+                        first_stolen_name = name
+                antenna_details.append({
+                    "name": name,
+                    "score": float(best_score),
+                    "status": "stolen" if is_stolen else "present"
+                })
+            else:
+                scores[name] = None
+                antenna_details.append({
+                    "name": name,
+                    "score": None,
+                    "status": "unverified"
+                })
+
+        # Draw overlays with similarity scores
+        draw_detection_zones_on_frame(frame, cam, scores=scores)
 
         # Draw YOLO detection on captured image if detect parameter is true
         detect = request.GET.get("detect", "false").lower() == "true"
@@ -326,19 +454,33 @@ def capture_photo(request):
                         cv2.putText(frame, label, (int(x1), int(y1) - 10), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Save single historical image (no latest file clone)
+        # Save photo: prefix with _stolen_ if any antenna was missing to trigger frontend alerts
         now = timezone.localtime(timezone.now())
-        filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+        if stolen_detected:
+            filename = f"{src}_stolen_{first_stolen_name or 'Antena'}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+        else:
+            filename = f"{src}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+            
         filepath = os.path.join(output_dir, filename)
         cv2.imwrite(filepath, frame)
 
         formatted_time = now.strftime("%b %d, %I:%M %p")
+        
+        total_antennas = len([z for z in antenna_details if z["status"] != "unverified"]) or len(zones)
+        present_antennas = len([z for z in antenna_details if z["status"] == "present"])
 
         return JsonResponse({
             "status": "success",
             "url": f"/media/cctv/photos/{filename}",
             "timestamp": now.isoformat(),
-            "formatted_time": formatted_time
+            "formatted_time": formatted_time,
+            "antenna_check": {
+                "checked": len(antenna_details) > 0,
+                "total": total_antennas,
+                "present": present_antennas,
+                "stolen_detected": stolen_detected,
+                "details": antenna_details
+            }
         })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -1045,15 +1187,23 @@ def extract_baseline_templates(camera):
         if xmax - xmin > 5 and ymax - ymin > 5:
             crop = frame[ymin:ymax, xmin:xmax]
             
-            # Determine Time of Day (TOD)
+            # Determine Time of Day (TOD) using camera database configurations
             from django.utils import timezone
             hour = timezone.localtime().hour
-            if 6 <= hour < 12:
+            
+            def check_range(h, start, end):
+                if start <= end:
+                    return start <= h < end
+                return h >= start or h < end
+                
+            if check_range(hour, camera.morning_start, camera.morning_end):
                 tod = "morning"
-            elif 12 <= hour < 18:
+            elif check_range(hour, camera.afternoon_start, camera.afternoon_end):
                 tod = "afternoon"
-            else:
+            elif check_range(hour, camera.night_start, camera.night_end):
                 tod = "night"
+            else:
+                tod = "morning"
                 
             # Save standard baseline
             filename = f"baseline_{camera.camera_id}_{name}.jpg"
@@ -1190,3 +1340,122 @@ def camera_delete(request, camera_id):
     cam = get_object_or_404(CCTVCamera, camera_id=camera_id)
     cam.delete()
     return JsonResponse({'success': True})
+
+@csrf_exempt
+@api_view(['GET'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def get_baselines_status(request):
+    camera_id = request.GET.get("camera_id")
+    if not camera_id:
+        return JsonResponse({"error": "camera_id is required"}, status=400)
+    
+    baselines_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "baselines")
+    status = {
+        "morning": False,
+        "afternoon": False,
+        "night": False
+    }
+    
+    if os.path.exists(baselines_dir):
+        import glob
+        for tod in ["morning", "afternoon", "night"]:
+            pattern = os.path.join(baselines_dir, f"baseline_{camera_id}_*_{tod}.jpg")
+            if glob.glob(pattern):
+                status[tod] = True
+                
+    return JsonResponse(status)
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def capture_baseline(request):
+    data = request.data
+    camera_id = data.get("camera_id")
+    tod = data.get("tod")
+    if not camera_id or not tod:
+        return JsonResponse({"error": "camera_id and tod are required"}, status=400)
+        
+    try:
+        camera = CCTVCamera.objects.filter(camera_id=camera_id, is_active=True).first()
+        if not camera:
+            return JsonResponse({"error": f"Camera {camera_id} not found"}, status=404)
+            
+        zones = json.loads(camera.detection_zones or '[]')
+        if not zones:
+            return JsonResponse({"error": "Gambar zona deteksi terlebih dahulu sebelum merekam baseline."}, status=400)
+            
+        rtsp_url = camera.rtsp_url
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+        cap = cv2.VideoCapture(rtsp_url)
+        if not cap.isOpened():
+            return JsonResponse({"error": "Failed to connect to camera stream"}, status=500)
+            
+        for _ in range(5):
+            cap.grab()
+        ret, frame = cap.retrieve()
+        cap.release()
+        
+        if not ret or frame is None:
+            return JsonResponse({"error": "Failed to retrieve frame from camera"}, status=500)
+            
+        height, width = frame.shape[:2]
+        baselines_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "baselines")
+        os.makedirs(baselines_dir, exist_ok=True)
+        
+        for zone in zones:
+            name = zone.get('name', 'Zone').strip().replace(' ', '_')
+            points = zone.get('points', [])
+            if len(points) < 3:
+                continue
+                
+            x_coords = [float(p[0]) for p in points]
+            y_coords = [float(p[1]) for p in points]
+            
+            xmin = max(0, int(min(x_coords) * width))
+            xmax = min(width, int(max(x_coords) * width))
+            ymin = max(0, int(min(y_coords) * height))
+            ymax = min(height, int(max(y_coords) * height))
+            
+            if xmax - xmin > 5 and ymax - ymin > 5:
+                crop = frame[ymin:ymax, xmin:xmax]
+                
+                # Save TOD specific baseline
+                tod_filename = f"baseline_{camera_id}_{name}_{tod}.jpg"
+                cv2.imwrite(os.path.join(baselines_dir, tod_filename), crop)
+                
+                # Save standard baseline as fallback
+                filename = f"baseline_{camera_id}_{name}.jpg"
+                cv2.imwrite(os.path.join(baselines_dir, filename), crop)
+                
+        return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def delete_baseline(request):
+    data = request.data
+    camera_id = data.get("camera_id")
+    tod = data.get("tod")
+    if not camera_id or not tod:
+        return JsonResponse({"error": "camera_id and tod are required"}, status=400)
+        
+    baselines_dir = os.path.join(settings.MEDIA_ROOT, "cctv", "baselines")
+    if not os.path.exists(baselines_dir):
+        return JsonResponse({"status": "success"})
+        
+    try:
+        import glob
+        pattern = os.path.join(baselines_dir, f"baseline_{camera_id}_*_{tod}.jpg")
+        for path in glob.glob(pattern):
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+        return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

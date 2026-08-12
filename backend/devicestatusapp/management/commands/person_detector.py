@@ -428,15 +428,6 @@ class CameraMonitorThread(threading.Thread):
 
         while self.running:
 
-            # ── Antenna Visual Integrity Check ──────────────────────────────
-            now_time = time.time()
-            if not hasattr(self, 'last_antenna_check_time') or now_time - self.last_antenna_check_time >= 60:
-                self.last_antenna_check_time = now_time
-                try:
-                    self.verify_antennas_integrity()
-                except Exception as ve:
-                    self.log_message(f"Error in verify_antennas_integrity: {ve}", self.style.ERROR)
-
             # ── Heartbeat ──────────────────────────────────────────────────
             now = time.time()
             if now - last_heartbeat_time >= HEARTBEAT_INTERVAL_SEC:

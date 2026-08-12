@@ -8,13 +8,15 @@ interface CCTVStreamCardProps {
   cameraName?: string;
   subTitle?: string;
   fallbackPhotoUrl?: string;
+  onVerifyResult?: (result: any) => void;
 }
 
 const CCTVStreamCard: React.FC<CCTVStreamCardProps> = ({
   streamId = 'cctv',
   cameraName = 'Kamera #1',
   subTitle = '',
-  fallbackPhotoUrl
+  fallbackPhotoUrl,
+  onVerifyResult
 }) => {
   const [photoUrl, setPhotoUrl] = useState<string | null>(fallbackPhotoUrl || null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -77,6 +79,9 @@ const CCTVStreamCard: React.FC<CCTVStreamCardProps> = ({
           setTimestamp(data.formatted_time);
           setLoading(false);
           setLoadingType(null);
+          if (onVerifyResult && data.antenna_check) {
+            onVerifyResult(data.antenna_check);
+          }
         }, 300);
       } else {
         alert("Failed to capture photo");
