@@ -88,6 +88,24 @@ services:
     networks:
       - nms_network
 
+  # 2e. RFID Listener (Worker Background)
+  rfid_listener:
+    build: ./backend
+    container_name: nms_rfid_worker
+    restart: always
+    command: python manage.py rfid_listener
+    environment:
+      - TZ=Asia/Jakarta
+    env_file: .env
+    depends_on:
+      - backend
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    networks:
+      - nms_network
+
   # 3. Frontend (React)
   frontend:
     build: ./frontend
