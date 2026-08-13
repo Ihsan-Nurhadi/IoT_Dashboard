@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db.models import Max, Subquery, OuterRef
 from django.utils import timezone
-from .models import SensorData, SiteVisibility, Site, SensorReading, BLEScan
+from .models import SensorData, SiteVisibility, Site, SensorReading, BLEScan, RFIDScan
 from .serializers import SensorDataSerializer, SiteVisibilitySerializer, SiteSerializer, SensorReadingSerializer
 
 
@@ -921,4 +921,75 @@ def ble_unregistered_list(request):
             })
             
     return Response(results)
+
+
+@api_view(['GET'])
+def rfid_latest_scans(request):
+    """
+    Returns the latest RFID scans.
+    """
+    from zoneinfo import ZoneInfo
+    jakarta_tz = ZoneInfo('Asia/Jakarta')
+    
+    scans = RFIDScan.objects.all().order_by('-timestamp')[:20]
+    results = []
+    for s in scans:
+        results.append({
+            'id': s.id,
+            'timestamp': s.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S'),
+            'reader_id': s.reader_id,
+            'tag_epc': s.tag_epc
+        })
+    return Response(results)
+
+
+@api_view(['GET'])
+def rfid_history_logs(request):
+    """
+    Returns historical RFID scan logs for a given date range.
+    """
+    import datetime
+    from zoneinfo import ZoneInfo
+    jakarta_tz = ZoneInfo('Asia/Jakarta')
+    
+    start_date_str = request.query_params.get('start_date')
+    end_date_str = request.query_params.get('end_date')
+    tag_epc = request.query_params.get('tag_epc')
+    
+    try:
+        if start_date_str:
+            start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        else:
+            start_date = timezone.now().astimezone(jakarta_tz).date()
+            
+        if end_date_str:
+            end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        else:
+            end_date = timezone.now().astimezone(jakarta_tz).date()
+    except ValueError:
+        return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=400)
+
+    start_datetime = datetime.datetime.combine(start_date, datetime.time.min).replace(tzinfo=jakarta_tz)
+    end_datetime = datetime.datetime.combine(end_date, datetime.time.max).replace(tzinfo=jakarta_tz)
+    
+    scans = RFIDScan.objects.filter(
+        timestamp__gte=start_datetime,
+        timestamp__lte=end_datetime
+    )
+    
+    if tag_epc:
+        scans = scans.filter(tag_epc__icontains=tag_epc)
+        
+    scans = scans.order_by('-timestamp')
+    
+    results = []
+    for s in scans:
+        results.append({
+            'timestamp': s.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S'),
+            'reader_id': s.reader_id,
+            'tag_epc': s.tag_epc
+        })
+        
+    return Response(results)
+
 

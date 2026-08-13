@@ -37,9 +37,10 @@ const TowerSentinel: React.FC = () => {
   const labelAqmsRef = useRef<HTMLDivElement | null>(null);
   const labelVertiRef = useRef<HTMLDivElement | null>(null);
   const labelAssetRef = useRef<HTMLDivElement | null>(null);
+  const labelRfidRef = useRef<HTMLDivElement | null>(null);
 
   // States
-  const [activeModal, setActiveModal] = useState<'nms' | 'aqms' | 'verti' | 'asset' | null>(null);
+  const [activeModal, setActiveModal] = useState<'nms' | 'aqms' | 'verti' | 'asset' | 'rfid' | null>(null);
   const [activeFeed, setActiveFeed] = useState<number>(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [mobileView, setMobileView] = useState<'tower' | 'data' | 'alerts' | 'feeds' | 'settings'>('tower');
@@ -58,7 +59,7 @@ const TowerSentinel: React.FC = () => {
   });
 
   // Reference functions for canvas zoom resets
-  const zoomToSystemRef = useRef<((key: 'nms' | 'aqms' | 'verti' | 'asset') => void) | null>(null);
+  const zoomToSystemRef = useRef<((key: 'nms' | 'aqms' | 'verti' | 'asset' | 'rfid') => void) | null>(null);
   const resetViewRef = useRef<(() => void) | null>(null);
   const toggleAutoRotateRef = useRef<((val?: boolean) => void) | null>(null);
   const toggleWireframeRef = useRef<(() => void) | null>(null);
@@ -129,6 +130,7 @@ const TowerSentinel: React.FC = () => {
 
   const [bleActiveCount, setBleActiveCount] = useState<number>(0);
   const [bleTotalCount, setBleTotalCount] = useState<number>(1);
+  const [latestRfidScan, setLatestRfidScan] = useState<any>(null);
 
   const [isLampuOn, setIsLampuOn] = useState<boolean>(false);
   const [isLampuLoading, setIsLampuLoading] = useState<boolean>(false);
@@ -326,7 +328,7 @@ const TowerSentinel: React.FC = () => {
         const res = await fetch('/api/ble/latest/');
         if (res.ok) {
           const data = await res.json();
-          const detected = data.filter((t: any) => t.status === 'Detected').length;
+          const detected = data.filter((item: any) => item.status === 'Detected').length;
           setBleActiveCount(detected);
           setBleTotalCount(data.length || 1);
         }
@@ -334,9 +336,30 @@ const TowerSentinel: React.FC = () => {
         console.error("Error fetching BLE status:", err);
       }
     };
-
     fetchBleStatus();
     const interval = setInterval(fetchBleStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Poll RFID Status
+  useEffect(() => {
+    const fetchRfidStatus = async () => {
+      try {
+        const res = await fetch('/api/rfid/latest/');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            setLatestRfidScan(data[0]);
+          } else {
+            setLatestRfidScan(null);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching RFID status:", err);
+      }
+    };
+    fetchRfidStatus();
+    const interval = setInterval(fetchRfidStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1176,6 +1199,48 @@ const TowerSentinel: React.FC = () => {
     let targetVaneAngle = -340 * Math.PI / 180;
     let currentVaneAngle = targetVaneAngle;
 
+    // RFID Device Model (Landing Page)
+    const rfidGroup = new THREE.Group();
+    towerGroup.add(rfidGroup);
+
+    // Grey plastic body
+    const rfidBodyMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.1, roughness: 0.5 });
+    const rfidBody = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.06), rfidBodyMat);
+    rfidBody.castShadow = true;
+    rfidGroup.add(rfidBody);
+
+    // Dark grey pill background for LEDs
+    const rfidLedBgMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.2, roughness: 0.4 });
+    const rfidLedBg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.045, 0.01), rfidLedBgMat);
+    rfidLedBg.position.set(-0.08, 0.11, 0.031);
+    rfidGroup.add(rfidLedBg);
+
+    // 3 Green LEDs
+    const rfidLedGreenMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 2.0 });
+    [-0.04, 0, 0.04].forEach((offsetX) => {
+      const ledSphere = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 6), rfidLedGreenMat);
+      ledSphere.position.set(-0.08 + offsetX, 0.11, 0.037);
+      rfidGroup.add(ledSphere);
+    });
+
+    // Antenna concentric circle markings (emblem)
+    const rfidSymbolMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.6 });
+    const symbolCenter = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), rfidSymbolMat);
+    symbolCenter.position.set(0, -0.02, 0.031);
+    rfidGroup.add(symbolCenter);
+
+    const symbolRing1 = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.005, 4, 16), rfidSymbolMat);
+    symbolRing1.position.set(0, -0.02, 0.031);
+    rfidGroup.add(symbolRing1);
+
+    const symbolRing2 = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.005, 4, 16), rfidSymbolMat);
+    symbolRing2.position.set(0, -0.02, 0.031);
+    rfidGroup.add(symbolRing2);
+
+    // Position and orientation (slightly below BLE, facing outwards towards negative Z)
+    rfidGroup.position.set(0, 16.3, -0.45);
+    rfidGroup.rotation.y = Math.PI;
+
     // --- Hotspots setup ---
     const makeHotspot = (color: number, wx3d: number, wy3d: number, wz3d: number) => {
       const mat = new THREE.MeshStandardMaterial({
@@ -1201,12 +1266,14 @@ const TowerSentinel: React.FC = () => {
     const hotspotAQMS = makeHotspot(0x22d3ee, 2.0, 11.5, 0.5);
     const hotspotVerti = makeHotspot(0xc084fc, 0.6, 20.0, 0.6);
     const hotspotAsset = makeHotspot(0x10b981, 0, 17.5, 0.5);
+    const hotspotRFID = makeHotspot(0x6366f1, 0, 16.3, -0.55);
 
     const allHotspots = [
       { key: 'nms' as const, hs: hotspotNMS, lookAtY: 7, dist: 14, rotX: 0.06, rotY: 0.6, labelRef: labelNmsRef },
       { key: 'aqms' as const, hs: hotspotAQMS, lookAtY: 11.5, dist: 14, rotX: 0.08, rotY: 0.4, labelRef: labelAqmsRef },
       { key: 'verti' as const, hs: hotspotVerti, lookAtY: 20.0, dist: 12, rotX: 0.05, rotY: -0.3, labelRef: labelVertiRef },
       { key: 'asset' as const, hs: hotspotAsset, lookAtY: 17.5, dist: 12, rotX: 0.05, rotY: 0.1, labelRef: labelAssetRef },
+      { key: 'rfid' as const, hs: hotspotRFID, lookAtY: 16.3, dist: 12, rotX: 0.05, rotY: 3.2, labelRef: labelRfidRef },
     ];
 
     // Raycaster for clicking hotspots
@@ -1238,7 +1305,7 @@ const TowerSentinel: React.FC = () => {
     let camDist = 38, targetDist = 38;
     let isDragging = false, lastX = 0, lastY = 0;
 
-    const zoomToSystem = (key: 'nms' | 'aqms' | 'verti' | 'asset') => {
+    const zoomToSystem = (key: 'nms' | 'aqms' | 'verti' | 'asset' | 'rfid') => {
       const info = allHotspots.find(h => h.key === key);
       if (!info) return;
       autoRotate = false;
@@ -1965,7 +2032,23 @@ const TowerSentinel: React.FC = () => {
               <div className="sys-dot" style={{ background: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
               <div className="sys-content">
                 <div className="sys-title">Asset Monitoring</div>
-                <div className="sys-sub">RFID &middot; 2 CCTV</div>
+                <div className="sys-sub">BLE &middot; 2 CCTV</div>
+              </div>
+            </div>
+
+            <div
+              ref={labelRfidRef}
+              id="label-rfid"
+              className="system-label"
+              onClick={() => {
+                setActiveModal('rfid');
+                zoomToSystemRef.current?.('rfid');
+              }}
+            >
+              <div className="sys-dot" style={{ background: '#6366f1', boxShadow: '0 0 8px #6366f1' }}></div>
+              <div className="sys-content">
+                <div className="sys-title">RFID Monitoring</div>
+                <div className="sys-sub">RFID Tag dan gateway</div>
               </div>
             </div>
           </div>
@@ -2563,6 +2646,82 @@ const TowerSentinel: React.FC = () => {
                   <div className="nms-cctv-grid">
                     <CCTVStreamCard streamId="cctv_asset_1" cameraName="Antenna CCTV #1" fallbackPhotoUrl="/camera_4.jpeg" />
                     <CCTVStreamCard streamId="cctv_asset_2" cameraName="Antenna CCTV #2" fallbackPhotoUrl="/contoh cctv.jpg" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeModal === 'rfid' && (
+            <div className="nms-drawer" onClick={(e) => e.stopPropagation()}>
+              <div className="nms-drawer-header">
+                <div className="nms-header-left">
+                  <div className="nms-title-row">
+                    <h2>NAYAKA WS</h2>
+                    <span className="status-badge-inline green" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', borderColor: 'rgba(99, 102, 241, 0.3)' }}>ONLINE</span>
+                  </div>
+                  <p className="nms-subtitle">
+                    20TS10B1529 &middot; SST 42m &middot; landing page rfid monitoring
+                  </p>
+                </div>
+                <div className="nms-header-actions">
+                  <button
+                    className="nms-action-btn border primary"
+                    style={{ borderColor: '#6366f1', color: '#818cf8' }}
+                    onClick={() => {
+                      setActiveModal(null);
+                      if (resetViewRef.current) resetViewRef.current();
+                      navigate('/rfid-monitoring');
+                    }}
+                  >
+                    Lihat Detail
+                  </button>
+                  <button className="nms-close-btn" onClick={handleCloseModal}>&times;</button>
+                </div>
+              </div>
+
+              <div className="nms-drawer-body">
+                {/* RFID STATUS */}
+                <div className="nms-section">
+                  <h3 className="nms-section-title" style={{ color: '#818cf8' }}>RFID SCANNER TELEMETRY</h3>
+                  <div className="nms-status-grid">
+                    <div className="nms-status-card" style={{
+                      gridColumn: '1 / -1',
+                      border: '1px solid rgba(99, 102, 241, 0.4)',
+                      boxShadow: '0 0 20px rgba(99, 102, 241, 0.2)',
+                      padding: '24px',
+                      background: 'rgba(99, 102, 241, 0.05)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <span style={{ fontSize: '2rem' }}>🏷️</span>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 350, color: '#ffffff' }}>Latest Scan EPC</h4>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-sub)' }}>
+                              {latestRfidScan ? latestRfidScan.tag_epc : 'No scans received'}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{
+                          color: '#818cf8',
+                          fontSize: '1.1rem',
+                          fontWeight: 'bold',
+                          textShadow: '0 0 12px rgba(99, 102, 241, 0.6)'
+                        }}>
+                          {latestRfidScan ? `Reader: ${latestRfidScan.reader_id}` : 'Reader: Raspi_RFID_Reader_01'}
+                        </div>
+                      </div>
+                      
+                      {latestRfidScan && (
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px', fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Waktu Pindai:</span>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{latestRfidScan.timestamp}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

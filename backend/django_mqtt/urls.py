@@ -30,6 +30,9 @@ urlpatterns = [
     path('api/ble/history/', monitoring_views.ble_history_chart, name='ble-history'),
     path('api/ble/alerts/', monitoring_views.ble_alerts, name='ble-alerts'),
     path('api/ble/history-logs/', monitoring_views.ble_history_logs, name='ble-history-logs'),
+    path('api/rfid/latest/', monitoring_views.rfid_latest_scans, name='rfid-latest'),
+    path('api/rfid/history-logs/', monitoring_views.rfid_history_logs, name='rfid-history-logs'),
+
     
     # Auth endpoints
     path('api/auth/login/', monitoring_views.api_login, name='api-login'),

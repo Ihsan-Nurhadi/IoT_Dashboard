@@ -222,3 +222,16 @@ class BLEScan(models.Model):
         return f"{self.name} ({self.mac}) - RSSI: {self.rssi} at {self.timestamp}"
 
 
+class RFIDScan(models.Model):
+    timestamp = models.DateTimeField(db_index=True, help_text="Timestamp of scan log")
+    reader_id = models.CharField(max_length=100, db_index=True, help_text="ID of the RFID reader")
+    tag_epc = models.CharField(max_length=100, db_index=True, help_text="EPC ID of the RFID tag scanned")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'RFID Scan'
+        verbose_name_plural = 'RFID Scans'
+
+    def __str__(self):
+        return f"{self.tag_epc} scanned by {self.reader_id} at {self.timestamp}"

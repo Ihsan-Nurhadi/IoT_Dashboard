@@ -8,6 +8,8 @@ import TowerSentinel from './components/TowerSentinel';
 import VerticalityDetail from './components/VerticalityDetail';
 import AqmsDetail from './components/AqmsDetail';
 import AssetMonitoringDetail from './components/AssetMonitoringDetail';
+import RfidMonitoringDetail from './components/RfidMonitoringDetail';
+
 
 import LoginPage from './components/LoginPage';
 import AdminDashboard from './components/AdminDashboard';
@@ -103,6 +105,7 @@ const App: React.FC = () => {
           <Route path="/verticality/:deviceId" element={<VerticalityDetail />} />
           <Route path="/aqms" element={<AqmsDetail />} />
           <Route path="/asset-monitoring" element={<AssetMonitoringDetail />} />
+          <Route path="/rfid-monitoring" element={<RfidMonitoringDetail />} />
         </Route>
       </Routes>
     </Router>
