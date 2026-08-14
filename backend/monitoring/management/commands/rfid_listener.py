@@ -4,7 +4,7 @@ import paho.mqtt.client as mqtt
 from datetime import datetime
 from django.utils import timezone
 from django.core.management.base import BaseCommand
-from monitoring.models import RFIDScan
+from monitoring.models import RFIDScan, RegisteredRFIDTag, RegisteredRFIDReader
 from zoneinfo import ZoneInfo
 
 class Command(BaseCommand):
@@ -64,6 +64,31 @@ class Command(BaseCommand):
                         timestamp = timezone.now()
                 else:
                     timestamp = timezone.now()
+
+                # Whitelist checks
+                # 1. Tag Whitelist Check: Tag MUST be registered in Admin Whitelist
+                tag_registered = RegisteredRFIDTag.objects.filter(tag_epc__iexact=tag_epc, is_active=True).exists()
+                if not tag_registered:
+                    self.stdout.write(self.style.WARNING(
+                        f"  [IGNORE] Discarding scan: Tag {tag_epc} is NOT registered in Admin Whitelist."
+                    ))
+                    return
+
+                # 2. Reader Auto-Registration & Check: Auto-register new reader ID so admin can see and custom name it in Admin Dashboard
+                reader_obj, created = RegisteredRFIDReader.objects.get_or_create(
+                    reader_id=reader_id,
+                    defaults={'name': f"Reader ({reader_id})", 'is_active': True}
+                )
+                if created:
+                    self.stdout.write(self.style.SUCCESS(
+                        f"  [NEW READER] Registered new Reader ID automatically: {reader_id}"
+                    ))
+
+                if not reader_obj.is_active:
+                    self.stdout.write(self.style.WARNING(
+                        f"  [IGNORE] Discarding scan: Reader {reader_id} is disabled in Admin."
+                    ))
+                    return
 
                 # Log scan to DB
                 RFIDScan.objects.create(

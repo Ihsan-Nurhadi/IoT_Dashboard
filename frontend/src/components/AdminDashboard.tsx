@@ -21,6 +21,20 @@ interface UnregisteredBeacon {
   last_seen: string;
 }
 
+interface RegisteredRFIDTag {
+  tag_epc: string;
+  name: string | null;
+  is_active: boolean;
+  created_at?: string;
+}
+
+interface RegisteredRFIDReader {
+  reader_id: string;
+  name: string | null;
+  is_active: boolean;
+  created_at?: string;
+}
+
 const AdminDashboard: React.FC = () => {
   const [devices, setDevices] = useState<BLEDevice[]>([]);
   const [unregistered, setUnregistered] = useState<UnregisteredBeacon[]>([]);
@@ -45,7 +59,27 @@ const AdminDashboard: React.FC = () => {
 
   const [cameras, setCameras] = useState<CCTVCamera[]>([]);
   const [loadingCameras, setLoadingCameras] = useState<boolean>(false);
-  const [activeSection, setActiveSection] = useState<'ble' | 'cctv'>('ble');
+  const [activeSection, setActiveSection] = useState<'ble' | 'cctv' | 'rfid'>('ble');
+
+  // RFID whitelisting states
+  const [rfidTags, setRfidTags] = useState<RegisteredRFIDTag[]>([]);
+  const [rfidReaders, setRfidReaders] = useState<RegisteredRFIDReader[]>([]);
+  const [loadingRfid, setLoadingRfid] = useState<boolean>(false);
+
+  // RFID modals and form states
+  const [isTagModalOpen, setIsTagModalOpen] = useState<boolean>(false);
+  const [isTagEditMode, setIsTagEditMode] = useState<boolean>(false);
+  const [selectedTag, setSelectedTag] = useState<RegisteredRFIDTag | null>(null);
+  const [formTagEpc, setFormTagEpc] = useState<string>('');
+  const [formTagName, setFormTagName] = useState<string>('');
+  const [formTagActive, setFormTagActive] = useState<boolean>(true);
+
+  const [isReaderModalOpen, setIsReaderModalOpen] = useState<boolean>(false);
+  const [isReaderEditMode, setIsReaderEditMode] = useState<boolean>(false);
+  const [selectedReader, setSelectedReader] = useState<RegisteredRFIDReader | null>(null);
+  const [formReaderId, setFormReaderId] = useState<string>('');
+  const [formReaderName, setFormReaderName] = useState<string>('');
+  const [formReaderActive, setFormReaderActive] = useState<boolean>(true);
 
   // Camera Form & Modal States
   const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
@@ -100,6 +134,8 @@ const AdminDashboard: React.FC = () => {
     fetchDevices();
     fetchUnregistered();
     fetchCameras();
+    fetchRfidTags();
+    fetchRfidReaders();
     const interval = setInterval(() => {
       fetchUnregistered();
     }, 10000); // refresh unregistered scans every 10s
@@ -154,6 +190,198 @@ const AdminDashboard: React.FC = () => {
       setError('Kesalahan jaringan saat memuat CCTV Camera');
     } finally {
       setLoadingCameras(false);
+    }
+  };
+
+  const fetchRfidTags = async () => {
+    try {
+      setLoadingRfid(true);
+      const res = await fetch('/api/rfid/tags/');
+      if (res.ok) {
+        const data = await res.json();
+        setRfidTags(data);
+      }
+    } catch (err) {
+      console.error("Error fetching RFID tags:", err);
+    } finally {
+      setLoadingRfid(false);
+    }
+  };
+
+  const fetchRfidReaders = async () => {
+    try {
+      setLoadingRfid(true);
+      const res = await fetch('/api/rfid/readers/');
+      if (res.ok) {
+        const data = await res.json();
+        setRfidReaders(data);
+      }
+    } catch (err) {
+      console.error("Error fetching RFID readers:", err);
+    } finally {
+      setLoadingRfid(false);
+    }
+  };
+
+  // RFID Tag CRUD actions
+  const openAddTagModal = () => {
+    setIsTagEditMode(false);
+    setSelectedTag(null);
+    setFormTagEpc('');
+    setFormTagName('');
+    setFormTagActive(true);
+    setIsTagModalOpen(true);
+  };
+
+  const openEditTagModal = (tag: RegisteredRFIDTag) => {
+    setIsTagEditMode(true);
+    setSelectedTag(tag);
+    setFormTagEpc(tag.tag_epc);
+    setFormTagName(tag.name || '');
+    setFormTagActive(tag.is_active);
+    setIsTagModalOpen(true);
+  };
+
+  const handleTagSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formTagEpc.trim()) {
+      setError('EPC Tag RFID tidak boleh kosong');
+      return;
+    }
+
+    const payload = {
+      tag_epc: formTagEpc.trim().toUpperCase(),
+      name: formTagName,
+      is_active: formTagActive
+    };
+
+    try {
+      const url = isTagEditMode 
+        ? `/api/rfid/tags/${encodeURIComponent(selectedTag!.tag_epc)}/`
+        : '/api/rfid/tags/';
+      
+      const method = isTagEditMode ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setSuccessMsg(isTagEditMode ? 'Tag RFID berhasil diperbarui' : 'Tag RFID berhasil didaftarkan');
+        setIsTagModalOpen(false);
+        fetchRfidTags();
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Gagal menyimpan konfigurasi RFID Tag');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Kesalahan jaringan saat menyimpan RFID Tag');
+    }
+  };
+
+  const handleTagDelete = async (tagEpc: string) => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus tag RFID "${tagEpc}" dari whitelist?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/rfid/tags/${encodeURIComponent(tagEpc)}/delete/`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setSuccessMsg('Tag RFID berhasil dihapus dari whitelist');
+        fetchRfidTags();
+      } else {
+        setError('Gagal menghapus tag RFID');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Kesalahan jaringan saat menghapus tag RFID');
+    }
+  };
+
+  // RFID Reader CRUD actions
+  const openAddReaderModal = () => {
+    setIsReaderEditMode(false);
+    setSelectedReader(null);
+    setFormReaderId('');
+    setFormReaderName('');
+    setFormReaderActive(true);
+    setIsReaderModalOpen(true);
+  };
+
+  const openEditReaderModal = (reader: RegisteredRFIDReader) => {
+    setIsReaderEditMode(true);
+    setSelectedReader(reader);
+    setFormReaderId(reader.reader_id);
+    setFormReaderName(reader.name || '');
+    setFormReaderActive(reader.is_active);
+    setIsReaderModalOpen(true);
+  };
+
+  const handleReaderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formReaderId.trim()) {
+      setError('ID Reader tidak boleh kosong');
+      return;
+    }
+
+    const payload = {
+      reader_id: formReaderId.trim(),
+      name: formReaderName,
+      is_active: formReaderActive
+    };
+
+    try {
+      const url = isReaderEditMode 
+        ? `/api/rfid/readers/${encodeURIComponent(selectedReader!.reader_id)}/`
+        : '/api/rfid/readers/';
+      
+      const method = isReaderEditMode ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setSuccessMsg(isReaderEditMode ? 'RFID Reader berhasil diperbarui' : 'RFID Reader berhasil didaftarkan');
+        setIsReaderModalOpen(false);
+        fetchRfidReaders();
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Gagal menyimpan konfigurasi RFID Reader');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Kesalahan jaringan saat menyimpan RFID Reader');
+    }
+  };
+
+  const handleReaderDelete = async (readerId: string) => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus reader "${readerId}"?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/rfid/readers/${encodeURIComponent(readerId)}/delete/`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setSuccessMsg('RFID Reader berhasil dihapus');
+        fetchRfidReaders();
+      } else {
+        setError('Gagal menghapus RFID Reader');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Kesalahan jaringan saat menghapus RFID Reader');
     }
   };
 
@@ -786,6 +1014,13 @@ const AdminDashboard: React.FC = () => {
           </button>
           <button 
             type="button"
+            className={`tab-nav-item ${activeSection === 'rfid' ? 'active' : ''}`}
+            onClick={() => setActiveSection('rfid')}
+          >
+            📋 RFID Whitelist Management
+          </button>
+          <button 
+            type="button"
             className="tab-nav-item portal-link-btn"
             onClick={() => navigate('/')}
           >
@@ -814,7 +1049,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {activeSection === 'ble' ? (
+        {activeSection === 'ble' && (
           <div className="admin-grid">
             {/* Left Column: Registered Devices */}
             <section className="grid-card devices-card">
@@ -976,7 +1211,9 @@ const AdminDashboard: React.FC = () => {
               )}
             </section>
           </div>
-        ) : (
+        )}
+
+        {activeSection === 'cctv' && (
           /* CCTV Camera configuration interface */
           <div className="cameras-grid-section">
             <section className="grid-card cameras-card">
@@ -1068,6 +1305,132 @@ const AdminDashboard: React.FC = () => {
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                                 </svg>
                               </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {activeSection === 'rfid' && (
+          <div className="admin-grid rfid-grid">
+            {/* Left Column: Registered Readers */}
+            <section className="grid-card devices-card">
+              <div className="card-header">
+                <div>
+                  <h2>Registered RFID Readers <span className="header-count-badge">{rfidReaders.length}</span></h2>
+                  <p>Konfigurasi Reader RFID yang diizinkan mengirim data scan ke dashboard.</p>
+                </div>
+                <button type="button" className="btn-primary" onClick={openAddReaderModal}>
+                  ➕ Register Reader
+                </button>
+              </div>
+
+              {loadingRfid ? (
+                <div className="loading-container">
+                  <div className="spinner"></div>
+                  <p>Memuat konfigurasi RFID Reader...</p>
+                </div>
+              ) : rfidReaders.length === 0 ? (
+                <div className="empty-state">
+                  <p>Belum ada RFID Reader yang terdaftar.</p>
+                  <button type="button" className="btn-secondary" style={{ marginTop: '12px' }} onClick={openAddReaderModal}>Daftarkan sekarang</button>
+                </div>
+              ) : (
+                <div className="table-responsive rfid-table-scroll">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Reader ID</th>
+                        <th>Nama / Lokasi</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rfidReaders.map((reader) => (
+                        <tr key={reader.reader_id}>
+                          <td>
+                            <code className="device-mac">{reader.reader_id}</code>
+                          </td>
+                          <td>
+                            <span className="device-name">{reader.name || '-'}</span>
+                          </td>
+                          <td>
+                            <span className={`status-badge ${reader.is_active ? 'badge-active' : 'badge-inactive'}`}>
+                              {reader.is_active ? 'Active' : 'Disabled'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="table-actions">
+                              <button type="button" className="btn-action btn-edit" onClick={() => openEditReaderModal(reader)}>Edit</button>
+                              <button type="button" className="btn-action btn-delete" onClick={() => handleReaderDelete(reader.reader_id)}>Hapus</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* Right Column: Whitelisted Tags */}
+            <section className="grid-card discovery-card">
+              <div className="card-header">
+                <div>
+                  <h2>Whitelisted EPC Tags <span className="header-count-badge">{rfidTags.length}</span></h2>
+                  <p>EPC Tag RFID terdaftar yang akan direkam dan disinkronisasikan ke Reader.</p>
+                </div>
+                <button type="button" className="btn-primary" onClick={openAddTagModal}>
+                  ➕ Add Whitelist Tag
+                </button>
+              </div>
+
+              {loadingRfid ? (
+                <div className="loading-container">
+                  <div className="spinner"></div>
+                  <p>Memuat whitelist EPC Tag...</p>
+                </div>
+              ) : rfidTags.length === 0 ? (
+                <div className="empty-state">
+                  <p>Belum ada EPC Tag terdaftar di whitelist.</p>
+                  <button type="button" className="btn-secondary" style={{ marginTop: '12px' }} onClick={openAddTagModal}>Tambahkan tag sekarang</button>
+                </div>
+              ) : (
+                <div className="table-responsive rfid-table-scroll">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>EPC Tag</th>
+                        <th>Deskripsi Aset</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rfidTags.map((tag) => (
+                        <tr key={tag.tag_epc}>
+                          <td>
+                            <code className="device-mac" style={{ fontFamily: 'monospace' }}>{tag.tag_epc}</code>
+                          </td>
+                          <td>
+                            <span className="device-name">{tag.name || '-'}</span>
+                          </td>
+                          <td>
+                            <span className={`status-badge ${tag.is_active ? 'badge-active' : 'badge-inactive'}`}>
+                              {tag.is_active ? 'Allowed' : 'Blocked'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="table-actions">
+                              <button type="button" className="btn-action btn-edit" onClick={() => openEditTagModal(tag)}>Edit</button>
+                              <button type="button" className="btn-action btn-delete" onClick={() => handleTagDelete(tag.tag_epc)}>Hapus</button>
                             </div>
                           </td>
                         </tr>
@@ -1227,6 +1590,118 @@ const AdminDashboard: React.FC = () => {
                   </svg>
                   Simpan Konfigurasi
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* RFID Tag Edit/Add Modal */}
+      {isTagModalOpen && (
+        <div className="modal-backdrop">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>{isTagEditMode ? 'Edit Whitelisted Tag' : 'Add New Whitelisted Tag'}</h3>
+              <button type="button" className="modal-close-btn" onClick={() => setIsTagModalOpen(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleTagSubmit} className="modal-form">
+              <div className="modal-body-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px 0' }}>
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label htmlFor="tag-epc" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>EPC Tag RFID *</label>
+                  <input
+                    id="tag-epc"
+                    type="text"
+                    value={formTagEpc}
+                    onChange={(e) => setFormTagEpc(e.target.value)}
+                    placeholder="Contoh: E2 80 68 94 00 00..."
+                    disabled={isTagEditMode}
+                    style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', padding: '10px 12px', color: '#fff', fontSize: '0.9rem' }}
+                    required
+                  />
+                  <small className="help-text" style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Masukkan kode EPC heksadesimal tag RFID.</small>
+                </div>
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label htmlFor="tag-name" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>Deskripsi Aset / Label</label>
+                  <input
+                    id="tag-name"
+                    type="text"
+                    value={formTagName}
+                    onChange={(e) => setFormTagName(e.target.value)}
+                    style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', padding: '10px 12px', color: '#fff', fontSize: '0.9rem' }}
+                    placeholder="Contoh: Aset Tower Landing Page"
+                  />
+                </div>
+                <div className="form-group checkbox-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: '#cbd5e1' }}>
+                    <input
+                      type="checkbox"
+                      checked={formTagActive}
+                      onChange={(e) => setFormTagActive(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>Izinkan Tag ini dibaca (Active Whitelist)</span>
+                  </label>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                <button type="button" className="btn-secondary" onClick={() => setIsTagModalOpen(false)}>Batal</button>
+                <button type="submit" className="btn-primary">Simpan Tag</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* RFID Reader Edit/Add Modal */}
+      {isReaderModalOpen && (
+        <div className="modal-backdrop">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>{isReaderEditMode ? 'Edit Registered Reader' : 'Register New Reader'}</h3>
+              <button type="button" className="modal-close-btn" onClick={() => setIsReaderModalOpen(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleReaderSubmit} className="modal-form">
+              <div className="modal-body-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px 0' }}>
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label htmlFor="reader-id" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>Reader ID *</label>
+                  <input
+                    id="reader-id"
+                    type="text"
+                    value={formReaderId}
+                    onChange={(e) => setFormReaderId(e.target.value)}
+                    placeholder="Contoh: Raspi_RFID_Reader_01"
+                    disabled={isReaderEditMode}
+                    style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', padding: '10px 12px', color: '#fff', fontSize: '0.9rem' }}
+                    required
+                  />
+                  <small className="help-text" style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Masukkan ID / Client ID MQTT unik reader RFID.</small>
+                </div>
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label htmlFor="reader-name" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>Nama / Lokasi Reader</label>
+                  <input
+                    id="reader-name"
+                    type="text"
+                    value={formReaderName}
+                    onChange={(e) => setFormReaderName(e.target.value)}
+                    style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', padding: '10px 12px', color: '#fff', fontSize: '0.9rem' }}
+                    placeholder="Contoh: Reader Landing Page"
+                  />
+                </div>
+                <div className="form-group checkbox-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: '#cbd5e1' }}>
+                    <input
+                      type="checkbox"
+                      checked={formReaderActive}
+                      onChange={(e) => setFormReaderActive(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>Izinkan Reader ini mengirim data (Active Reader)</span>
+                  </label>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                <button type="button" className="btn-secondary" onClick={() => setIsReaderModalOpen(false)}>Batal</button>
+                <button type="submit" className="btn-primary">Simpan Reader</button>
               </div>
             </form>
           </div>

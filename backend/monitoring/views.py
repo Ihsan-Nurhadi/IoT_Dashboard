@@ -2,9 +2,9 @@ from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.db.models import Max, Subquery, OuterRef
+from django.db.models import Max, Subquery, OuterRef, Count
 from django.utils import timezone
-from .models import SensorData, SiteVisibility, Site, SensorReading, BLEScan, RFIDScan
+from .models import SensorData, SiteVisibility, Site, SensorReading, BLEScan, RFIDScan, RegisteredRFIDTag, RegisteredRFIDReader
 from .serializers import SensorDataSerializer, SiteVisibilitySerializer, SiteSerializer, SensorReadingSerializer
 
 
@@ -926,18 +926,23 @@ def ble_unregistered_list(request):
 @api_view(['GET'])
 def rfid_latest_scans(request):
     """
-    Returns the latest RFID scans.
+    Returns the latest RFID scans of registered tags.
     """
     from zoneinfo import ZoneInfo
     jakarta_tz = ZoneInfo('Asia/Jakarta')
     
-    scans = RFIDScan.objects.all().order_by('-timestamp')[:20]
+    registered_tags = list(RegisteredRFIDTag.objects.all().values_list('tag_epc', flat=True))
+    scans = RFIDScan.objects.filter(tag_epc__in=registered_tags).order_by('-timestamp')[:20]
+    reader_map = {r.reader_id: r.name for r in RegisteredRFIDReader.objects.all() if r.name}
+    
     results = []
     for s in scans:
+        custom_name = reader_map.get(s.reader_id)
+        display_reader = custom_name if custom_name else s.reader_id
         results.append({
             'id': s.id,
             'timestamp': s.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S'),
-            'reader_id': s.reader_id,
+            'reader_id': display_reader,
             'tag_epc': s.tag_epc
         })
     return Response(results)
@@ -946,7 +951,9 @@ def rfid_latest_scans(request):
 @api_view(['GET'])
 def rfid_history_logs(request):
     """
-    Returns historical RFID scan logs for a given date range.
+    Returns either:
+    1. Grouped unique registered RFID tags with latest scan details (default).
+    2. Raw individual scan logs of registered tags if raw_scans=true.
     """
     import datetime
     from zoneinfo import ZoneInfo
@@ -955,41 +962,309 @@ def rfid_history_logs(request):
     start_date_str = request.query_params.get('start_date')
     end_date_str = request.query_params.get('end_date')
     tag_epc = request.query_params.get('tag_epc')
+    raw_scans = request.query_params.get('raw_scans') == 'true'
     
+    registered_tags = list(RegisteredRFIDTag.objects.all().values_list('tag_epc', flat=True))
+    
+    start_datetime = None
+    end_datetime = None
     try:
         if start_date_str:
             start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        else:
-            start_date = timezone.now().astimezone(jakarta_tz).date()
-            
+            start_datetime = datetime.datetime.combine(start_date, datetime.time.min).replace(tzinfo=jakarta_tz)
         if end_date_str:
             end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        else:
-            end_date = timezone.now().astimezone(jakarta_tz).date()
+            end_datetime = datetime.datetime.combine(end_date, datetime.time.max).replace(tzinfo=jakarta_tz)
     except ValueError:
         return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=400)
-
-    start_datetime = datetime.datetime.combine(start_date, datetime.time.min).replace(tzinfo=jakarta_tz)
-    end_datetime = datetime.datetime.combine(end_date, datetime.time.max).replace(tzinfo=jakarta_tz)
-    
-    scans = RFIDScan.objects.filter(
-        timestamp__gte=start_datetime,
-        timestamp__lte=end_datetime
-    )
-    
-    if tag_epc:
-        scans = scans.filter(tag_epc__icontains=tag_epc)
         
-    scans = scans.order_by('-timestamp')
+    reader_map = {r.reader_id: r.name for r in RegisteredRFIDReader.objects.all() if r.name}
     
+    if raw_scans:
+        scans = RFIDScan.objects.filter(tag_epc__in=registered_tags)
+        if start_datetime:
+            scans = scans.filter(timestamp__gte=start_datetime)
+        if end_datetime:
+            scans = scans.filter(timestamp__lte=end_datetime)
+        if tag_epc:
+            scans = scans.filter(tag_epc__icontains=tag_epc)
+            
+        scans = scans.order_by('-timestamp')
+        results = []
+        for s in scans:
+            custom_name = reader_map.get(s.reader_id)
+            display_reader = custom_name if custom_name else s.reader_id
+            results.append({
+                'timestamp': s.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S'),
+                'reader_id': display_reader,
+                'tag_epc': s.tag_epc
+            })
+        return Response(results)
+        
+    tags = RegisteredRFIDTag.objects.all()
+    if tag_epc:
+        tags = tags.filter(tag_epc__icontains=tag_epc)
+        
     results = []
-    for s in scans:
+    for tag in tags:
+        scans = RFIDScan.objects.filter(tag_epc=tag.tag_epc)
+        if start_datetime:
+            scans = scans.filter(timestamp__gte=start_datetime)
+        if end_datetime:
+            scans = scans.filter(timestamp__lte=end_datetime)
+            
+        latest_scan = scans.order_by('-timestamp').first()
+        
+        if latest_scan:
+            last_scan_time = latest_scan.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S')
+            raw_reader = latest_scan.reader_id
+            custom_name = reader_map.get(raw_reader)
+            display_reader = custom_name if custom_name else raw_reader
+        else:
+            if start_date_str or end_date_str:
+                continue
+            last_scan_time = ''
+            display_reader = '-'
+            
         results.append({
-            'timestamp': s.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S'),
-            'reader_id': s.reader_id,
-            'tag_epc': s.tag_epc
+            'tag_epc': tag.tag_epc,
+            'last_scan': last_scan_time,
+            'last_reader': display_reader,
         })
         
+    results.sort(key=lambda x: x['last_scan'] or '0000-00-00 00:00:00', reverse=True)
     return Response(results)
+
+
+def publish_rfid_config():
+    """
+    Publishes the whitelisted EPC tags to the MQTT topic rfid/config.
+    Using retain=True allows newly connected clients to receive the latest config immediately.
+    """
+    import paho.mqtt.client as mqtt
+    import json
+    import time
+    try:
+        tags = list(RegisteredRFIDTag.objects.filter(is_active=True).values_list('tag_epc', flat=True))
+        # Ensure the tags are sanitized (uppercase and trimmed)
+        tags = [t.upper().strip() for t in tags]
+        payload = json.dumps({'allowed_tags': tags})
+
+        # Use CallbackAPIVersion.VERSION2 if available (paho >= 2.0)
+        try:
+            client = mqtt.Client(
+                callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+                client_id="django_rfid_publisher_temp"
+            )
+        except AttributeError:
+            client = mqtt.Client(client_id="django_rfid_publisher_temp")
+
+        # Use loop_start so the network loop runs in background while we wait for connection
+        client.loop_start()
+        client.connect("broker.emqx.io", 1883, 60)
+        # Wait briefly for the connection to be established before publishing
+        time.sleep(1.5)
+        result = client.publish("rfid/config", payload, qos=1, retain=True)
+        # Wait for the message to be sent (important for QoS 1)
+        result.wait_for_publish(timeout=5)
+        client.loop_stop()
+        client.disconnect()
+        print("Successfully published RFID config to MQTT with retain=True:", payload)
+    except Exception as e:
+        print("Failed to publish RFID config to MQTT:", e)
+
+
+@api_view(['GET', 'POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def rfid_tags_list(request):
+    """
+    List all configured RFID tags (public) or register a new RFID tag (admin only).
+    """
+    if request.method == 'GET':
+        tags = RegisteredRFIDTag.objects.all()
+        data = []
+        for t in tags:
+            data.append({
+                'tag_epc': t.tag_epc,
+                'name': t.name,
+                'is_active': t.is_active,
+                'created_at': t.created_at.strftime('%Y-%m-%d %H:%M:%S') if t.created_at else None,
+            })
+        return Response(data)
+
+    elif request.method == 'POST':
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        tag_epc = request.data.get('tag_epc')
+        if tag_epc:
+            tag_epc = tag_epc.strip().upper()
+            
+        name = request.data.get('name')
+        is_active_val = request.data.get('is_active', True)
+        is_active = is_active_val.lower() == 'true' if isinstance(is_active_val, str) else bool(is_active_val)
+
+        if not tag_epc:
+            return Response({'error': 'EPC Tag is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            tag = RegisteredRFIDTag.objects.create(
+                tag_epc=tag_epc,
+                name=name,
+                is_active=is_active
+            )
+            # Trigger MQTT publish sync
+            publish_rfid_config()
+            
+            return Response({
+                'tag_epc': tag.tag_epc,
+                'name': tag.name,
+                'is_active': tag.is_active,
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def rfid_tag_detail(request, tag_epc):
+    """
+    Get, Update, or Delete a specific registered RFID tag.
+    """
+    tag_epc = tag_epc.strip().upper()
+    tag = get_object_or_404(RegisteredRFIDTag, tag_epc=tag_epc)
+
+    if request.method == 'GET':
+        return Response({
+            'tag_epc': tag.tag_epc,
+            'name': tag.name,
+            'is_active': tag.is_active,
+        })
+
+    if not request.user.is_authenticated:
+        return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if request.method == 'PUT':
+        name = request.data.get('name')
+        is_active_val = request.data.get('is_active')
+        
+        if name is not None:
+            tag.name = name
+        if is_active_val is not None:
+            tag.is_active = is_active_val.lower() == 'true' if isinstance(is_active_val, str) else bool(is_active_val)
+            
+        tag.save()
+        # Trigger MQTT publish sync
+        publish_rfid_config()
+        
+        return Response({
+            'tag_epc': tag.tag_epc,
+            'name': tag.name,
+            'is_active': tag.is_active,
+        })
+
+    elif request.method == 'DELETE':
+        tag.delete()
+        # Trigger MQTT publish sync
+        publish_rfid_config()
+        return Response({'detail': 'RFID Tag deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET', 'POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def rfid_readers_list(request):
+    """
+    List all configured RFID readers (public) or register a new RFID reader (admin only).
+    """
+    if request.method == 'GET':
+        readers = RegisteredRFIDReader.objects.all()
+        data = []
+        for r in readers:
+            data.append({
+                'reader_id': r.reader_id,
+                'name': r.name,
+                'is_active': r.is_active,
+                'created_at': r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else None,
+            })
+        return Response(data)
+
+    elif request.method == 'POST':
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        reader_id = request.data.get('reader_id')
+        if reader_id:
+            reader_id = reader_id.strip()
+            
+        name = request.data.get('name')
+        is_active_val = request.data.get('is_active', True)
+        is_active = is_active_val.lower() == 'true' if isinstance(is_active_val, str) else bool(is_active_val)
+
+        if not reader_id:
+            return Response({'error': 'Reader ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            reader = RegisteredRFIDReader.objects.create(
+                reader_id=reader_id,
+                name=name,
+                is_active=is_active
+            )
+            # Trigger MQTT publish sync so the new reader config is pushed
+            publish_rfid_config()
+            return Response({
+                'reader_id': reader.reader_id,
+                'name': reader.name,
+                'is_active': reader.is_active,
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def rfid_reader_detail(request, reader_id):
+    """
+    Get, Update, or Delete a specific registered RFID reader.
+    """
+    reader_id = reader_id.strip()
+    reader = get_object_or_404(RegisteredRFIDReader, reader_id=reader_id)
+
+    if request.method == 'GET':
+        return Response({
+            'reader_id': reader.reader_id,
+            'name': reader.name,
+            'is_active': reader.is_active,
+        })
+
+    if not request.user.is_authenticated:
+        return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if request.method == 'PUT':
+        name = request.data.get('name')
+        is_active_val = request.data.get('is_active')
+        
+        if name is not None:
+            reader.name = name
+        if is_active_val is not None:
+            reader.is_active = is_active_val.lower() == 'true' if isinstance(is_active_val, str) else bool(is_active_val)
+            
+        reader.save()
+        # Trigger MQTT publish sync
+        publish_rfid_config()
+        return Response({
+            'reader_id': reader.reader_id,
+            'name': reader.name,
+            'is_active': reader.is_active,
+        })
+
+    elif request.method == 'DELETE':
+        reader.delete()
+        # Trigger MQTT publish sync
+        publish_rfid_config()
+        return Response({'detail': 'RFID Reader deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
 
 

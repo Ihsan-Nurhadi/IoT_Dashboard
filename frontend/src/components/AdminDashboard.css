@@ -1075,3 +1075,117 @@
   color: #64748b;
   margin-top: 4px;
 }
+
+/* ==========================================
+   RFID ADMIN STYLING ENHANCEMENTS
+   ========================================== */
+
+/* Balanced 50/50 Grid for RFID */
+.admin-grid.rfid-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1100px) {
+  .admin-grid.rfid-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* RFID Scroll Containers */
+.rfid-table-scroll {
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin: 0 -24px;
+  padding: 0 24px;
+}
+
+.rfid-table-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rfid-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rfid-table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.rfid-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Count Badge in Header */
+.header-count-badge {
+  font-size: 12px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  padding: 3px 9px;
+  border-radius: 20px;
+  margin-left: 8px;
+  font-weight: 700;
+  vertical-align: middle;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* RFID Actions buttons */
+.btn-action {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-edit {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.btn-edit:hover {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-delete {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+.btn-delete:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Custom Status Badge Colors */
+.badge-active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.1);
+}
+
+.badge-inactive {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.2);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.05);
+}

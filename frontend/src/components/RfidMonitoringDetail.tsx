@@ -8,23 +8,21 @@ interface RFIDLog {
   tag_epc: string;
 }
 
+interface RFIDTagGroup {
+  tag_epc: string;
+  last_scan: string;
+  last_reader: string;
+}
+
 const RfidMonitoringDetail: React.FC = () => {
   const [liveLogs, setLiveLogs] = useState<RFIDLog[]>([]);
-  const [historyLogs, setHistoryLogs] = useState<RFIDLog[]>([]);
+  const [historyLogs, setHistoryLogs] = useState<RFIDTagGroup[]>([]);
   const [loadingLive, setLoadingLive] = useState<boolean>(true);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
   const [searchTag, setSearchTag] = useState<string>('');
 
-  const getTodayDateString = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const [startDate, setStartDate] = useState<string>(getTodayDateString());
-  const [endDate, setEndDate] = useState<string>(getTodayDateString());
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // Fetch live RFID scans
@@ -75,24 +73,43 @@ const RfidMonitoringDetail: React.FC = () => {
     fetchHistoryScans();
   };
 
+  const handleResetFilters = async () => {
+    setStartDate('');
+    setEndDate('');
+    setSearchTag('');
+    setLoadingHistory(true);
+    try {
+      const url = `/api/rfid/history-logs/?start_date=&end_date=&tag_epc=`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryLogs(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch history RFID scans:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   // Generate and export CSV
   const handleExportCSV = async () => {
     if (isExporting) return;
     setIsExporting(true);
     try {
-      const url = `/api/rfid/history-logs/?start_date=${startDate}&end_date=${endDate}&tag_epc=${searchTag}`;
+      const url = `/api/rfid/history-logs/?start_date=${startDate}&end_date=${endDate}&tag_epc=${searchTag}&raw_scans=true`;
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Gagal mengambil data log RFID untuk diekspor.');
+        throw new Error('Gagal mengambil data log scan RFID untuk diekspor.');
       }
       const logs = await res.json();
       if (logs.length === 0) {
-        alert('Tidak ada log RFID ditemukan untuk kriteria pencarian dan rentang tanggal terpilih.');
+        alert('Tidak ada data scan RFID ditemukan untuk kriteria pencarian dan rentang tanggal terpilih.');
         return;
       }
 
       const headers = ['No', 'Waktu (WIB)', 'ID Reader', 'EPC Tag RFID'];
-      const rows = logs.map((l: RFIDLog, idx: number) => [
+      const rows = logs.map((l: any, idx: number) => [
         idx + 1,
         l.timestamp,
         l.reader_id,
@@ -108,7 +125,8 @@ const RfidMonitoringDetail: React.FC = () => {
       const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', downloadUrl);
-      link.setAttribute('download', `RFID_Scan_Report_${startDate}_to_${endDate}.csv`);
+      const fileSuffix = startDate && endDate ? `${startDate}_to_${endDate}` : 'All';
+      link.setAttribute('download', `RFID_Tags_Report_${fileSuffix}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -122,6 +140,7 @@ const RfidMonitoringDetail: React.FC = () => {
   };
 
   const formatLastScanned = (timestampStr: string) => {
+    if (!timestampStr) return '-';
     try {
       const date = new Date(timestampStr);
       const diffMs = new Date().getTime() - date.getTime();
@@ -208,7 +227,7 @@ const RfidMonitoringDetail: React.FC = () => {
         <div className="split-column right-history glass-card">
           <div className="card-section-title-row">
             <div className="section-title-container">
-              <h2>Historical Logs & Export</h2>
+              <h2>Daftar RFID Tags Terdeteksi & Export</h2>
             </div>
           </div>
 
@@ -243,7 +262,14 @@ const RfidMonitoringDetail: React.FC = () => {
             
             <div className="form-actions">
               <button type="submit" className="action-btn search-btn">
-                Tampilkan Log
+                Cari / Filter
+              </button>
+              <button 
+                type="button" 
+                onClick={handleResetFilters} 
+                className="action-btn reset-btn"
+              >
+                Reset Filter
               </button>
               <button 
                 type="button" 
@@ -264,25 +290,25 @@ const RfidMonitoringDetail: React.FC = () => {
               </div>
             ) : historyLogs.length === 0 ? (
               <div className="no-data-alert text-muted">
-                Tidak ada data log RFID ditemukan untuk filter dan rentang tanggal yang dipilih.
+                Tidak ada data RFID tag terdeteksi dengan filter yang dipilih.
               </div>
             ) : (
               <table className="rfid-table history-table">
                 <thead>
                   <tr>
                     <th>No</th>
-                    <th>Waktu (WIB)</th>
-                    <th>ID Reader</th>
                     <th>EPC Tag RFID</th>
+                    <th>Terakhir Terdeteksi</th>
+                    <th>Reader Terakhir</th>
                   </tr>
                 </thead>
                 <tbody>
                   {historyLogs.map((log, idx) => (
                     <tr key={idx}>
                       <td>{idx + 1}</td>
-                      <td>{log.timestamp}</td>
-                      <td><span className="reader-badge">{log.reader_id}</span></td>
                       <td className="epc-col">{log.tag_epc}</td>
+                      <td>{formatLastScanned(log.last_scan)}</td>
+                      <td><span className="reader-badge">{log.last_reader}</span></td>
                     </tr>
                   ))}
                 </tbody>

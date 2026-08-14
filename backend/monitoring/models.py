@@ -235,3 +235,33 @@ class RFIDScan(models.Model):
 
     def __str__(self):
         return f"{self.tag_epc} scanned by {self.reader_id} at {self.timestamp}"
+
+
+class RegisteredRFIDTag(models.Model):
+    tag_epc = models.CharField(max_length=100, unique=True, db_index=True, help_text="EPC ID of the registered RFID tag")
+    name = models.CharField(max_length=100, blank=True, null=True, help_text="Custom name/label for the tag")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['tag_epc']
+        verbose_name = 'Registered RFID Tag'
+        verbose_name_plural = 'Registered RFID Tags'
+
+    def __str__(self):
+        return f"{self.tag_epc} - {self.name or 'Unnamed'}"
+
+
+class RegisteredRFIDReader(models.Model):
+    reader_id = models.CharField(max_length=100, unique=True, db_index=True, help_text="ID of the registered RFID reader")
+    name = models.CharField(max_length=100, blank=True, null=True, help_text="Custom name/label for the reader")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['reader_id']
+        verbose_name = 'Registered RFID Reader'
+        verbose_name_plural = 'Registered RFID Readers'
+
+    def __str__(self):
+        return f"{self.reader_id} - {self.name or 'Unnamed'}"

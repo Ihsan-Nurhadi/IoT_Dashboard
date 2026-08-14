@@ -45,6 +45,14 @@ urlpatterns = [
     path('api/ble/devices/<str:mac>/delete/', monitoring_views.ble_device_delete_post, name='ble-device-delete-post'),
     path('api/ble/devices/scanned-unregistered/', monitoring_views.ble_unregistered_list, name='ble-unregistered-list'),
 
+    # RFID Devices config endpoints
+    path('api/rfid/tags/', monitoring_views.rfid_tags_list, name='rfid-tags-list'),
+    path('api/rfid/tags/<str:tag_epc>/', monitoring_views.rfid_tag_detail, name='rfid-tag-detail'),
+    path('api/rfid/tags/<str:tag_epc>/delete/', monitoring_views.rfid_tag_detail, name='rfid-tag-delete'), # mapping delete to detail since detail handles DELETE
+    path('api/rfid/readers/', monitoring_views.rfid_readers_list, name='rfid-readers-list'),
+    path('api/rfid/readers/<str:reader_id>/', monitoring_views.rfid_reader_detail, name='rfid-reader-detail'),
+    path('api/rfid/readers/<str:reader_id>/delete/', monitoring_views.rfid_reader_detail, name='rfid-reader-delete'), # mapping delete to detail since detail handles DELETE
+
     # CCTV Cameras config endpoints
     path('api/cameras/', dorlock_views.cameras_list, name='cameras-list'),
     path('api/cameras/create/', dorlock_views.camera_create, name='camera-create'),
