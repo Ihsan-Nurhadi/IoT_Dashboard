@@ -970,13 +970,25 @@ def rfid_history_logs(request):
     end_datetime = None
     try:
         if start_date_str:
-            start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            start_datetime = datetime.datetime.combine(start_date, datetime.time.min).replace(tzinfo=jakarta_tz)
+            if 'T' in start_date_str:
+                try:
+                    start_datetime = datetime.datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M').replace(tzinfo=jakarta_tz)
+                except ValueError:
+                    start_datetime = datetime.datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=jakarta_tz)
+            else:
+                start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                start_datetime = datetime.datetime.combine(start_date, datetime.time.min).replace(tzinfo=jakarta_tz)
         if end_date_str:
-            end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            end_datetime = datetime.datetime.combine(end_date, datetime.time.max).replace(tzinfo=jakarta_tz)
+            if 'T' in end_date_str:
+                try:
+                    end_datetime = datetime.datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M').replace(tzinfo=jakarta_tz)
+                except ValueError:
+                    end_datetime = datetime.datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=jakarta_tz)
+            else:
+                end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                end_datetime = datetime.datetime.combine(end_date, datetime.time.max).replace(tzinfo=jakarta_tz)
     except ValueError:
-        return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=400)
+        return Response({'error': 'Invalid date format. Use YYYY-MM-DD or YYYY-MM-DDTHH:MM'}, status=400)
         
     reader_map = {r.reader_id: r.name for r in RegisteredRFIDReader.objects.all() if r.name}
     

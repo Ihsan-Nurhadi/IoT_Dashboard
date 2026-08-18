@@ -262,17 +262,17 @@ const RfidMonitoringDetail: React.FC = () => {
           <form onSubmit={handleSearchSubmit} className="history-filter-form">
             <div className="filter-grid">
               <div className="filter-item">
-                <label>Tanggal Mulai</label>
+                <label>Mulai Tanggal & Jam</label>
                 <input 
-                  type="date" 
+                  type="datetime-local" 
                   value={startDate} 
                   onChange={(e) => setStartDate(e.target.value)} 
                 />
               </div>
               <div className="filter-item">
-                <label>Tanggal Selesai</label>
+                <label>Selesai Tanggal & Jam</label>
                 <input 
-                  type="date" 
+                  type="datetime-local" 
                   value={endDate} 
                   onChange={(e) => setEndDate(e.target.value)} 
                 />
