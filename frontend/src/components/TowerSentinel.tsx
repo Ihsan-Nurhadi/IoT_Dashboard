@@ -2639,15 +2639,6 @@ const TowerSentinel: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* CCTV */}
-                <div className="nms-section">
-                  <h3 className="nms-section-title">ANTENNA MONITORING CCTV</h3>
-                  <div className="nms-cctv-grid">
-                    <CCTVStreamCard streamId="cctv_asset_1" cameraName="Antenna CCTV #1" fallbackPhotoUrl="/camera_4.jpeg" />
-                    <CCTVStreamCard streamId="cctv_asset_2" cameraName="Antenna CCTV #2" fallbackPhotoUrl="/contoh cctv.jpg" />
-                  </div>
-                </div>
               </div>
             </div>
           )}

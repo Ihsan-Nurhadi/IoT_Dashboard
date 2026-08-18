@@ -102,13 +102,25 @@
 /* ===== SPLIT LAYOUT ===== */
 .rfid-content-split {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.15fr 1.15fr 1fr;
   gap: 24px;
+}
+
+@media (max-width: 1400px) {
+  .rfid-content-split {
+    grid-template-columns: 1fr 1fr;
+  }
+  .right-cctv {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 1024px) {
   .rfid-content-split {
     grid-template-columns: 1fr;
+  }
+  .right-cctv {
+    grid-column: span 1;
   }
 }
 
@@ -546,5 +558,114 @@
   color: var(--text-muted, #64748b);
   background: transparent;
   border: none;
+}
+
+/* ===== CCTV & AI SURVEILLANCE STYLES ===== */
+.rfid-cctv-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.cctv-container-with-info {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 16px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 16px;
+  align-items: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 1024px) {
+  .cctv-container-with-info {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cctv-stream-box {
+  width: 100%;
+}
+
+.cctv-description-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-left: 4px;
+}
+
+.cctv-info-header {
+  display: flex;
+}
+
+.cctv-count-badge {
+  font-size: 0.68rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cctv-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cctv-count-info {
+  display: flex;
+  gap: 16px;
+}
+
+.count-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.count-number {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.count-number.text-red {
+  color: #ef4444;
+}
+
+.count-label {
+  font-size: 0.72rem;
+  color: var(--text-muted, #94a3b8);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+/* Light mode overrides for CCTV in RFID */
+[data-theme="light"] .cctv-container-with-info,
+.light .cctv-container-with-info {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .cctv-count-badge,
+.light .cctv-count-badge {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #475569;
+}
+
+[data-theme="light"] .count-number,
+.light .count-number {
+  color: #0f172a;
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaBoxes, FaDownload } from 'react-icons/fa';
 import './RfidMonitoringDetail.css';
+import CCTVStreamCard from './CCTVStreamCard';
 
 interface RFIDLog {
   timestamp: string;
@@ -24,6 +25,33 @@ const RfidMonitoringDetail: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  interface CCTVCamera {
+    camera_id: string;
+    camera_name: string;
+    is_active: boolean;
+    detection_zones: { name: string; points: [number, number][] }[];
+  }
+  const [cameras, setCameras] = useState<CCTVCamera[]>([]);
+  const [verifiedCounts, setVerifiedCounts] = useState<{ [camId: string]: { total: number; present: number } }>({});
+
+  // Fetch CCTV Cameras dynamically
+  useEffect(() => {
+    const fetchCams = async () => {
+      try {
+        const res = await fetch('/api/cameras/');
+        if (res.ok) {
+          const data = await res.json();
+          setCameras(data.filter((c: CCTVCamera) => c.is_active));
+        }
+      } catch (err) {
+        console.error("Failed to fetch cameras:", err);
+      }
+    };
+    fetchCams();
+    const interval = setInterval(fetchCams, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch live RFID scans
   useEffect(() => {
@@ -313,6 +341,72 @@ const RfidMonitoringDetail: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+            )}
+          </div>
+        </div>
+
+        {/* Column 3: CCTV feeds */}
+        <div className="split-column right-cctv glass-card">
+          <div className="card-section-title-row">
+            <div className="section-title-container">
+              <h2>RFID CCTV Monitoring</h2>
+            </div>
+            <span className="live-pill animate-pulse" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' }}>LIVE FEED</span>
+          </div>
+          <div className="rfid-cctv-column">
+            {cameras.length === 0 ? (
+              <div className="cctv-placeholder" style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                <p>Belum ada kamera CCTV aktif terpasang</p>
+              </div>
+            ) : (
+              cameras.map((cam) => {
+                return (
+                  <div className="cctv-container-with-info" key={cam.camera_id}>
+                    <div className="cctv-stream-box">
+                      <CCTVStreamCard 
+                        streamId={cam.camera_id} 
+                        cameraName={cam.camera_name} 
+                        fallbackPhotoUrl="/contoh cctv.jpg" 
+                        onVerifyResult={(result) => {
+                          setVerifiedCounts(prev => ({
+                            ...prev,
+                            [cam.camera_id]: {
+                              total: result.total,
+                              present: result.present
+                            }
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="cctv-description-box">
+                      <div className="cctv-info-header">
+                        <span className="cctv-count-badge">Aset Terdeteksi AI</span>
+                      </div>
+                      <div className="cctv-info-body">
+                        {(() => {
+                          const verified = verifiedCounts[cam.camera_id];
+                          if (verified) {
+                            const diff = verified.total - verified.present;
+                            return (
+                              <div className="cctv-count-info">
+                                <div className="count-stat">
+                                  <span className="count-number">{verified.present}</span>
+                                  <span className="count-label">Hadir</span>
+                                </div>
+                                <div className="count-stat">
+                                  <span className={`count-number ${diff > 0 ? 'text-red font-bold' : ''}`}>{diff}</span>
+                                  <span className="count-label">Hilang</span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return <div className="mono-text">Analyzing stream...</div>;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
