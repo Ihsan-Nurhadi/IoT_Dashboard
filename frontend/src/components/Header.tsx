@@ -142,6 +142,7 @@ const Header: React.FC = () => {
         <Link to="/aqms" className={`nav-link ${location.pathname === '/aqms' ? 'active' : ''}`}>🌤️ AQMS</Link>
         <Link to="/asset-monitoring" className={`nav-link ${location.pathname === '/asset-monitoring' ? 'active' : ''}`}>📦 Asset</Link>
         <Link to="/rfid-monitoring" className={`nav-link ${location.pathname === '/rfid-monitoring' ? 'active' : ''}`}>🏷️ RFID</Link>
+        <Link to="/cable-sense" className={`nav-link ${location.pathname === '/cable-sense' ? 'active' : ''}`}>⚡ Cable Sense</Link>
       </div>
 
       <div className="nav-actions">

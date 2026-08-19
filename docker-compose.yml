@@ -105,6 +105,42 @@ services:
       - media_volume:/app/media
     networks:
       - nms_network
+      
+  # 2f. RFID Listener (Worker Background)
+  cablesense_listener:
+    build: ./backend
+    container_name: nms_cablesense_worker
+    restart: always
+    command: python manage.py cablesense_listener
+    environment:
+      - TZ=Asia/Jakarta
+    env_file: .env
+    depends_on:
+      - backend
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    networks:
+      - nms_network
+  
+  # 2g. RFID Publisher (Worker Background)
+  cablesense_simulator:
+    build: ./backend
+    container_name: nms_cablesense_simulator
+    restart: always
+    command: python manage.py cablesense_simulator
+    environment:
+      - TZ=Asia/Jakarta
+    env_file: .env
+    depends_on:
+      - backend
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    networks:
+      - nms_network
 
   # 3. Frontend (React)
   frontend:
@@ -134,22 +170,22 @@ services:
       - nms_network
 
   # 6. Person Detector (YOLO Background Worker)
-  person_detector:
-    build: ./backend
-    container_name: nms_person_detector
-    restart: always
-    command: python manage.py person_detector
-    environment:
-      - TZ=Asia/Jakarta
-    env_file: .env
-    depends_on:
-      - backend
-    volumes:
-      - ./backend:/app
-      - static_volume:/app/static
-      - media_volume:/app/media
-    networks:
-      - nms_network
+  # person_detector:
+  #   build: ./backend
+  #   container_name: nms_person_detector
+  #   restart: always
+  #   command: python manage.py person_detector
+  #   environment:
+  #     - TZ=Asia/Jakarta
+  #   env_file: .env
+  #   depends_on:
+  #     - backend
+  #   volumes:
+  #     - ./backend:/app
+  #     - static_volume:/app/static
+  #     - media_volume:/app/media
+  #   networks:
+  #     - nms_network
 
 volumes:
   static_volume:

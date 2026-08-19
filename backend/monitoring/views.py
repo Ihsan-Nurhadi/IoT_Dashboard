@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db.models import Max, Subquery, OuterRef, Count
 from django.utils import timezone
-from .models import SensorData, SiteVisibility, Site, SensorReading, BLEScan, RFIDScan, RegisteredRFIDTag, RegisteredRFIDReader
+from .models import SensorData, SiteVisibility, Site, SensorReading, BLEScan, RFIDScan, RegisteredRFIDTag, RegisteredRFIDReader, CableHealthTelemetry
 from .serializers import SensorDataSerializer, SiteVisibilitySerializer, SiteSerializer, SensorReadingSerializer
 
 
@@ -1278,5 +1278,128 @@ def rfid_reader_detail(request, reader_id):
         # Trigger MQTT publish sync
         publish_rfid_config()
         return Response({'detail': 'RFID Reader deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+def cablesense_latest(request):
+    """
+    Returns the latest Cable Sense telemetry data.
+    If no records exist, it returns a default mock/fallback record.
+    """
+    from zoneinfo import ZoneInfo
+    jakarta_tz = ZoneInfo('Asia/Jakarta')
+    
+    device_id = request.query_params.get('device_id', 'Cable_Sense_01')
+    latest = CableHealthTelemetry.objects.filter(device_id=device_id).order_by('-timestamp').first()
+    
+    if latest:
+        data = {
+            'id': latest.id,
+            'device_id': latest.device_id,
+            'timestamp': latest.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S'),
+            'vibration': latest.vibration,
+            'tension': latest.tension,
+            'impact': latest.impact,
+            'is_cut': latest.is_cut,
+            'temperature': latest.temperature,
+            'device_status': latest.device_status,
+            'signal_strength': latest.signal_strength,
+            'is_connected': latest.is_connected
+        }
+    else:
+        # Fallback default data
+        import datetime
+        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        data = {
+            'id': 0,
+            'device_id': device_id,
+            'timestamp': now_str,
+            'vibration': 0.02,
+            'tension': 100.0,
+            'impact': 0.0,
+            'is_cut': False,
+            'temperature': 27.5,
+            'device_status': 'Normal',
+            'signal_strength': -60,
+            'is_connected': True
+        }
+        
+    return Response(data)
+
+
+@api_view(['GET'])
+def cablesense_history_logs(request):
+    """
+    Returns either grouped or raw individual historical logs of Cable Sense.
+    Filters: start_date, end_date, device_id.
+    """
+    import datetime
+    from zoneinfo import ZoneInfo
+    jakarta_tz = ZoneInfo('Asia/Jakarta')
+    
+    start_date_str = request.query_params.get('start_date')
+    end_date_str = request.query_params.get('end_date')
+    device_id = request.query_params.get('device_id', 'Cable_Sense_01')
+    limit_val = request.query_params.get('limit', 100)
+    
+    logs = CableHealthTelemetry.objects.filter(device_id=device_id)
+    
+    start_datetime = None
+    end_datetime = None
+    try:
+        if start_date_str:
+            if 'T' in start_date_str:
+                try:
+                    start_datetime = datetime.datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M').replace(tzinfo=jakarta_tz)
+                except ValueError:
+                    start_datetime = datetime.datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=jakarta_tz)
+            else:
+                start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                start_datetime = datetime.datetime.combine(start_date, datetime.time.min).replace(tzinfo=jakarta_tz)
+        if end_date_str:
+            if 'T' in end_date_str:
+                try:
+                    end_datetime = datetime.datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M').replace(tzinfo=jakarta_tz)
+                except ValueError:
+                    end_datetime = datetime.datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=jakarta_tz)
+            else:
+                end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                end_datetime = datetime.datetime.combine(end_date, datetime.time.max).replace(tzinfo=jakarta_tz)
+    except ValueError:
+        return Response({'error': 'Invalid date format. Use YYYY-MM-DD or YYYY-MM-DDTHH:MM'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if start_datetime:
+        logs = logs.filter(timestamp__gte=start_datetime)
+    if end_datetime:
+        logs = logs.filter(timestamp__lte=end_datetime)
+        
+    logs = logs.order_by('-timestamp')
+    
+    try:
+        limit = int(limit_val)
+        limit = min(limit, 5000)
+    except ValueError:
+        limit = 100
+        
+    logs = logs[:limit]
+    
+    results = []
+    for l in logs:
+        results.append({
+            'id': l.id,
+            'timestamp': l.timestamp.astimezone(jakarta_tz).strftime('%Y-%m-%d %H:%M:%S'),
+            'device_id': l.device_id,
+            'vibration': l.vibration,
+            'tension': l.tension,
+            'impact': l.impact,
+            'is_cut': l.is_cut,
+            'temperature': l.temperature,
+            'device_status': l.device_status,
+            'signal_strength': l.signal_strength,
+            'is_connected': l.is_connected
+        })
+        
+    return Response(results)
+
 
 

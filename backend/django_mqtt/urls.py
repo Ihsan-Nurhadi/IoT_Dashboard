@@ -32,6 +32,8 @@ urlpatterns = [
     path('api/ble/history-logs/', monitoring_views.ble_history_logs, name='ble-history-logs'),
     path('api/rfid/latest/', monitoring_views.rfid_latest_scans, name='rfid-latest'),
     path('api/rfid/history-logs/', monitoring_views.rfid_history_logs, name='rfid-history-logs'),
+    path('api/cablesense/latest/', monitoring_views.cablesense_latest, name='cablesense-latest'),
+    path('api/cablesense/history-logs/', monitoring_views.cablesense_history_logs, name='cablesense-history-logs'),
 
     
     # Auth endpoints

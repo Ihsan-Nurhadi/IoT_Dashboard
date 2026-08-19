@@ -38,9 +38,10 @@ const TowerSentinel: React.FC = () => {
   const labelVertiRef = useRef<HTMLDivElement | null>(null);
   const labelAssetRef = useRef<HTMLDivElement | null>(null);
   const labelRfidRef = useRef<HTMLDivElement | null>(null);
+  const labelCableSenseRef = useRef<HTMLDivElement | null>(null);
 
   // States
-  const [activeModal, setActiveModal] = useState<'nms' | 'aqms' | 'verti' | 'asset' | 'rfid' | null>(null);
+  const [activeModal, setActiveModal] = useState<'nms' | 'aqms' | 'verti' | 'asset' | 'rfid' | 'cablesense' | null>(null);
   const [activeFeed, setActiveFeed] = useState<number>(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [mobileView, setMobileView] = useState<'tower' | 'data' | 'alerts' | 'feeds' | 'settings'>('tower');
@@ -58,8 +59,21 @@ const TowerSentinel: React.FC = () => {
     ion_negatif: 138
   });
 
+  const [cableData, setCableData] = useState({
+    vibration: 0.02,
+    tension: 100.0,
+    impact: 0.0,
+    is_cut: false,
+    temperature: 27.5,
+    device_status: 'Normal',
+    signal_strength: -60,
+    is_connected: true,
+    timestamp: '-'
+  });
+  const cableStatusRef = useRef<string>('Normal');
+
   // Reference functions for canvas zoom resets
-  const zoomToSystemRef = useRef<((key: 'nms' | 'aqms' | 'verti' | 'asset' | 'rfid') => void) | null>(null);
+  const zoomToSystemRef = useRef<((key: 'nms' | 'aqms' | 'verti' | 'asset' | 'rfid' | 'cablesense') => void) | null>(null);
   const resetViewRef = useRef<(() => void) | null>(null);
   const toggleAutoRotateRef = useRef<((val?: boolean) => void) | null>(null);
   const toggleWireframeRef = useRef<(() => void) | null>(null);
@@ -360,6 +374,37 @@ const TowerSentinel: React.FC = () => {
     };
     fetchRfidStatus();
     const interval = setInterval(fetchRfidStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Poll Cable Sense Status
+  useEffect(() => {
+    const fetchCableStatus = async () => {
+      try {
+        const res = await fetch('/api/cablesense/latest/');
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            setCableData({
+              vibration: data.vibration !== undefined ? data.vibration : 0.02,
+              tension: data.tension !== undefined ? data.tension : 100.0,
+              impact: data.impact !== undefined ? data.impact : 0.0,
+              is_cut: !!data.is_cut,
+              temperature: data.temperature !== undefined ? data.temperature : 27.5,
+              device_status: data.device_status || 'Normal',
+              signal_strength: data.signal_strength !== undefined ? data.signal_strength : -60,
+              is_connected: data.is_connected !== undefined ? !!data.is_connected : true,
+              timestamp: data.timestamp || '-'
+            });
+            cableStatusRef.current = data.device_status || 'Normal';
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching Cable Sense status:", err);
+      }
+    };
+    fetchCableStatus();
+    const interval = setInterval(fetchCableStatus, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1241,6 +1286,44 @@ const TowerSentinel: React.FC = () => {
     rfidGroup.position.set(0, 16.3, -0.45);
     rfidGroup.rotation.y = Math.PI;
 
+    // --- Cable Sense Device Model (Ground level, parallel/next to shelter) ---
+    const csGroup = new THREE.Group();
+    towerGroup.add(csGroup);
+
+    // Metallic box representing the sensor enclosure
+    const csBoxMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
+    const csBox = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.4), csBoxMat);
+    csBox.castShadow = csBox.receiveShadow = true;
+    csGroup.add(csBox);
+
+    // Status LED on the box (reactive via material reference in animation loop)
+    const csLedMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 2.0 });
+    const csLed = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), csLedMat);
+    csLed.position.set(0.2, 0.15, 0.21); // Front face top-right
+    csGroup.add(csLed);
+
+    csGroup.position.set(-2.2, 0.3, -1.5);
+    csGroup.rotation.y = 0;
+
+    // Cable runs: sensor box to shelter
+    const csCableGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.5, 6);
+    const csCable = new THREE.Mesh(csCableGeo, metalDark);
+    csCable.rotation.z = Math.PI / 2;
+    csCable.position.set(0.35, 0, 0);
+    csGroup.add(csCable);
+
+    // Thick cable from sensor box along ground to tower base
+    const csCableCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-2.2, 0.05, -1.5),
+      new THREE.Vector3(-1.8, 0.02, -0.8),
+      new THREE.Vector3(-1.0, 0.02, -0.2),
+      new THREE.Vector3(0, 0.02, 0)
+    ]);
+    const csCableTubeGeo = new THREE.TubeGeometry(csCableCurve, 20, 0.035, 8, false);
+    const csCableTube = new THREE.Mesh(csCableTubeGeo, metalDark);
+    csCableTube.castShadow = true;
+    towerGroup.add(csCableTube);
+
     // --- Hotspots setup ---
     const makeHotspot = (color: number, wx3d: number, wy3d: number, wz3d: number) => {
       const mat = new THREE.MeshStandardMaterial({
@@ -1267,6 +1350,7 @@ const TowerSentinel: React.FC = () => {
     const hotspotVerti = makeHotspot(0xc084fc, 0.6, 20.0, 0.6);
     const hotspotAsset = makeHotspot(0x10b981, 0, 17.5, 0.5);
     const hotspotRFID = makeHotspot(0x6366f1, 0, 16.3, -0.55);
+    const hotspotCableSense = makeHotspot(0xf43f5e, -2.2, 0.45, -1.5);
 
     const allHotspots = [
       { key: 'nms' as const, hs: hotspotNMS, lookAtY: 7, dist: 14, rotX: 0.06, rotY: 0.6, labelRef: labelNmsRef },
@@ -1274,6 +1358,7 @@ const TowerSentinel: React.FC = () => {
       { key: 'verti' as const, hs: hotspotVerti, lookAtY: 20.0, dist: 12, rotX: 0.05, rotY: -0.3, labelRef: labelVertiRef },
       { key: 'asset' as const, hs: hotspotAsset, lookAtY: 17.5, dist: 12, rotX: 0.05, rotY: 0.1, labelRef: labelAssetRef },
       { key: 'rfid' as const, hs: hotspotRFID, lookAtY: 16.3, dist: 12, rotX: 0.05, rotY: 3.2, labelRef: labelRfidRef },
+      { key: 'cablesense' as const, hs: hotspotCableSense, lookAtY: 0.5, dist: 10, rotX: 0.15, rotY: -0.8, labelRef: labelCableSenseRef },
     ];
 
     // Raycaster for clicking hotspots
@@ -1305,7 +1390,7 @@ const TowerSentinel: React.FC = () => {
     let camDist = 38, targetDist = 38;
     let isDragging = false, lastX = 0, lastY = 0;
 
-    const zoomToSystem = (key: 'nms' | 'aqms' | 'verti' | 'asset' | 'rfid') => {
+    const zoomToSystem = (key: 'nms' | 'aqms' | 'verti' | 'asset' | 'rfid' | 'cablesense') => {
       const info = allHotspots.find(h => h.key === key);
       if (!info) return;
       autoRotate = false;
@@ -1445,6 +1530,27 @@ const TowerSentinel: React.FC = () => {
       const blink = Math.sin(t * 2.5) > 0;
       warnMat.emissiveIntensity = blink ? 3 : 0.1;
       warnPointLight.intensity = blink ? 5 : 0;
+
+      // Update Cable Sense LED indicator color dynamically based on current status
+      const csStatus = cableStatusRef.current;
+      if (csStatus === 'Normal') {
+        csLedMat.color.setHex(0x22c55e);
+        csLedMat.emissive.setHex(0x22c55e);
+        csLedMat.emissiveIntensity = 2.0;
+      } else if (csStatus === 'Warning') {
+        csLedMat.color.setHex(0xf59e0b);
+        csLedMat.emissive.setHex(0xf59e0b);
+        csLedMat.emissiveIntensity = 2.0;
+      } else if (csStatus === 'Critical') {
+        const csBlink = Math.sin(t * 5.0) > 0;
+        csLedMat.color.setHex(0xef4444);
+        csLedMat.emissive.setHex(0xef4444);
+        csLedMat.emissiveIntensity = csBlink ? 3.0 : 0.2;
+      } else { // Offline or fallback
+        csLedMat.color.setHex(0x64748b);
+        csLedMat.emissive.setHex(0x000000);
+        csLedMat.emissiveIntensity = 0.0;
+      }
 
       // Pulse ground glow
       groundLight.intensity = 3 + Math.sin(t * 0.8) * 1.2;
@@ -1669,6 +1775,16 @@ const TowerSentinel: React.FC = () => {
             }}
           >
             🏷️
+          </div>
+          <div
+            className={`s-icon ${activeModal === 'cablesense' ? 'active' : ''}`}
+            title="Cable Sense"
+            onClick={() => {
+              setActiveModal('cablesense');
+              zoomToSystemRef.current?.('cablesense');
+            }}
+          >
+            ⚡
           </div>
           <div className="s-icon" title="Settings" style={{ marginTop: 'auto' }}>⚙️</div>
         </div>
@@ -2049,6 +2165,22 @@ const TowerSentinel: React.FC = () => {
               <div className="sys-content">
                 <div className="sys-title">RFID Monitoring</div>
                 <div className="sys-sub">RFID Tag dan gateway</div>
+              </div>
+            </div>
+
+            <div
+              ref={labelCableSenseRef}
+              id="label-cablesense"
+              className="system-label"
+              onClick={() => {
+                setActiveModal('cablesense');
+                zoomToSystemRef.current?.('cablesense');
+              }}
+            >
+              <div className="sys-dot" style={{ background: '#f43f5e', boxShadow: '0 0 8px #f43f5e' }}></div>
+              <div className="sys-content">
+                <div className="sys-title">Cable Sense</div>
+                <div className="sys-sub">Kesehatan Kabel Site</div>
               </div>
             </div>
           </div>
@@ -2713,6 +2845,129 @@ const TowerSentinel: React.FC = () => {
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeModal === 'cablesense' && (
+            <div className="nms-drawer" onClick={(e) => e.stopPropagation()}>
+              <div className="nms-drawer-header animate-slide-in">
+                <div className="nms-header-left">
+                  <div className="nms-title-row">
+                    <h2>NAYAKA WS</h2>
+                    <span 
+                      className={`status-badge-inline ${
+                        cableData.device_status === 'Normal' ? 'green' : 
+                        cableData.device_status === 'Warning' ? 'warning' : 'red-glow'
+                      }`}
+                      style={{
+                        background: cableData.device_status === 'Normal' ? 'rgba(34, 197, 94, 0.15)' : 
+                                    cableData.device_status === 'Warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: cableData.device_status === 'Normal' ? '#22c55e' : 
+                               cableData.device_status === 'Warning' ? '#f59e0b' : '#ef4444',
+                        borderColor: cableData.device_status === 'Normal' ? 'rgba(34, 197, 94, 0.3)' : 
+                                     cableData.device_status === 'Warning' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'
+                      }}
+                    >
+                      {cableData.device_status.toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="nms-subtitle">
+                    20TS10B1529 &middot; SST 42m &middot; cable health monitoring
+                  </p>
+                </div>
+                <div className="nms-header-actions">
+                  <button
+                    className="nms-action-btn border primary"
+                    style={{ borderColor: '#f43f5e', color: '#fb7185' }}
+                    onClick={() => {
+                      setActiveModal(null);
+                      if (resetViewRef.current) resetViewRef.current();
+                      navigate('/cable-sense');
+                    }}
+                  >
+                    Lihat Detail
+                  </button>
+                  <button className="nms-close-btn" onClick={handleCloseModal}>&times;</button>
+                </div>
+              </div>
+
+              <div className="nms-drawer-body">
+                {/* CABLE SENSE STATUS */}
+                <div className="nms-section">
+                  <h3 className="nms-section-title" style={{ color: '#fb7185' }}>CABLE HEALTH SUMMARY</h3>
+                  <div className="nms-status-grid">
+                    
+                    {/* Vibration */}
+                    <div className="nms-status-card">
+                      <div className="card-header">
+                        <div className="card-title-group">
+                          <span className="card-icon-wrapper orange">〽️</span>
+                          <span className="card-name">Getaran (Vibration)</span>
+                        </div>
+                        <span className="card-val">{cableData.vibration.toFixed(3)} m/s²</span>
+                      </div>
+                      <div className="card-footer">
+                        <span className="card-time">Mekanikal</span>
+                      </div>
+                    </div>
+
+                    {/* Tension */}
+                    <div className="nms-status-card">
+                      <div className="card-header">
+                        <div className="card-title-group">
+                          <span className="card-icon-wrapper yellow">🏹</span>
+                          <span className="card-name">Tegangan (Tension)</span>
+                        </div>
+                        <span className="card-val">{cableData.tension.toFixed(1)}%</span>
+                      </div>
+                      <div className="card-footer">
+                        <span className="card-time">Mekanikal</span>
+                      </div>
+                    </div>
+
+                    {/* Temperature */}
+                    <div className="nms-status-card">
+                      <div className="card-header">
+                        <div className="card-title-group">
+                          <span className="card-icon-wrapper red">🌡️</span>
+                          <span className="card-name">Suhu Kabel</span>
+                        </div>
+                        <span className="card-val">{cableData.temperature.toFixed(1)}&deg;C</span>
+                      </div>
+                      <div className="card-footer">
+                        <span className="card-time">Termal Lingkungan</span>
+                      </div>
+                    </div>
+
+                    {/* Connection & Security */}
+                    <div className="nms-status-card" style={{ gridColumn: '1 / -1', background: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.2)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
+                          <span style={{ color: 'var(--text-sub)' }}>Integritas Fisik (Kabel Potong):</span>
+                          <span style={{ color: cableData.is_cut ? '#ef4444' : '#22c55e', fontWeight: 'bold' }}>
+                            {cableData.is_cut ? '🚨 TERPOTONG (Pencurian)' : '✅ AMAN (Utuh)'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
+                          <span style={{ color: 'var(--text-sub)' }}>Kekuatan Sinyal (RSSI):</span>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{cableData.signal_strength} dBm</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
+                          <span style={{ color: 'var(--text-sub)' }}>Koneksi Sensor:</span>
+                          <span style={{ color: cableData.is_connected ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
+                            {cableData.is_connected ? 'CONNECTED' : 'DISCONNECTED'}
+                          </span>
+                        </div>
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          <span>Waktu Data:</span>
+                          <span>{cableData.timestamp}</span>
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               </div>

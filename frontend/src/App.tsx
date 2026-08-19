@@ -9,6 +9,7 @@ import VerticalityDetail from './components/VerticalityDetail';
 import AqmsDetail from './components/AqmsDetail';
 import AssetMonitoringDetail from './components/AssetMonitoringDetail';
 import RfidMonitoringDetail from './components/RfidMonitoringDetail';
+import CableSenseDetail from './components/CableSenseDetail';
 
 
 import LoginPage from './components/LoginPage';
@@ -106,6 +107,7 @@ const App: React.FC = () => {
           <Route path="/aqms" element={<AqmsDetail />} />
           <Route path="/asset-monitoring" element={<AssetMonitoringDetail />} />
           <Route path="/rfid-monitoring" element={<RfidMonitoringDetail />} />
+          <Route path="/cable-sense" element={<CableSenseDetail />} />
         </Route>
       </Routes>
     </Router>

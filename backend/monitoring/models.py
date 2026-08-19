@@ -265,3 +265,73 @@ class RegisteredRFIDReader(models.Model):
 
     def __str__(self):
         return f"{self.reader_id} - {self.name or 'Unnamed'}"
+
+
+class CableHealthTelemetry(models.Model):
+    """
+    Model untuk menyimpan data telemetri kesehatan kabel (Cable Sense).
+    Dipantau: perubahan mekanis (getaran, tarik, benturan), pencurian (is_cut),
+    suhu, dan status perangkat (sinyal, koneksi).
+    """
+    device_id = models.CharField(
+        max_length=50,
+        default='Cable_Sense_01',
+        db_index=True,
+        help_text='ID perangkat sensor kabel'
+    )
+    timestamp = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        help_text='Waktu data diterima'
+    )
+    vibration = models.FloatField(
+        default=0.0,
+        help_text='Getaran kabel (vibration) dalam m/s² atau g'
+    )
+    tension = models.FloatField(
+        default=100.0,
+        help_text='Tegangan tarik kabel (tension) dalam % atau kg'
+    )
+    impact = models.FloatField(
+        default=0.0,
+        help_text='Benturan mekanis (impact) dalam g'
+    )
+    is_cut = models.BooleanField(
+        default=False,
+        help_text='Indikator aktivitas pencurian (kabel dipotong/dilepas)'
+    )
+    temperature = models.FloatField(
+        default=25.0,
+        help_text='Suhu kabel/lingkungan dalam °C'
+    )
+    device_status = models.CharField(
+        max_length=20,
+        default='Normal',
+        choices=[
+            ('Normal', 'Normal'),
+            ('Warning', 'Warning'),
+            ('Critical', 'Critical'),
+            ('Offline', 'Offline')
+        ],
+        help_text='Kondisi kesehatan/status perangkat'
+    )
+    signal_strength = models.IntegerField(
+        default=-60,
+        help_text='Kekuatan sinyal RSSI dalam dBm'
+    )
+    is_connected = models.BooleanField(
+        default=True,
+        help_text='Status konektivitas perangkat ke gateway'
+    )
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Cable Health Telemetry'
+        verbose_name_plural = 'Cable Health Telemetry Logs'
+        indexes = [
+            models.Index(fields=['device_id', '-timestamp']),
+        ]
+
+    def __str__(self):
+        return f"CableHealth [{self.device_id}] [{self.timestamp:%Y-%m-%d %H:%M:%S}] - Status: {self.device_status}"
+
