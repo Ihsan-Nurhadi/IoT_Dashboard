@@ -172,6 +172,12 @@
   background-color: rgba(16, 185, 129, 0.08);
 }
 
+.pill-off-outline {
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
 .pill-open-outline {
   border: 1px solid #ef4444;
   color: #ef4444;
@@ -272,6 +278,18 @@
   border: 1px solid #10b981;
   color: #10b981;
   background-color: rgba(16, 185, 129, 0.08);
+}
+
+.log-badge-on {
+  border: 1px solid #10b981;
+  color: #10b981;
+  background-color: rgba(16, 185, 129, 0.08);
+}
+
+.log-badge-off {
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.08);
 }
 
 .device-card-footer {

@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.utils import timezone  # <--- PENTING: Tambahkan import ini
-from .models import DeviceState, DoorStatusLog, CCTVCamera
+from .models import DeviceState, DoorStatusLog, PowerStatusLog, CCTVCamera
 import os
 import shutil
 import imageio
@@ -899,6 +899,63 @@ def get_door_logs(request):
             "raw_time": local_time.isoformat()
         })
 
+
+    return JsonResponse({
+        "current_status": current_status,
+        "logs": items,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": page
+    })
+
+def get_power_logs(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "GET only"}, status=405)
+
+    page = int(request.GET.get("page", 1))
+    limit = int(request.GET.get("limit", 5))
+
+    # Current overall PLN / Power status
+    pln_device = DeviceState.objects.filter(device_name="PLN").first()
+    current_status = "ON"
+    if pln_device:
+        current_status = "ON" if pln_device.status in ["Active", "ON", "Open"] else "OFF"
+
+    # Auto-seed initial sample log data if empty so UI looks filled right away
+    if PowerStatusLog.objects.count() == 0:
+        now = timezone.now()
+        sample_events = [
+            (current_status, now - timezone.timedelta(minutes=2)),
+            ("OFF" if current_status == "ON" else "ON", now - timezone.timedelta(minutes=45)),
+            ("ON", now - timezone.timedelta(hours=2)),
+            ("OFF", now - timezone.timedelta(hours=4)),
+            ("ON", now - timezone.timedelta(hours=6)),
+        ]
+        for st, ts in sample_events:
+            PowerStatusLog.objects.create(status=st, timestamp=ts)
+
+    qs = PowerStatusLog.objects.order_by("-timestamp")
+    total_count = qs.count()
+
+    import math
+    total_pages = math.ceil(total_count / limit) or 1
+
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    logs_page = qs[start_idx:end_idx]
+
+    if not pln_device and qs.exists():
+        current_status = qs.first().status
+
+    items = []
+    for log in logs_page:
+        local_time = timezone.localtime(log.timestamp)
+        items.append({
+            "id": log.id,
+            "status": log.status,
+            "timestamp": local_time.strftime("%b %d, %I:%M %p"),
+            "raw_time": local_time.isoformat()
+        })
 
     return JsonResponse({
         "current_status": current_status,

@@ -7,7 +7,7 @@ import paho.mqtt.client as mqtt
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.utils import timezone
-from devicestatusapp.models import DeviceState, DoorStatusLog
+from devicestatusapp.models import DeviceState, DoorStatusLog, PowerStatusLog
 
 LAST_PIR_SNAPSHOT_TIME = 0.0
 PIR_SNAPSHOT_COOLDOWN = 15.0
@@ -76,7 +76,7 @@ class Command(BaseCommand):
         USER = settings.MQTT_USER
         PASSWORD = settings.MQTT_PASSWORD
 
-        TOPIC_BLACKBOX = "nms/E32_WB_WS/whitebox/#"
+        TOPIC_BLACKBOX = "nms/E32_WB_TBGTEST/whitebox/#"
         TOPIC_SPEAKER = "nms/esp32-speaker-003734fe8ce0/speaker/#"
         TOPIC_PIR = "nms/E32_PIR_WS/pir/#"
 
@@ -122,11 +122,16 @@ class Command(BaseCommand):
                         mains_present = payload.get("mains")
                         if mains_present is not None:
                             status_val = "Active" if mains_present else "Inactive"
+                            log_status = "ON" if mains_present else "OFF"
                             now_time = timezone.now()
                             dev, created = DeviceState.objects.get_or_create(
                                 device_name="PLN",
                                 defaults={'status': status_val, 'last_updated': now_time}
                             )
+                            if created or dev.status != status_val:
+                                PowerStatusLog.objects.create(status=log_status, timestamp=now_time)
+                                self.stdout.write(f"Updated PLN & Logged Event: {log_status}")
+
                             dev.status = status_val
                             dev.last_updated = now_time
                             dev.save()

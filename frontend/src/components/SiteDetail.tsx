@@ -48,9 +48,34 @@ interface DoorLogResponse {
   current_page: number;
 }
 
+interface PowerLogItem {
+  id: number;
+  status: 'ON' | 'OFF';
+  timestamp: string;
+}
+
+interface PowerLogResponse {
+  current_status: 'ON' | 'OFF';
+  logs: PowerLogItem[];
+  total_count: number;
+  total_pages: number;
+  current_page: number;
+}
+
 const ITEMS_PER_PAGE = 10; // 2 rows of 5 items
 
 const SiteDetail: React.FC = () => {
+  // Power Logs State
+  const [powerLogsData, setPowerLogsData] = useState<PowerLogResponse>({
+    current_status: 'ON',
+    logs: [],
+    total_count: 0,
+    total_pages: 1,
+    current_page: 1,
+  });
+  const [powerLogsPage, setPowerLogsPage] = useState(1);
+  const [powerLogsLoading, setPowerLogsLoading] = useState(false);
+
   // Door Logs State
   const [doorLogsData, setDoorLogsData] = useState<DoorLogResponse>({
     current_status: 'CLOSE',
@@ -107,6 +132,25 @@ const SiteDetail: React.FC = () => {
     };
     fetchDoorLogs();
   }, [doorLogsPage]);
+
+  // Fetch Power Device Logs
+  useEffect(() => {
+    const fetchPowerLogs = async () => {
+      setPowerLogsLoading(true);
+      try {
+        const res = await fetch(`/api/power-logs/?page=${powerLogsPage}&limit=5`);
+        if (res.ok) {
+          const data = await res.json();
+          setPowerLogsData(data);
+        }
+      } catch (err) {
+        console.error("Error fetching power logs:", err);
+      } finally {
+        setPowerLogsLoading(false);
+      }
+    };
+    fetchPowerLogs();
+  }, [powerLogsPage]);
 
   // Fetch photos
   useEffect(() => {
@@ -206,11 +250,57 @@ const SiteDetail: React.FC = () => {
               <FaBolt className="card-header-icon yellow-icon" />
               <h3>Power Device</h3>
             </div>
-            <span className="status-pill pill-on-outline">ON</span>
+            <span className={`status-pill ${powerLogsData.current_status === 'ON' ? 'pill-on-outline' : 'pill-off-outline'}`}>
+              {powerLogsData.current_status}
+            </span>
           </div>
-          <div className="device-card-body empty-state-body">
-            <FaMinusCircle className="empty-icon" />
-            <p>Tidak ada data</p>
+          <div className="device-card-body door-logs-body">
+            {powerLogsLoading ? (
+              <div className="logs-loader">
+                <FaSpinner className="spinner-icon spinning" />
+                <p>Memuat log power device...</p>
+              </div>
+            ) : powerLogsData.logs.length === 0 ? (
+              <div className="empty-state-body">
+                <FaMinusCircle className="empty-icon" />
+                <p>Belum ada riwayat status power device</p>
+              </div>
+            ) : (
+              <div className="door-logs-list">
+                {powerLogsData.logs.map((log) => (
+                  <div key={log.id} className="door-log-row">
+                    <span className="log-timestamp">{log.timestamp}</span>
+                    <span className={`log-badge ${log.status === 'ON' ? 'log-badge-on' : 'log-badge-off'}`}>
+                      {log.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Pagination Footer */}
+          <div className="device-card-footer">
+            <span className="pagination-text">
+              {powerLogsPage} / {powerLogsData.total_pages || 1}
+            </span>
+            <div className="pagination-controls">
+              <button 
+                disabled={powerLogsPage <= 1}
+                onClick={() => setPowerLogsPage(powerLogsPage - 1)}
+                className="mini-page-btn"
+                title="Previous Page"
+              >
+                <FaChevronLeft />
+              </button>
+              <button 
+                disabled={powerLogsPage >= powerLogsData.total_pages}
+                onClick={() => setPowerLogsPage(powerLogsPage + 1)}
+                className="mini-page-btn"
+                title="Next Page"
+              >
+                <FaChevronRight />
+              </button>
+            </div>
           </div>
         </div>
 

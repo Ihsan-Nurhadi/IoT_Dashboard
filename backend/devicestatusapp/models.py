@@ -17,6 +17,13 @@ class DoorStatusLog(models.Model):
     def __str__(self):
         return f"{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')} - {self.status}"
 
+class PowerStatusLog(models.Model):
+    status = models.CharField(max_length=50) # e.g., "ON", "OFF"
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')} - {self.status}"
+
 class CCTVCamera(models.Model):
     camera_id = models.CharField(max_length=50, unique=True) # e.g., 'cctv', 'cctv2'
     camera_name = models.CharField(max_length=100)

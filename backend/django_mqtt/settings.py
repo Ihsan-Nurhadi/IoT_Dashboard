@@ -108,9 +108,9 @@ MQTT_SERVER = os.environ.get("MQTT_SERVER", "emqx.nayakanms.com")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", 1884))
 MQTT_USER = os.environ.get("MQTT_USER", "nyk_ws")
 MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "ws")
-MQTT_TOPIC_SUB = os.environ.get("MQTT_TOPIC_SUB", "nms/E32_WB_WS/whitebox/config")
+MQTT_TOPIC_SUB = os.environ.get("MQTT_TOPIC_SUB", "nms/E32_WB_TBGTEST/config")
 MQTT_TOPIC_PUB = os.environ.get("MQTT_TOPIC_PUB", "/matalite-test/reply/")
-MQTT_TOPIC_PUB2 = os.environ.get("MQTT_TOPIC_PUB2", "nms/E32_WB_WS/whitebox/#")
+MQTT_TOPIC_PUB2 = os.environ.get("MQTT_TOPIC_PUB2", "nms/E32_WB_TBGTEST/whitebox/#")
 MQTT_TOPIC_SPEAKER_CONFIG = os.environ.get("MQTT_TOPIC_SPEAKER_CONFIG", "nms/esp32-speaker-003734fe8ce0/speaker/config")
 
 # New MQTT Settings (for Lamp/Relay) - Unified with primary settings
