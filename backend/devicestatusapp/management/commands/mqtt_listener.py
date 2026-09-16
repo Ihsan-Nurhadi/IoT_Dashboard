@@ -71,6 +71,9 @@ class Command(BaseCommand):
     help = 'Listens for MQTT messages for Door, PLN, and Motion Sensors'
 
     def handle(self, *args, **kwargs):
+        self.last_siren_trigger_time = 0.0
+        self.relay_active = False
+        self.last_pir_s = None
         BROKER = settings.MQTT_SERVER
         PORT = settings.MQTT_PORT
         USER = settings.MQTT_USER
@@ -137,15 +140,17 @@ class Command(BaseCommand):
                             dev.save()
                             self.stdout.write(f"Updated PLN: {status_val}")
                             
-                    # 3. Motion (PIR) status -> ONLY nms/E32_PIR_WS/pir/#
-                    elif "/pir/" in msg.topic:
+                    # 3. Motion (PIR) status -> nms/.../whitebox/motion_pir OR /pir/
+                    elif msg.topic.endswith("/motion_pir") or "/pir/" in msg.topic:
                         s_arr = payload.get("s")
                         if isinstance(s_arr, list):
                             has_detection = False
                             now_time = timezone.now()
+                            normalized_s = []
                             for idx, val in enumerate(s_arr):
                                 if val is not None:
                                     is_detected = str(val).strip().lower() in ["1", "true"]
+                                    normalized_s.append(1 if is_detected else 0)
                                     if is_detected:
                                         has_detection = True
                                     sensor_name = f"Motion Sensor {idx + 1}"
@@ -160,9 +165,48 @@ class Command(BaseCommand):
                                     dev.save()
                                     self.stdout.write(f"Updated {sensor_name}: {sensor_val} at {now_time.strftime('%H:%M:%S')}")
 
-                            if has_detection:
-                                self.stdout.write("[PIR] Motion detected! Triggering CCTV snapshot...")
-                                trigger_pir_cctv_snapshot(self.stdout)
+                            # Simulasi / Logika Alarm Prototipe:
+                            # Jika PIR bernilai [0, 0, 0] (atau semua sensor 0) -> Trigger sirine relay timeout 10 detik
+                            # Jika PIR bernilai normal e.g. [1, 0, 0] -> Status normal
+                            is_alarm_triggered = len(normalized_s) > 0 and all(x == 0 for x in normalized_s)
+                            is_state_transition = (self.last_pir_s != normalized_s)
+                            self.last_pir_s = normalized_s
+
+                            if is_alarm_triggered:
+                                current_epoch = time.time()
+                                # Trigger sirine jika:
+                                # 1. Relay saat ini sedang MATI (sudah selesai timeout 10s), ATAU
+                                # 2. Terjadi perubahan status baru (misal dari normal 1,0,0 ke 0,0,0), ATAU
+                                # 3. Sudah lewat jeda 10 detik
+                                should_trigger = (not self.relay_active) or is_state_transition or (current_epoch - self.last_siren_trigger_time >= 10.0)
+
+                                if should_trigger:
+                                    self.last_siren_trigger_time = current_epoch
+                                    self.relay_active = True
+                                    self.stdout.write(self.style.WARNING(f"[ALARM SIRINE] Kondisi bahaya PIR terdeteksi (s={normalized_s})! Mentargetkan sirine relay 10s..."))
+                                    
+                                    relay_cmd = json.dumps({"relay": {"state": True, "timeout_ms": 10000}})
+                                    
+                                    target_config_topics = []
+                                    if "/" in msg.topic:
+                                        base_prefix = msg.topic.rsplit('/', 1)[0]
+                                        target_config_topics.append(f"{base_prefix}/config")
+                                    if hasattr(settings, 'MQTT_TOPIC_SUB') and settings.MQTT_TOPIC_SUB:
+                                        if settings.MQTT_TOPIC_SUB not in target_config_topics:
+                                            target_config_topics.append(settings.MQTT_TOPIC_SUB)
+                                    
+                                    for cfg_topic in target_config_topics:
+                                        client.publish(cfg_topic, relay_cmd, qos=0)
+                                        self.stdout.write(self.style.SUCCESS(f"[MQTT Action] Published to {cfg_topic}: {relay_cmd}"))
+                                    
+                                    trigger_pir_cctv_snapshot(self.stdout)
+                                else:
+                                    self.stdout.write(f"[ALARM SIRINE] Sirine masih aktif/cooldown (s={normalized_s}, relay_active={self.relay_active})")
+                            else:
+                                self.stdout.write(f"[PIR Normal] Kondisi PIR normal (s={normalized_s})")
+                                if has_detection:
+                                    self.stdout.write("[PIR] Motion detected! Triggering CCTV snapshot...")
+                                    trigger_pir_cctv_snapshot(self.stdout)
                                 
                     # 4. Speaker status -> nms/esp32-speaker-003734fe8ce0/speaker/speaker
                     elif "/speaker/speaker" in msg.topic:
@@ -171,17 +215,31 @@ class Command(BaseCommand):
                         volume = payload.get("volume")
                         self.stdout.write(f"Speaker State: playing={playing}, track={track}, volume={volume}")
 
+                    # 5. Relay rotary status -> nms/.../whitebox/relay_rotary
+                    elif msg.topic.endswith("/relay_rotary"):
+                        state = payload.get("state")
+                        if state is not None:
+                            self.relay_active = bool(state)
+                            source = payload.get("source", "unknown")
+                            self.stdout.write(f"[Relay Status] Rotary beacon: {'ON' if self.relay_active else 'OFF'} (source: {source})")
+
                 except json.JSONDecodeError:
                     self.stdout.write(f"[MQTT] JSON Decode Error on payload: {payload_str}")
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"[MQTT] Error: {e}"))
 
-        client = mqtt.Client("django_subscriber_unified")
+        client_id = f"django_subscriber_{os.getpid()}_{int(time.time())}"
+        client = mqtt.Client(client_id)
         if USER and PASSWORD:
             client.username_pw_set(USER, PASSWORD)
         client.on_connect = on_connect
         client.on_message = on_message
+
+        def on_disconnect(client, userdata, rc):
+            if rc != 0:
+                self.stdout.write(self.style.WARNING(f"[MQTT] Disconnected unexpectedly (rc={rc}). Reconnecting..."))
+        client.on_disconnect = on_disconnect
 
         try:
             self.stdout.write(f"Connecting to Broker: {BROKER}:{PORT}")
@@ -191,7 +249,6 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"Connection Error (Broker): {e}"))
 
         # Keep main thread alive
-        import time
         try:
             while True:
                 time.sleep(1)
