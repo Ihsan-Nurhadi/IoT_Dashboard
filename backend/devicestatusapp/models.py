@@ -24,6 +24,15 @@ class PowerStatusLog(models.Model):
     def __str__(self):
         return f"{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')} - {self.status}"
 
+class SecurityAlertLog(models.Model):
+    alert_type = models.CharField(max_length=50, default="pir_disconnect") # e.g., "pir_disconnect", "pir_motion"
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True, null=True)
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')} - {self.title}"
+
 class CCTVCamera(models.Model):
     camera_id = models.CharField(max_length=50, unique=True) # e.g., 'cctv', 'cctv2'
     camera_name = models.CharField(max_length=100)

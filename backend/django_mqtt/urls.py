@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/cctv/detection-logs/', dorlock_views.cctv_detection_logs, name='cctv_detection_logs'),
     path('api/door-logs/', dorlock_views.get_door_logs, name='get_door_logs'),
     path('api/power-logs/', dorlock_views.get_power_logs, name='get_power_logs'),
+    path('api/pir-alarm-status/', dorlock_views.get_pir_alarm_status, name='get_pir_alarm_status'),
     path('api/verticality/', include('monitoring.urls')),
     path('api/sensor-readings/latest/', monitoring_views.LatestReadingView.as_view(), name='sensor-latest'),
     path('api/sensor-readings/history/', monitoring_views.SensorHistoryView.as_view(), name='sensor-history'),

@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.utils import timezone  # <--- PENTING: Tambahkan import ini
-from .models import DeviceState, DoorStatusLog, PowerStatusLog, CCTVCamera
+from .models import DeviceState, DoorStatusLog, PowerStatusLog, SecurityAlertLog, CCTVCamera
 import os
 import shutil
 import imageio
@@ -845,11 +845,47 @@ def cctv_alerts(request):
                 "raw_time": dt.isoformat()
             })
         
+    # 4. Security Alerts from Database (PIR Disconnect / Cable Unplugged)
+    if category in ["all", "pir"]:
+        for sec_alert in SecurityAlertLog.objects.order_by("-timestamp")[:10]:
+            local_time = timezone.localtime(sec_alert.timestamp)
+            alerts.append({
+                "id": f"sec_alert_{sec_alert.id}",
+                "type": "pir",
+                "camera": "Whitebox Security",
+                "title": sec_alert.title,
+                "url": "",
+                "timestamp": local_time.strftime("%d %b %I:%M %p"),
+                "raw_time": local_time.isoformat()
+            })
+
     # Sort descending by timestamp (newest first)
     alerts.sort(key=lambda x: x["raw_time"], reverse=True)
     
     # Return top 10 alerts
     return JsonResponse(alerts[:10], safe=False)
+
+def get_pir_alarm_status(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "GET only"}, status=405)
+
+    cable_dev = DeviceState.objects.filter(device_name="PIR Cable State").first()
+    alarm_dev = DeviceState.objects.filter(device_name="PIR Alarm").first()
+    
+    is_disconnected = (cable_dev.status == "DISCONNECTED") if cable_dev else False
+    is_alarm = (alarm_dev.status == "ALARM_ACTIVE") if alarm_dev else False
+    
+    latest_alert = SecurityAlertLog.objects.order_by("-timestamp").first()
+    alert_time = timezone.localtime(latest_alert.timestamp).strftime("%H:%M:%S") if latest_alert else None
+    
+    return JsonResponse({
+        "is_alarm": is_alarm,
+        "is_disconnected": is_disconnected,
+        "cable_status": cable_dev.status if cable_dev else "CONNECTED",
+        "last_updated": timezone.localtime(cable_dev.last_updated).strftime("%Y-%m-%d %H:%M:%S") if cable_dev else "-",
+        "alert_title": latest_alert.title if latest_alert else None,
+        "alert_time": alert_time
+    })
 
 def get_door_logs(request):
     if request.method != "GET":

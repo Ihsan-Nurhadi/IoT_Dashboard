@@ -7,7 +7,7 @@ import paho.mqtt.client as mqtt
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.utils import timezone
-from devicestatusapp.models import DeviceState, DoorStatusLog, PowerStatusLog
+from devicestatusapp.models import DeviceState, DoorStatusLog, PowerStatusLog, SecurityAlertLog
 
 LAST_PIR_SNAPSHOT_TIME = 0.0
 PIR_SNAPSHOT_COOLDOWN = 15.0
@@ -81,14 +81,14 @@ class Command(BaseCommand):
 
         TOPIC_BLACKBOX = "nms/E32_WB_TBGTEST/whitebox/#"
         TOPIC_SPEAKER = "nms/esp32-speaker-003734fe8ce0/speaker/#"
-        TOPIC_PIR = "nms/E32_PIR_WS/pir/#"
+        # TOPIC_PIR = "nms/E32_PIR_WS/pir/#"  # [DISABLED] Standalone ESP32 PIR dinonaktifkan
 
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
-                self.stdout.write(self.style.SUCCESS(f"[MQTT] Connected! Subscribing to {TOPIC_BLACKBOX}, {TOPIC_SPEAKER}, {TOPIC_PIR}"))
+                self.stdout.write(self.style.SUCCESS(f"[MQTT] Connected! Subscribing to {TOPIC_BLACKBOX}, {TOPIC_SPEAKER}"))
                 client.subscribe(TOPIC_BLACKBOX)
                 client.subscribe(TOPIC_SPEAKER)
-                client.subscribe(TOPIC_PIR)
+                # client.subscribe(TOPIC_PIR)  # [DISABLED] Standalone ESP32 PIR dinonaktifkan
             else:
                 self.stdout.write(self.style.ERROR(f"[MQTT] Connection failed with code {rc}"))
 
@@ -140,14 +140,16 @@ class Command(BaseCommand):
                             dev.save()
                             self.stdout.write(f"Updated PLN: {status_val}")
                             
-                    # 3. Motion (PIR) status -> nms/.../whitebox/motion_pir OR /pir/
-                    elif msg.topic.endswith("/motion_pir") or "/pir/" in msg.topic:
+                    # 3. Motion (PIR) status -> HANYA Whitebox (nms/.../whitebox/motion_pir)
+                    # (Catatan: Standalone ESP32 /pir/ dinonaktifkan)
+                    elif msg.topic.endswith("/motion_pir"):
                         s_arr = payload.get("s")
                         if isinstance(s_arr, list):
                             has_detection = False
                             now_time = timezone.now()
                             normalized_s = []
-                            for idx, val in enumerate(s_arr):
+                            # Sensor PIR Whitebox memiliki 3 saluran (PIR 1, PIR 2, PIR 3)
+                            for idx, val in enumerate(s_arr[:3]):
                                 if val is not None:
                                     is_detected = str(val).strip().lower() in ["1", "true"]
                                     normalized_s.append(1 if is_detected else 0)
@@ -165,15 +167,27 @@ class Command(BaseCommand):
                                     dev.save()
                                     self.stdout.write(f"Updated {sensor_name}: {sensor_val} at {now_time.strftime('%H:%M:%S')}")
 
-                            # Simulasi / Logika Alarm Prototipe:
-                            # Jika PIR bernilai [0, 0, 0] (atau semua sensor 0) -> Trigger sirine relay timeout 10 detik
+                            # Nonaktifkan Motion Sensor 4 jika ada di database dari sistem standalone lama
+                            DeviceState.objects.filter(device_name="Motion Sensor 4").update(status="Standby", last_updated=now_time)
+
+                            # Logika Alarm Kabel Dicabut:
+                            # Jika PIR bernilai [0, 0, 0] (kabel dicabut / semua sensor 0) -> Trigger sirine / rotary 10s
                             # Jika PIR bernilai normal e.g. [1, 0, 0] -> Status normal
-                            is_alarm_triggered = len(normalized_s) > 0 and all(x == 0 for x in normalized_s)
+                            is_alarm_triggered = len(normalized_s) == 3 and all(x == 0 for x in normalized_s)
                             is_state_transition = (self.last_pir_s != normalized_s)
                             self.last_pir_s = normalized_s
 
                             if is_alarm_triggered:
                                 current_epoch = time.time()
+                                DeviceState.objects.update_or_create(
+                                    device_name="PIR Cable State",
+                                    defaults={'status': 'DISCONNECTED', 'last_updated': now_time}
+                                )
+                                DeviceState.objects.update_or_create(
+                                    device_name="PIR Alarm",
+                                    defaults={'status': 'ALARM_ACTIVE', 'last_updated': now_time}
+                                )
+
                                 # Trigger sirine jika:
                                 # 1. Relay saat ini sedang MATI (sudah selesai timeout 10s), ATAU
                                 # 2. Terjadi perubahan status baru (misal dari normal 1,0,0 ke 0,0,0), ATAU
@@ -183,8 +197,16 @@ class Command(BaseCommand):
                                 if should_trigger:
                                     self.last_siren_trigger_time = current_epoch
                                     self.relay_active = True
-                                    self.stdout.write(self.style.WARNING(f"[ALARM SIRINE] Kondisi bahaya PIR terdeteksi (s={normalized_s})! Mentargetkan sirine relay 10s..."))
+                                    self.stdout.write(self.style.WARNING(f"[ALARM KABEL DICABUT] Saluran PIR bernilai [0, 0, 0]! Mengaktifkan sirine relay 10s..."))
                                     
+                                    # Catat Security Alert ke Database agar masuk ke notifikasi Lonceng Header
+                                    SecurityAlertLog.objects.create(
+                                        alert_type="pir_disconnect",
+                                        title="PERINGATAN: Sensor PIR Terputus / Kabel Dicabut!",
+                                        message="Seluruh saluran PIR Whitebox bernilai 0,0,0. Sirine Rotary menyala.",
+                                        timestamp=now_time
+                                    )
+
                                     relay_cmd = json.dumps({"relay": {"state": True, "timeout_ms": 10000}})
                                     
                                     target_config_topics = []
@@ -203,6 +225,14 @@ class Command(BaseCommand):
                                 else:
                                     self.stdout.write(f"[ALARM SIRINE] Sirine masih aktif/cooldown (s={normalized_s}, relay_active={self.relay_active})")
                             else:
+                                DeviceState.objects.update_or_create(
+                                    device_name="PIR Cable State",
+                                    defaults={'status': 'CONNECTED', 'last_updated': now_time}
+                                )
+                                DeviceState.objects.update_or_create(
+                                    device_name="PIR Alarm",
+                                    defaults={'status': 'STANDBY', 'last_updated': now_time}
+                                )
                                 self.stdout.write(f"[PIR Normal] Kondisi PIR normal (s={normalized_s})")
                                 if has_detection:
                                     self.stdout.write("[PIR] Motion detected! Triggering CCTV snapshot...")
@@ -230,7 +260,13 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"[MQTT] Error: {e}"))
 
         client_id = f"django_subscriber_{os.getpid()}_{int(time.time())}"
-        client = mqtt.Client(client_id)
+        try:
+            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id)
+        except (AttributeError, TypeError):
+            try:
+                client = mqtt.Client(client_id)
+            except Exception:
+                client = mqtt.Client()
         if USER and PASSWORD:
             client.username_pw_set(USER, PASSWORD)
         client.on_connect = on_connect
