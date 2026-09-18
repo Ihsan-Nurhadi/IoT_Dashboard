@@ -1,0 +1,46 @@
+[
+  {
+    "chip_id": "E32_VER_SWADAYA",
+    "mac_address": "3A:0E:4C:1E:80:6E"
+  },
+  {
+    "chip_id": "E32_VER_PEDURENAN",
+    "mac_address": "D9:DA:D9:08:94:FF"
+  },
+  {
+    "chip_id": "E32_VER_SMU84",
+    "mac_address": "71:0D:4E:CA:62:6A"
+  },
+  {
+    "chip_id": "E32_VER_JLNMUSTIKA",
+    "mac_address": "12:B7:3C:F5:82:0C"
+  },
+  {
+    "chip_id": "E32_VER_CIKONDANG",
+    "mac_address": "10:B7:C8:81:F0:18"
+  },
+  {
+    "chip_id": "ESP32_VER_PRMANEN",
+    "mac_address": "C0:A4:DA:C9:7F:E2"
+  },
+  {
+    "chip_id": "E32_VER_BEKASIKOTA",
+    "mac_address": "E0:8C:FE:34:84:D4"
+  },
+  {
+    "chip_id": "E32_VER_GANGAM",
+    "mac_address": "28:05:A5:24:D5:10"
+  },
+  {
+    "chip_id": "E32_VER_SIITU",
+    "mac_address": "68:09:47:74:B6:54"
+  },
+  {
+    "chip_id": "E32_VER_BANTARSARI",
+    "mac_address": "58:2A:BD:80:F6:34"
+  },
+  {
+    "chip_id": "E32_VER_JLABDULSALEH",
+    "mac_address": "20:50:0D:29:B6:70"
+  }
+]

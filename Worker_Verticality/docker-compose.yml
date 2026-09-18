@@ -1,0 +1,16 @@
+services:
+  verticality_workers:
+    build: .
+    container_name: nms_verticality_workers
+    restart: always
+    environment:
+      - TZ=Asia/Jakarta
+      - BROKER_HOST=emqx.nayakanms.com
+      - BROKER_PORT=1884
+      - MQTT_USER=nyk_ws
+      - MQTT_PASS=ws
+      - INTERVAL_SEC=5
+      - HEARTBEAT_SEC=60
+    # Jika ingin me-mount devices.json agar bisa diupdate tanpa rebuild image:
+    volumes:
+      - ./devices.json:/app/devices.json:ro

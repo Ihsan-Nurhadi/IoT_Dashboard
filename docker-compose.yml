@@ -142,6 +142,22 @@ services:
     networks:
       - nms_network
 
+  # 2h. Verticality Simulator (Unified 11 Devices Worker)
+  verticality_simulators:
+    build: ./Worker_Verticality
+    container_name: nms_verticality_simulators
+    restart: always
+    environment:
+      - TZ=Asia/Jakarta
+      - BROKER_HOST=emqx.nayakanms.com
+      - BROKER_PORT=1884
+      - MQTT_USER=nyk_ws
+      - MQTT_PASS=ws
+    volumes:
+      - ./Worker_Verticality/devices.json:/app/devices.json:ro
+    networks:
+      - nms_network
+
   # 3. Frontend (React)
   frontend:
     build: ./frontend
