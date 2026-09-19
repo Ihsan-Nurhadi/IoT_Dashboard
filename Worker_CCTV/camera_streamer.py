@@ -39,9 +39,9 @@ class CameraStreamer:
         self.password = password or os.getenv("CAMERA_PASS", "Nayaka2025")
         self.rtsp_url_override = rtsp_url_override or os.getenv("RTSP_URL")
 
-        self.target_fps = int(target_fps or os.getenv("TARGET_FPS", 20))
-        self.stream_width = int(stream_width or os.getenv("STREAM_WIDTH", 1280))
-        self.stream_quality = int(stream_quality or os.getenv("STREAM_QUALITY", 75))
+        self.target_fps = int(target_fps or os.getenv("TARGET_FPS", 15))
+        self.stream_width = int(stream_width or os.getenv("STREAM_WIDTH", 854))
+        self.stream_quality = int(stream_quality or os.getenv("STREAM_QUALITY", 60))
         self.rtsp_transport = rtsp_transport or os.getenv("RTSP_TRANSPORT", "tcp")
 
         # Runtime state
@@ -88,14 +88,19 @@ class CameraStreamer:
         logger.info("Streamer thread stopped")
 
     def _capture_loop(self):
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = f"rtsp_transport;{self.rtsp_transport}"
+        # Force low-latency, zero-buffer FFmpeg demuxing over TCP
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
+            f"rtsp_transport;{self.rtsp_transport}|fflags;nobuffer|flags;low_delay|max_delay;500000|probesize;32|analyzeduration;0"
+        )
 
         fps_timer = time.time()
         fps_frame_count = 0
+        encode_interval = 1.0 / max(1, self.target_fps)
+        last_encode_time = 0
 
         while self.running:
             rtsp_url = self.get_rtsp_url(mask_password=False)
-            logger.info(f"Connecting to RTSP stream: {self.get_rtsp_url(mask_password=True)}")
+            logger.info(f"Connecting to RTSP stream (low-latency): {self.get_rtsp_url(mask_password=True)}")
 
             cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -113,6 +118,7 @@ class CameraStreamer:
             logger.info("RTSP stream successfully connected!")
 
             while self.running:
+                # Continuous grab with NO sleep to constantly drain network buffer and prevent lag buildup
                 ret, frame = cap.read()
                 if not ret or frame is None:
                     logger.warning("RTSP frame read dropped. Reconnecting...")
@@ -120,37 +126,40 @@ class CameraStreamer:
                     self.reconnect_count += 1
                     break
 
-                h, w = frame.shape[:2]
-                self.resolution = f"{w}x{h}"
-
-                # Resize if frame is wider than max width to save bandwidth/CPU
-                if self.stream_width > 0 and w > self.stream_width:
-                    new_h = int(h * (self.stream_width / w))
-                    frame = cv2.resize(frame, (self.stream_width, new_h), interpolation=cv2.INTER_AREA)
-
-                # Encode to JPEG
-                encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), self.stream_quality]
-                success, jpeg = cv2.imencode(".jpg", frame, encode_param)
-
-                if success:
-                    with self.lock:
-                        self.latest_jpeg = jpeg.tobytes()
-                        self.latest_frame = frame
-                        self.latest_frame_time = time.time()
-                        self.total_frames += 1
-
-                # Calculate measured FPS
-                fps_frame_count += 1
                 now = time.time()
-                elapsed = now - fps_timer
-                if elapsed >= 1.0:
-                    self.measured_fps = round(fps_frame_count / elapsed, 1)
-                    fps_frame_count = 0
-                    fps_timer = now
 
-                # Sleep a tiny fraction if reading too fast
-                target_interval = 1.0 / max(1, self.target_fps)
-                time.sleep(max(0.005, target_interval * 0.2))
+                # Only encode at target_fps to prevent burning CPU
+                if now - last_encode_time >= encode_interval:
+                    last_encode_time = now
+
+                    h, w = frame.shape[:2]
+                    self.resolution = f"{w}x{h}"
+
+                    # Downscale for web transmission efficiency
+                    if self.stream_width > 0 and w > self.stream_width:
+                        new_h = int(h * (self.stream_width / w))
+                        encoded_frame = cv2.resize(frame, (self.stream_width, new_h), interpolation=cv2.INTER_AREA)
+                    else:
+                        encoded_frame = frame
+
+                    # Encode to JPEG
+                    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), self.stream_quality]
+                    success, jpeg = cv2.imencode(".jpg", encoded_frame, encode_param)
+
+                    if success:
+                        with self.lock:
+                            self.latest_jpeg = jpeg.tobytes()
+                            self.latest_frame = frame
+                            self.latest_frame_time = now
+                            self.total_frames += 1
+
+                    # Calculate measured FPS
+                    fps_frame_count += 1
+                    elapsed = now - fps_timer
+                    if elapsed >= 1.0:
+                        self.measured_fps = round(fps_frame_count / elapsed, 1)
+                        fps_frame_count = 0
+                        fps_timer = now
 
             cap.release()
             self.connected = False

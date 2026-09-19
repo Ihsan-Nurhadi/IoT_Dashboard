@@ -941,10 +941,10 @@ imageElement.src = `${streamUrl}?t=${Date.now()}`;</pre>
                 <div class="test-box">
                   <div class="test-box-header">
                     <span class="test-box-title">Live Preview Test</span>
-                    <a href="/api/stream" target="_blank" class="btn-run-api">Open Stream in New Tab ↗</a>
+                    <button class="btn-run-api" id="btn-toggle-doc-stream" onclick="toggleDocStream()">▶ Start Live Stream</button>
                   </div>
-                  <div style="aspect-ratio: 16/9; background: #000; border: 1px solid var(--border-color); border-radius: 3px; overflow: hidden;">
-                    <img src="/api/stream" style="width: 100%; height: 100%; object-fit: cover;" alt="Live stream preview" />
+                  <div style="aspect-ratio: 16/9; background: #000; border: 1px solid var(--border-color); border-radius: 3px; overflow: hidden; position: relative;">
+                    <img id="doc-stream-img" src="/api/snapshot" style="width: 100%; height: 100%; object-fit: cover;" alt="Live stream preview" />
                   </div>
                 </div>
               </div>
@@ -1395,7 +1395,7 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
               <div class="overlay-tag">10.10.1.17:554/stream1</div>
               <div class="overlay-tag" style="background: rgba(239, 68, 68, 0.85); color: #fff; border: none; font-weight: 700;">● LIVE</div>
             </div>
-            <img id="monitor-stream-img" class="video-feed" src="/api/stream" alt="Live CCTV Stream" />
+            <img id="monitor-stream-img" class="video-feed" src="" alt="Live CCTV Stream (Click tab to view)" />
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 10px;">
@@ -1483,12 +1483,37 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
       setTimeout(() => t.classList.remove('show'), 2500);
     }
 
+    let docStreamActive = false;
+    function toggleDocStream() {
+      const img = document.getElementById('doc-stream-img');
+      const btn = document.getElementById('btn-toggle-doc-stream');
+      if (!docStreamActive) {
+        img.src = '/api/stream?t=' + Date.now();
+        btn.innerText = '⏹ Stop Live Stream';
+        btn.style.color = 'var(--accent-danger)';
+        docStreamActive = true;
+      } else {
+        img.src = '/api/snapshot?t=' + Date.now();
+        btn.innerText = '▶ Start Live Stream';
+        btn.style.color = '';
+        docStreamActive = false;
+      }
+    }
+
     function switchView(viewName, btn) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
 
       btn.classList.add('active');
       document.getElementById('view-' + viewName).classList.add('active');
+
+      const monitorImg = document.getElementById('monitor-stream-img');
+      if (viewName === 'monitor') {
+        monitorImg.src = '/api/stream?t=' + Date.now();
+      } else {
+        // Disconnect monitor stream when viewing docs to save bandwidth & prevent lag
+        monitorImg.src = '';
+      }
     }
 
     function switchSnippet(btn, targetId) {
