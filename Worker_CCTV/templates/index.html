@@ -1,187 +1,144 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CCTV API Gateway & Live Monitor - Nayaka IoT</title>
+  <title>Nayaka CCTV Gateway API Documentation</title>
+  <meta name="description" content="Developer documentation and live bridge for Nayaka CCTV RTSP and ONVIF Gateway. Access camera feeds and controls without VPN.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-primary: #0b0f19;
-      --bg-secondary: #121829;
-      --card-bg: rgba(18, 24, 41, 0.75);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --accent-cyan: #00f2fe;
-      --accent-blue: #4facfe;
-      --accent-emerald: #10b981;
-      --accent-rose: #f43f5e;
-      --accent-amber: #f59e0b;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --radius-lg: 16px;
-      --radius-md: 10px;
+      --bg-base: #000000;
+      --bg-surface: #0a0a0c;
+      --bg-surface-elevated: #121215;
+      --border-color: #1f1f23;
+      --border-color-hover: #2e2e35;
+      --accent-primary: #ffffff;
+      --accent-primary-hover: #e4e4e7;
+      --accent-success: #10b981;
+      --accent-danger: #ef4444;
+      --accent-warning: #f59e0b;
+      --accent-info: #3b82f6;
+      --text-primary: #ffffff;
+      --text-secondary: #a1a1aa;
+      --text-muted: #52525b;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --transition-fast: 0.15s ease;
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
     }
 
-    * {
+    *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
 
     body {
-      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: var(--bg-primary);
-      color: var(--text-main);
-      background-image: 
-        radial-gradient(circle at 15% 15%, rgba(0, 242, 254, 0.07) 0%, transparent 40%),
-        radial-gradient(circle at 85% 85%, rgba(79, 172, 254, 0.05) 0%, transparent 45%);
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
       min-height: 100vh;
-      padding: 24px;
     }
 
-    .container {
-      max-width: 1380px;
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-base);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f1f23;
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #333;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
+    }
+
+    p {
+      color: var(--text-secondary);
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background-color: #121215;
+      color: #e4e4e7;
+      padding: 2px 5px;
+      border: 1px solid var(--border-color);
+      border-radius: 3px;
+    }
+
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      max-width: 1440px;
       margin: 0 auto;
+      padding: 0 24px;
     }
 
     /* Header */
-    header {
+    header.app-header {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 24px;
+      gap: 20px;
       flex-wrap: wrap;
-      gap: 16px;
-      padding-bottom: 24px;
-      border-bottom: 1px solid var(--card-border);
-      margin-bottom: 28px;
     }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .brand-logo {
-      width: 46px;
-      height: 46px;
-      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      box-shadow: 0 0 24px rgba(0, 242, 254, 0.35);
-    }
-
-    .brand-text h1 {
-      font-size: 1.45rem;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-      background: linear-gradient(to right, #fff, #94a3b8);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .brand-text p {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    .header-actions {
+    .brand-section {
       display: flex;
       align-items: center;
       gap: 12px;
     }
 
-    .btn {
-      padding: 9px 16px;
-      border-radius: var(--radius-md);
-      font-size: 0.875rem;
-      font-weight: 600;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: 1px solid transparent;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-      color: #0b0f19;
-      box-shadow: 0 4px 14px rgba(0, 242, 254, 0.3);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 242, 254, 0.45);
-    }
-
-    .btn-outline {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: var(--card-border);
-      color: var(--text-main);
-    }
-
-    .btn-outline:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.2);
-    }
-
-    /* Top Stats Grid */
-    .stats-bar {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .stat-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      backdrop-filter: blur(12px);
-      border-radius: var(--radius-md);
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .stat-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
+    .logo-icon {
+      width: 34px;
+      height: 34px;
+      background: #ffffff;
+      border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--card-border);
-    }
-
-    .stat-meta {
-      flex: 1;
-    }
-
-    .stat-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-
-    .stat-val {
-      font-size: 1.15rem;
       font-weight: 700;
-      color: var(--text-main);
+      font-size: 16px;
+      color: #000000;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-title h1 {
+      font-size: 18px;
+    }
+
+    .brand-title p {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .header-right {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .status-badge {
@@ -190,85 +147,526 @@
       gap: 6px;
       padding: 4px 10px;
       border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface);
     }
 
-    .status-badge.online {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--accent-emerald);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-
-    .status-badge.offline {
-      background: rgba(244, 63, 94, 0.15);
-      color: var(--accent-rose);
-      border: 1px solid rgba(244, 63, 94, 0.3);
-    }
-
-    .pulse-dot {
-      width: 8px;
-      height: 8px;
+    .indicator-dot {
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      background-color: currentColor;
-      box-shadow: 0 0 8px currentColor;
-      animation: pulse 1.8s infinite;
+      background: #52525b;
     }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
+    .indicator-dot.online {
+      background: var(--accent-success);
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
     }
 
-    /* Main Grid: Stream & Controls */
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 380px;
-      gap: 24px;
+    .indicator-dot.offline {
+      background: var(--accent-danger);
+    }
+
+    .btn {
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 12px;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-primary-hover);
+    }
+
+    .btn-outline {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      border-color: var(--border-color);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--border-color-hover);
+      background: var(--bg-surface);
+    }
+
+    /* Top Tab Switcher */
+    .tab-switcher {
+      display: flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 3px;
+      border-radius: var(--radius-sm);
       margin-bottom: 24px;
+      align-self: flex-start;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: var(--text-primary);
+    }
+
+    /* Notice Banner */
+    .notice-banner {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 12px 18px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .notice-icon {
+      font-size: 16px;
+    }
+
+    .notice-content h4 {
+      font-size: 12.5px;
+      margin-bottom: 2px;
+    }
+
+    .notice-content p {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Views */
+    .app-view {
+      display: none;
+    }
+
+    .app-view.active {
+      display: block;
+    }
+
+    /* Docs Layout */
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 36px;
+      margin-bottom: 60px;
     }
 
     @media (max-width: 1024px) {
-      .main-grid {
+      .docs-layout {
         grid-template-columns: 1fr;
       }
     }
 
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-lg);
-      backdrop-filter: blur(12px);
-      padding: 24px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    /* Sidebar */
+    .docs-sidebar {
+      position: sticky;
+      top: 24px;
+      align-self: start;
     }
 
-    .card-header {
+    .docs-nav-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+
+    .docs-nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-bottom: 20px;
+    }
+
+    .docs-nav-link {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 12.5px;
+      text-decoration: none;
+      transition: all var(--transition-fast);
+    }
+
+    .docs-nav-link:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .docs-nav-link.active {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      font-weight: 500;
+      border-left: 2px solid #ffffff;
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+
+    .method-tag {
+      font-size: 9px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-right: 8px;
+    }
+
+    .method-tag.get {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--accent-info);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+
+    .method-tag.post {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-success);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    /* Documentation Sections */
+    .docs-content {
+      display: flex;
+      flex-direction: column;
+      gap: 50px;
+    }
+
+    .docs-section {
+      padding-bottom: 36px;
+      border-bottom: 1px solid var(--border-color);
+      scroll-margin-top: 24px;
+    }
+
+    .docs-section:last-child {
+      border-bottom: none;
+    }
+
+    .docs-title-row {
+      margin-bottom: 10px;
+    }
+
+    .docs-title-row h2 {
+      font-size: 19px;
+    }
+
+    .docs-section p.lead {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 18px;
+      max-width: 820px;
+    }
+
+    /* Endpoint bar */
+    .endpoint-bar {
+      display: flex;
+      align-items: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      margin-bottom: 18px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .endpoint-url {
+      color: var(--text-primary);
+    }
+
+    .endpoint-domain {
+      color: var(--text-muted);
+    }
+
+    /* Two columns */
+    .docs-two-col {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .docs-two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .docs-code-col {
+      position: sticky;
+      top: 24px;
+      align-self: start;
+    }
+
+    /* Tables */
+    .schema-table-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .schema-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 12.5px;
+    }
+
+    .schema-table th {
+      text-align: left;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .schema-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: top;
+    }
+
+    .schema-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .schema-prop-name {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .schema-prop-name.required::after {
+      content: ' *';
+      color: var(--accent-danger);
+    }
+
+    .schema-prop-type {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    .schema-prop-desc {
+      color: var(--text-secondary);
+    }
+
+    /* Code Viewer Panel */
+    .code-viewer-panel {
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface);
+      margin-bottom: 16px;
+    }
+
+    .code-viewer-tabs {
+      display: flex;
+      background: var(--bg-surface-elevated);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 8px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tab-buttons-group {
+      display: flex;
+    }
+
+    .code-tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 11px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .code-tab-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .code-tab-btn.active {
+      color: var(--text-primary);
+      background: var(--bg-surface);
+    }
+
+    .code-container {
+      position: relative;
+      padding: 14px;
+      overflow-x: auto;
+      max-height: 280px;
+    }
+
+    .code-container pre {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #e4e4e7;
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .btn-copy-code {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      opacity: 0.8;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-copy-code:hover {
+      background: #1f1f23;
+      color: var(--text-primary);
+      opacity: 1;
+    }
+
+    /* Response & Tester Card */
+    .test-box {
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      padding: 12px;
+    }
+
+    .test-box-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 18px;
+      margin-bottom: 8px;
     }
 
-    .card-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      display: flex;
+    .test-box-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-run-api {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 4px;
     }
 
-    /* Video Player Container */
+    .btn-run-api:hover {
+      border-color: #fff;
+    }
+
+    .test-output {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: #a1a1aa;
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      border-radius: 3px;
+      padding: 10px;
+      max-height: 180px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Live Monitor View */
+    .monitor-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    @media (max-width: 960px) {
+      .monitor-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .glass-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
     .video-viewport {
       position: relative;
       width: 100%;
       aspect-ratio: 16 / 9;
       background: #000;
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-sm);
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border-color);
     }
 
     .video-feed {
@@ -278,11 +676,11 @@
       display: block;
     }
 
-    .video-overlay-top {
+    .video-overlay {
       position: absolute;
-      top: 14px;
-      left: 14px;
-      right: 14px;
+      top: 10px;
+      left: 10px;
+      right: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -290,175 +688,88 @@
       z-index: 10;
     }
 
-    .cam-tag {
-      background: rgba(11, 15, 25, 0.75);
-      backdrop-filter: blur(8px);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-family: 'JetBrains Mono', monospace;
-      color: #fff;
+    .overlay-tag {
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-family: var(--font-mono);
       border: 1px solid rgba(255, 255, 255, 0.15);
     }
 
-    .rec-indicator {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(244, 63, 94, 0.85);
-      color: #fff;
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-    }
-
-    .video-controls-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 14px;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    /* PTZ Pad */
     .ptz-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      max-width: 240px;
-      margin: 16px auto;
+      gap: 8px;
+      max-width: 220px;
+      margin: 14px auto;
     }
 
     .ptz-btn {
       aspect-ratio: 1;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      color: var(--text-main);
-      font-size: 1.25rem;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 14px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.15s ease;
+      transition: all var(--transition-fast);
       user-select: none;
     }
 
     .ptz-btn:hover {
-      background: rgba(0, 242, 254, 0.15);
-      border-color: var(--accent-cyan);
-      color: var(--accent-cyan);
-      transform: scale(1.05);
-    }
-
-    .ptz-btn:active {
-      transform: scale(0.95);
-      background: rgba(0, 242, 254, 0.3);
+      border-color: #fff;
     }
 
     .ptz-btn.stop {
-      background: rgba(244, 63, 94, 0.15);
-      border-color: rgba(244, 63, 94, 0.3);
-      color: var(--accent-rose);
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: var(--accent-danger);
     }
 
     .zoom-group {
       display: flex;
-      gap: 10px;
-      margin-top: 14px;
+      gap: 8px;
+      margin-top: 12px;
     }
 
     .zoom-btn {
       flex: 1;
-      padding: 10px;
-      border-radius: var(--radius-md);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      color: var(--text-main);
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
       cursor: pointer;
-      font-weight: 600;
-      font-size: 0.85rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: all 0.15s ease;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all var(--transition-fast);
     }
 
     .zoom-btn:hover {
-      background: rgba(0, 242, 254, 0.15);
-      border-color: var(--accent-cyan);
-      color: var(--accent-cyan);
+      border-color: #fff;
     }
 
-    /* Slider */
     .slider-wrap {
-      margin-top: 16px;
+      margin-top: 14px;
     }
 
     .slider-label {
       display: flex;
       justify-content: space-between;
-      font-size: 0.75rem;
+      font-size: 11px;
       color: var(--text-muted);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     input[type="range"] {
       width: 100%;
-      accent-color: var(--accent-cyan);
+      accent-color: #ffffff;
       cursor: pointer;
-    }
-
-    /* API Explorer Section */
-    .api-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-    }
-
-    .api-table th {
-      text-align: left;
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--card-border);
-      color: var(--text-muted);
-      font-weight: 600;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-    }
-
-    .api-table td {
-      padding: 14px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: var(--text-main);
-    }
-
-    .method-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-    }
-
-    .method-badge.get {
-      background: rgba(16, 185, 129, 0.2);
-      color: var(--accent-emerald);
-    }
-
-    .method-badge.post {
-      background: rgba(79, 172, 254, 0.2);
-      color: var(--accent-blue);
-    }
-
-    .endpoint-code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.82rem;
-      color: var(--accent-cyan);
     }
 
     /* Toast */
@@ -466,16 +777,15 @@
       position: fixed;
       bottom: 24px;
       right: 24px;
-      background: rgba(18, 24, 41, 0.95);
-      border: 1px solid var(--accent-cyan);
-      padding: 12px 20px;
-      border-radius: var(--radius-md);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
       color: #fff;
-      font-size: 0.875rem;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      font-size: 12.5px;
       transform: translateY(100px);
       opacity: 0;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
       z-index: 1000;
     }
 
@@ -487,261 +797,775 @@
 </head>
 <body>
 
-  <div class="container">
-    <!-- Header -->
-    <header>
-      <div class="brand">
-        <div class="brand-logo">📹</div>
-        <div class="brand-text">
-          <h1>Worker CCTV Gateway</h1>
-          <p>RTSP Video Streamer & ONVIF REST API Bridge (No VPN Required for Clients)</p>
+  <div class="app-container">
+
+    <!-- Header Section -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="logo-icon">CCTV</div>
+        <div class="brand-title">
+          <h1>Nayaka CCTV Gateway API</h1>
+          <p>RTSP to HTTP & ONVIF Public Bridge (No VPN Required for Clients)</p>
         </div>
       </div>
-      <div class="header-actions">
-        <a href="/api/snapshot" target="_blank" class="btn btn-outline" download="snapshot.jpg">
-          📸 Capture Snapshot
+
+      <div class="header-right">
+        <div class="status-badge">
+          <span class="indicator-dot" id="header-status-dot"></span>
+          <span id="header-status-text">Checking...</span>
+        </div>
+        <a href="/api/snapshot" download="snapshot.jpg" class="btn btn-outline">
+          📸 Snapshot Frame
         </a>
         <a href="/docs" target="_blank" class="btn btn-primary">
-          ⚡ Open Swagger API Docs
+          ⚡ OpenAPI (Swagger)
         </a>
       </div>
     </header>
 
-    <!-- Status Bar -->
-    <div class="stats-bar">
-      <div class="stat-card">
-        <div class="stat-icon">📡</div>
-        <div class="stat-meta">
-          <div class="stat-label">RTSP Stream Status</div>
-          <div class="stat-val">
-            <span id="badge-rtsp" class="status-badge offline">
-              <span class="pulse-dot"></span> <span id="text-rtsp">Checking...</span>
-            </span>
-          </div>
-        </div>
-      </div>
+    <!-- Navigation Switcher Tabs -->
+    <div class="tab-switcher">
+      <button class="tab-btn active" onclick="switchView('docs', this)">
+        <span>📖</span> API Documentation
+      </button>
+      <button class="tab-btn" onclick="switchView('monitor', this)">
+        <span>📹</span> Live Video & PTZ Monitor
+      </button>
+    </div>
 
-      <div class="stat-card">
-        <div class="stat-icon">🎞️</div>
-        <div class="stat-meta">
-          <div class="stat-label">Measured Framerate</div>
-          <div class="stat-val" id="stat-fps">-- FPS</div>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon">📐</div>
-        <div class="stat-meta">
-          <div class="stat-label">Resolution</div>
-          <div class="stat-val" id="stat-res">--</div>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon">⚙️</div>
-        <div class="stat-meta">
-          <div class="stat-label">Target Camera (VPN)</div>
-          <div class="stat-val" style="font-size: 0.95rem; font-family: 'JetBrains Mono', monospace;">
-            10.10.1.17:554
-          </div>
-        </div>
+    <!-- Notice Banner -->
+    <div class="notice-banner">
+      <span class="notice-icon">ℹ️</span>
+      <div class="notice-content">
+        <h4>VPN Bypass Gateway Active</h4>
+        <p>This worker is hosted on the VPS with an active OpenVPN tunnel to <code>10.10.1.17</code>. External clients, dashboards, and mobile devices can consume these APIs without connecting to any VPN.</p>
       </div>
     </div>
 
-    <!-- Main Grid -->
-    <div class="main-grid">
-      <!-- Live Video Card -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <span>🎥</span> Live Video Stream (MJPEG via HTTP)
-          </div>
-          <button class="btn btn-outline" style="padding: 6px 12px; font-size: 0.75rem;" onclick="reloadStream()">
-            🔄 Reload Stream
-          </button>
-        </div>
+    <!-- ===================================================================== -->
+    <!-- VIEW 1: API DOCUMENTATION -->
+    <!-- ===================================================================== -->
+    <div id="view-docs" class="app-view active">
+      <div class="docs-layout">
 
-        <div class="video-viewport" id="viewport">
-          <div class="video-overlay-top">
-            <div class="cam-tag">POS 17 • rtsp://10.10.1.17:554/stream1</div>
-            <div class="rec-indicator">
-              <span class="pulse-dot"></span> LIVE
+        <!-- Sidebar Navigation -->
+        <aside class="docs-sidebar">
+          <h3 class="docs-nav-title">Video Stream APIs</h3>
+          <ul class="docs-nav-list">
+            <li><a href="#api-stream" class="docs-nav-link active"><span class="method-tag get">GET</span>Live Stream</a></li>
+            <li><a href="#api-snapshot" class="docs-nav-link"><span class="method-tag get">GET</span>Snapshot Frame</a></li>
+            <li><a href="#api-status" class="docs-nav-link"><span class="method-tag get">GET</span>Stream Status</a></li>
+            <li><a href="#api-health" class="docs-nav-link"><span class="method-tag get">GET</span>Health Check</a></li>
+          </ul>
+
+          <h3 class="docs-nav-title">ONVIF Control APIs</h3>
+          <ul class="docs-nav-list">
+            <li><a href="#onvif-device-info" class="docs-nav-link"><span class="method-tag get">GET</span>Device Info</a></li>
+            <li><a href="#onvif-profiles" class="docs-nav-link"><span class="method-tag get">GET</span>Media Profiles</a></li>
+            <li><a href="#onvif-stream-uri" class="docs-nav-link"><span class="method-tag get">GET</span>Stream URI</a></li>
+            <li><a href="#onvif-ptz-move" class="docs-nav-link"><span class="method-tag post">POST</span>PTZ Move</a></li>
+            <li><a href="#onvif-ptz-stop" class="docs-nav-link"><span class="method-tag post">POST</span>PTZ Stop</a></li>
+            <li><a href="#onvif-ptz-presets" class="docs-nav-link"><span class="method-tag get">GET</span>PTZ Presets</a></li>
+            <li><a href="#onvif-soap-proxy" class="docs-nav-link"><span class="method-tag post">POST</span>ONVIF SOAP Proxy</a></li>
+          </ul>
+        </aside>
+
+        <!-- Documentation Content -->
+        <main class="docs-content">
+
+          <!-- Section 1: Live Stream -->
+          <section id="api-stream" class="docs-section">
+            <div class="docs-two-col">
+              <div class="docs-desc-col">
+                <div class="docs-title-row">
+                  <h2>Live MJPEG Video Stream</h2>
+                </div>
+                <p class="lead">Streams real-time video encoded as multipart MJPEG over HTTP. It can be rendered directly in any web browser with a standard HTML <code>&lt;img&gt;</code> tag, inside React/Vue dashboards, or played with VLC Media Player without needing RTSP support.</p>
+
+                <div class="endpoint-bar">
+                  <span class="method-tag get">GET</span>
+                  <span class="endpoint-url"><span class="endpoint-domain">http://110.232.92.134:3001</span>/api/stream</span>
+                </div>
+
+                <div class="schema-table-title">Response Specification</div>
+                <table class="schema-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 140px;">Header / Type</th>
+                      <th>Value</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="schema-prop-name">Content-Type</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc"><code>multipart/x-mixed-replace; boundary=frame</code></td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">Cache-Control</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc"><code>no-cache, no-store, must-revalidate</code></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="docs-code-col">
+                <div class="code-viewer-panel">
+                  <div class="code-viewer-tabs">
+                    <div class="tab-buttons-group">
+                      <button class="code-tab-btn active" onclick="switchSnippet(this, 'stream-html')">HTML</button>
+                      <button class="code-tab-btn" onclick="switchSnippet(this, 'stream-curl')">cURL</button>
+                      <button class="code-tab-btn" onclick="switchSnippet(this, 'stream-js')">JavaScript</button>
+                    </div>
+                  </div>
+                  <div class="code-container">
+                    <button class="btn-copy-code" onclick="copyCode(this)">📋 Copy</button>
+                    <pre id="stream-html">&lt;!-- Embed live camera stream in any web page without VPN --&gt;
+&lt;img src="http://110.232.92.134:3001/api/stream"
+     alt="CCTV Live Stream"
+     style="width: 100%; max-width: 640px; border-radius: 6px;" /&gt;</pre>
+                    <pre id="stream-curl" style="display:none;"># View or pipe stream using curl or open in VLC:
+curl -N http://110.232.92.134:3001/api/stream
+
+# Or open in VLC Player:
+vlc http://110.232.92.134:3001/api/stream</pre>
+                    <pre id="stream-js" style="display:none;">// Dynamic stream reloading in React / frontend:
+const streamUrl = "http://110.232.92.134:3001/api/stream";
+const imageElement = document.getElementById("my-cctv");
+imageElement.src = `${streamUrl}?t=${Date.now()}`;</pre>
+                  </div>
+                </div>
+
+                <div class="test-box">
+                  <div class="test-box-header">
+                    <span class="test-box-title">Live Preview Test</span>
+                    <a href="/api/stream" target="_blank" class="btn-run-api">Open Stream in New Tab ↗</a>
+                  </div>
+                  <div style="aspect-ratio: 16/9; background: #000; border: 1px solid var(--border-color); border-radius: 3px; overflow: hidden;">
+                    <img src="/api/stream" style="width: 100%; height: 100%; object-fit: cover;" alt="Live stream preview" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 2: Snapshot -->
+          <section id="api-snapshot" class="docs-section">
+            <div class="docs-two-col">
+              <div class="docs-desc-col">
+                <div class="docs-title-row">
+                  <h2>Capture Single JPEG Snapshot</h2>
+                </div>
+                <p class="lead">Retrieves a single high-resolution JPEG frame captured directly from the camera video stream in real-time. Ideal for motion detection alerts, image saving, AI models, or thumbnail generation.</p>
+
+                <div class="endpoint-bar">
+                  <span class="method-tag get">GET</span>
+                  <span class="endpoint-url"><span class="endpoint-domain">http://110.232.92.134:3001</span>/api/snapshot</span>
+                </div>
+
+                <div class="schema-table-title">Response Specification</div>
+                <table class="schema-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 140px;">Header / Type</th>
+                      <th>Value</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="schema-prop-name">Content-Type</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc"><code>image/jpeg</code></td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">Content-Disposition</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc"><code>inline; filename=snapshot.jpg</code></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="docs-code-col">
+                <div class="code-viewer-panel">
+                  <div class="code-viewer-tabs">
+                    <div class="tab-buttons-group">
+                      <button class="code-tab-btn active" onclick="switchSnippet(this, 'snap-curl')">cURL</button>
+                      <button class="code-tab-btn" onclick="switchSnippet(this, 'snap-js')">JavaScript</button>
+                      <button class="code-tab-btn" onclick="switchSnippet(this, 'snap-py')">Python</button>
+                    </div>
+                  </div>
+                  <div class="code-container">
+                    <button class="btn-copy-code" onclick="copyCode(this)">📋 Copy</button>
+                    <pre id="snap-curl"># Download snapshot image to a local file
+curl -o snapshot.jpg http://110.232.92.134:3001/api/snapshot</pre>
+                    <pre id="snap-js" style="display:none;">// Fetch snapshot as a Blob in JavaScript
+const response = await fetch("http://110.232.92.134:3001/api/snapshot");
+const imageBlob = await response.blob();
+const imageUrl = URL.createObjectURL(imageBlob);</pre>
+                    <pre id="snap-py" style="display:none;"># Fetch snapshot with Python requests
+import requests
+
+res = requests.get("http://110.232.92.134:3001/api/snapshot")
+with open("cctv_frame.jpg", "wb") as f:
+    f.write(res.content)</pre>
+                  </div>
+                </div>
+
+                <div class="test-box">
+                  <div class="test-box-header">
+                    <span class="test-box-title">Live API Playground</span>
+                    <button class="btn-run-api" onclick="testSnapshot()">▶ Capture Frame Now</button>
+                  </div>
+                  <div id="snapshot-result-box" style="display:none; margin-top: 8px;">
+                    <img id="snapshot-result-img" style="width: 100%; border-radius: 3px; border: 1px solid var(--border-color);" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 3: Stream Status -->
+          <section id="api-status" class="docs-section">
+            <div class="docs-two-col">
+              <div class="docs-desc-col">
+                <div class="docs-title-row">
+                  <h2>Get Stream Telemetry & Status</h2>
+                </div>
+                <p class="lead">Returns real-time telemetry from the gateway background capture thread, including measured framerate (FPS), video resolution, reconnect count, and ONVIF handshake status.</p>
+
+                <div class="endpoint-bar">
+                  <span class="method-tag get">GET</span>
+                  <span class="endpoint-url"><span class="endpoint-domain">http://110.232.92.134:3001</span>/api/status</span>
+                </div>
+
+                <div class="schema-table-title">Response Attributes</div>
+                <table class="schema-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 150px;">Property</th>
+                      <th style="width: 90px;">Type</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="schema-prop-name">status</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc"><code>"online"</code> or <code>"offline"</code> based on active incoming video frames.</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">connected</td>
+                      <td class="schema-prop-type">boolean</td>
+                      <td class="schema-prop-desc">Whether the background RTSP capture connection to <code>10.10.1.17:554</code> is active.</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">measured_fps</td>
+                      <td class="schema-prop-type">number</td>
+                      <td class="schema-prop-desc">Actual measured frames per second received from the camera stream.</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">resolution</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc">Dimensions of the video stream (e.g. <code>"1280x720"</code>).</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">onvif_connected</td>
+                      <td class="schema-prop-type">boolean</td>
+                      <td class="schema-prop-desc">Status of ONVIF service handshake on port 2020.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="docs-code-col">
+                <div class="code-viewer-panel">
+                  <div class="code-viewer-tabs">
+                    <div class="tab-buttons-group">
+                      <button class="code-tab-btn active" onclick="switchSnippet(this, 'status-curl')">cURL</button>
+                      <button class="code-tab-btn" onclick="switchSnippet(this, 'status-js')">JavaScript</button>
+                    </div>
+                  </div>
+                  <div class="code-container">
+                    <button class="btn-copy-code" onclick="copyCode(this)">📋 Copy</button>
+                    <pre id="status-curl">curl http://110.232.92.134:3001/api/status</pre>
+                    <pre id="status-js" style="display:none;">const res = await fetch("http://110.232.92.134:3001/api/status");
+const data = await res.json();
+console.log(`Camera status: ${data.status}, FPS: ${data.measured_fps}`);</pre>
+                  </div>
+                </div>
+
+                <div class="test-box">
+                  <div class="test-box-header">
+                    <span class="test-box-title">Live Response Preview</span>
+                    <button class="btn-run-api" onclick="testStatus()">▶ Test Request</button>
+                  </div>
+                  <pre id="test-output-status" class="test-output">Click "Test Request" to query status...</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 4: ONVIF Device Info -->
+          <section id="onvif-device-info" class="docs-section">
+            <div class="docs-two-col">
+              <div class="docs-desc-col">
+                <div class="docs-title-row">
+                  <h2>Get ONVIF Device Information</h2>
+                </div>
+                <p class="lead">Queries the camera's ONVIF Device Management service to extract hardware details, manufacturer name, model name, firmware version, and device serial number.</p>
+
+                <div class="endpoint-bar">
+                  <span class="method-tag get">GET</span>
+                  <span class="endpoint-url"><span class="endpoint-domain">http://110.232.92.134:3001</span>/api/onvif/device-info</span>
+                </div>
+
+                <div class="schema-table-title">Response Attributes</div>
+                <table class="schema-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 150px;">Property</th>
+                      <th style="width: 90px;">Type</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="schema-prop-name">manufacturer</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc">Device manufacturer brand.</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">model</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc">Camera model name or number.</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">firmware_version</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc">Installed firmware release string.</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">serial_number</td>
+                      <td class="schema-prop-type">string</td>
+                      <td class="schema-prop-desc">Unique device serial number identifier.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="docs-code-col">
+                <div class="code-viewer-panel">
+                  <div class="code-viewer-tabs">
+                    <div class="tab-buttons-group">
+                      <button class="code-tab-btn active" onclick="switchSnippet(this, 'devinfo-curl')">cURL</button>
+                      <button class="code-tab-btn" onclick="switchSnippet(this, 'devinfo-js')">JavaScript</button>
+                    </div>
+                  </div>
+                  <div class="code-container">
+                    <button class="btn-copy-code" onclick="copyCode(this)">📋 Copy</button>
+                    <pre id="devinfo-curl">curl http://110.232.92.134:3001/api/onvif/device-info</pre>
+                    <pre id="devinfo-js" style="display:none;">const res = await fetch("http://110.232.92.134:3001/api/onvif/device-info");
+const info = await res.json();
+console.log(`Manufacturer: ${info.manufacturer}, Model: ${info.model}`);</pre>
+                  </div>
+                </div>
+
+                <div class="test-box">
+                  <div class="test-box-header">
+                    <span class="test-box-title">Live Response Preview</span>
+                    <button class="btn-run-api" onclick="testDeviceInfo()">▶ Test Request</button>
+                  </div>
+                  <pre id="test-output-devinfo" class="test-output">Click "Test Request" to fetch device info...</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 5: PTZ Move -->
+          <section id="onvif-ptz-move" class="docs-section">
+            <div class="docs-two-col">
+              <div class="docs-desc-col">
+                <div class="docs-title-row">
+                  <h2>PTZ Continuous Move</h2>
+                </div>
+                <p class="lead">Controls camera physical orientation and optical zoom. Sends continuous Pan, Tilt, and Zoom velocity commands to the camera via ONVIF PTZ service. Speeds range from <code>-1.0</code> to <code>1.0</code>.</p>
+
+                <div class="endpoint-bar">
+                  <span class="method-tag post">POST</span>
+                  <span class="endpoint-url"><span class="endpoint-domain">http://110.232.92.134:3001</span>/api/onvif/ptz/move</span>
+                </div>
+
+                <div class="schema-table-title">Request Body (JSON)</div>
+                <table class="schema-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 120px;">Field Name</th>
+                      <th style="width: 80px;">Type</th>
+                      <th style="width: 80px;">Range</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="schema-prop-name">pan</td>
+                      <td class="schema-prop-type">float</td>
+                      <td>-1.0 to 1.0</td>
+                      <td class="schema-prop-desc">Horizontal movement speed. Negative values pan Left, positive values pan Right.</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">tilt</td>
+                      <td class="schema-prop-type">float</td>
+                      <td>-1.0 to 1.0</td>
+                      <td class="schema-prop-desc">Vertical movement speed. Negative values tilt Down, positive values tilt Up.</td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">zoom</td>
+                      <td class="schema-prop-type">float</td>
+                      <td>-1.0 to 1.0</td>
+                      <td class="schema-prop-desc">Optical zoom velocity. Negative values Zoom Out, positive values Zoom In.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="docs-code-col">
+                <div class="code-viewer-panel">
+                  <div class="code-viewer-tabs">
+                    <div class="tab-buttons-group">
+                      <button class="code-tab-btn active" onclick="switchSnippet(this, 'ptz-curl')">cURL</button>
+                      <button class="code-tab-btn" onclick="switchSnippet(this, 'ptz-js')">JavaScript</button>
+                    </div>
+                  </div>
+                  <div class="code-container">
+                    <button class="btn-copy-code" onclick="copyCode(this)">📋 Copy</button>
+                    <pre id="ptz-curl"># Pan right at 50% velocity
+curl -X POST http://110.232.92.134:3001/api/onvif/ptz/move \
+  -H "Content-Type: application/json" \
+  -d '{"pan": 0.5, "tilt": 0.0, "zoom": 0.0}'</pre>
+                    <pre id="ptz-js" style="display:none;">// Pan Left in JavaScript
+await fetch("http://110.232.92.134:3001/api/onvif/ptz/move", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ pan: -0.5, tilt: 0, zoom: 0 })
+});</pre>
+                  </div>
+                </div>
+
+                <div class="test-box">
+                  <div class="test-box-header">
+                    <span class="test-box-title">Quick Directional Tester</span>
+                  </div>
+                  <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
+                    <button class="btn-run-api" onclick="sendPtzCmd(-0.5, 0)">◀ Pan Left</button>
+                    <button class="btn-run-api" onclick="sendPtzCmd(0.5, 0)">▶ Pan Right</button>
+                    <button class="btn-run-api" onclick="sendPtzCmd(0, 0.5)">▲ Tilt Up</button>
+                    <button class="btn-run-api" onclick="sendPtzCmd(0, -0.5)">▼ Tilt Down</button>
+                    <button class="btn-run-api" style="background:rgba(239,68,68,0.2); color:var(--accent-danger);" onclick="sendStopCmd()">⏹ Stop</button>
+                  </div>
+                  <pre id="test-output-ptz" class="test-output">Click a button above to test PTZ motion...</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 6: PTZ Stop -->
+          <section id="onvif-ptz-stop" class="docs-section">
+            <div class="docs-two-col">
+              <div class="docs-desc-col">
+                <div class="docs-title-row">
+                  <h2>PTZ Stop Movement</h2>
+                </div>
+                <p class="lead">Immediately halts all ongoing Pan, Tilt, and Zoom motion on the camera. Always call this endpoint after triggering a continuous move.</p>
+
+                <div class="endpoint-bar">
+                  <span class="method-tag post">POST</span>
+                  <span class="endpoint-url"><span class="endpoint-domain">http://110.232.92.134:3001</span>/api/onvif/ptz/stop</span>
+                </div>
+              </div>
+
+              <div class="docs-code-col">
+                <div class="code-viewer-panel">
+                  <div class="code-viewer-tabs">
+                    <div class="tab-buttons-group">
+                      <button class="code-tab-btn active" onclick="switchSnippet(this, 'stop-curl')">cURL</button>
+                      <button class="code-tab-btn" onclick="switchSnippet(this, 'stop-js')">JavaScript</button>
+                    </div>
+                  </div>
+                  <div class="code-container">
+                    <button class="btn-copy-code" onclick="copyCode(this)">📋 Copy</button>
+                    <pre id="stop-curl">curl -X POST http://110.232.92.134:3001/api/onvif/ptz/stop</pre>
+                    <pre id="stop-js" style="display:none;">await fetch("http://110.232.92.134:3001/api/onvif/ptz/stop", { method: "POST" });</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 7: Transparent SOAP Proxy -->
+          <section id="onvif-soap-proxy" class="docs-section">
+            <div class="docs-two-col">
+              <div class="docs-desc-col">
+                <div class="docs-title-row">
+                  <h2>Transparent ONVIF SOAP Proxy</h2>
+                </div>
+                <p class="lead">Transparent reverse-proxy for full ONVIF SOAP XML requests. Any external Video Management System (VMS), Synology Surveillance Station, or ONVIF Device Manager software can point directly to this gateway on port 3001 to interact with the camera via native ONVIF protocol without a VPN.</p>
+
+                <div class="endpoint-bar">
+                  <span class="method-tag post">POST</span>
+                  <span class="endpoint-url"><span class="endpoint-domain">http://110.232.92.134:3001</span>/onvif/{service}</span>
+                </div>
+
+                <div class="schema-table-title">VMS Connection Settings</div>
+                <table class="schema-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 140px;">Parameter</th>
+                      <th>Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="schema-prop-name">ONVIF Host / IP</td>
+                      <td class="schema-prop-desc"><code>110.232.92.134</code></td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">ONVIF Port</td>
+                      <td class="schema-prop-desc"><code>3001</code></td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">Path</td>
+                      <td class="schema-prop-desc"><code>/onvif/device_service</code> or <code>/onfiv/device_service</code></td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">Username</td>
+                      <td class="schema-prop-desc"><code>NMSIOTYOGYA1</code></td>
+                    </tr>
+                    <tr>
+                      <td class="schema-prop-name">Password</td>
+                      <td class="schema-prop-desc"><code>Nayaka2025</code></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="docs-code-col">
+                <div class="code-viewer-panel">
+                  <div class="code-viewer-tabs">
+                    <div class="tab-buttons-group">
+                      <button class="code-tab-btn active" onclick="switchSnippet(this, 'soap-curl')">SOAP cURL</button>
+                    </div>
+                  </div>
+                  <div class="code-container">
+                    <button class="btn-copy-code" onclick="copyCode(this)">📋 Copy</button>
+                    <pre id="soap-curl"># Sample raw SOAP GetDeviceInformation call:
+curl -X POST http://110.232.92.134:3001/onvif/device_service \
+  -H "Content-Type: application/soap+xml; charset=utf-8" \
+  -d '&lt;?xml version="1.0" encoding="utf-8"?&gt;&lt;soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:tds="http://www.onvif.org/ver10/device/wsdl"&gt;&lt;soap:Body&gt;&lt;tds:GetDeviceInformation/&gt;&lt;/soap:Body&gt;&lt;/soap:Envelope&gt;'</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </main>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 2: LIVE VIDEO & PTZ MONITOR -->
+    <!-- ===================================================================== -->
+    <div id="view-monitor" class="app-view">
+      <div class="monitor-grid">
+        <!-- Live Video Viewport -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <span class="panel-title">📹 Live Camera Feed (MJPEG via HTTP)</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline" style="font-size: 11px; padding: 4px 8px;" onclick="reloadVideo()">🔄 Refresh</button>
+              <button class="btn btn-outline" style="font-size: 11px; padding: 4px 8px;" onclick="toggleFullscreen()">⛶ Fullscreen</button>
             </div>
           </div>
-          <img id="stream-img" class="video-feed" src="/api/stream" alt="Live CCTV Stream" onerror="handleStreamError()" />
-        </div>
 
-        <div class="video-controls-bar">
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            Stream URL: <code style="color: var(--accent-cyan);">/api/stream</code> (Bisa langsung dipasang di HTML <code>&lt;img src="..."&gt;</code> atau VLC)
+          <div class="video-viewport" id="monitor-viewport">
+            <div class="video-overlay">
+              <div class="overlay-tag">10.10.1.17:554/stream1</div>
+              <div class="overlay-tag" style="background: rgba(239, 68, 68, 0.85); color: #fff; border: none; font-weight: 700;">● LIVE</div>
+            </div>
+            <img id="monitor-stream-img" class="video-feed" src="/api/stream" alt="Live CCTV Stream" />
           </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-outline" onclick="toggleFullscreen()">⛶ Fullscreen</button>
-            <a href="/api/snapshot" download="cctv_snapshot.jpg" class="btn btn-outline">⬇ Download Frame</a>
-          </div>
-        </div>
-      </div>
 
-      <!-- PTZ & ONVIF Controls Card -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <span>🕹️</span> PTZ Control (ONVIF)
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 10px;">
+            <div style="font-size: 12px; color: var(--text-secondary);">
+              Stream URL: <code>http://110.232.92.134:3001/api/stream</code>
+            </div>
+            <a href="/api/snapshot" download="cctv_frame.jpg" class="btn btn-primary">
+              ⬇ Download High-Res Snapshot
+            </a>
           </div>
         </div>
 
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">
-          Kontrol pergerakan kamera Pan / Tilt / Zoom melalui protokol ONVIF tanpa VPN.
-        </p>
-
-        <!-- PTZ Pad -->
-        <div class="ptz-grid">
-          <button class="ptz-btn" title="Up-Left" onclick="sendPtz(-1, 1)">↖</button>
-          <button class="ptz-btn" title="Up" onclick="sendPtz(0, 1)">▲</button>
-          <button class="ptz-btn" title="Up-Right" onclick="sendPtz(1, 1)">↗</button>
-
-          <button class="ptz-btn" title="Left" onclick="sendPtz(-1, 0)">◀</button>
-          <button class="ptz-btn stop" title="Stop Move" onclick="stopPtz()">■</button>
-          <button class="ptz-btn" title="Right" onclick="sendPtz(1, 0)">▶</button>
-
-          <button class="ptz-btn" title="Down-Left" onclick="sendPtz(-1, -1)">↙</button>
-          <button class="ptz-btn" title="Down" onclick="sendPtz(0, -1)">▼</button>
-          <button class="ptz-btn" title="Down-Right" onclick="sendPtz(1, -1)">↘</button>
-        </div>
-
-        <div class="zoom-group">
-          <button class="zoom-btn" onclick="sendZoom(1)">🔍 Zoom In (+)</button>
-          <button class="zoom-btn" onclick="sendZoom(-1)">🔎 Zoom Out (-)</button>
-          <button class="zoom-btn" style="background: rgba(244,63,94,0.1); color: var(--accent-rose);" onclick="stopPtz()">⏹ Stop</button>
-        </div>
-
-        <div class="slider-wrap">
-          <div class="slider-label">
-            <span>Kecepatan Gerak (Speed)</span>
-            <span id="speed-val">0.5</span>
+        <!-- PTZ & Telemetry Controls -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <span class="panel-title">🕹️ PTZ Directional Controller</span>
           </div>
-          <input type="range" id="ptz-speed" min="0.1" max="1.0" step="0.1" value="0.5" oninput="document.getElementById('speed-val').innerText = this.value">
-        </div>
 
-        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--card-border);">
-          <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 8px;">Device Info (ONVIF):</div>
-          <div id="onvif-info" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted);">
-            Loading ONVIF info...
+          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+            Control the camera Pan, Tilt, and Zoom motors in real-time.
+          </p>
+
+          <div class="ptz-grid">
+            <button class="ptz-btn" title="Up-Left" onclick="sendPtzCmd(-0.5, 0.5)">↖</button>
+            <button class="ptz-btn" title="Up" onclick="sendPtzCmd(0, 0.5)">▲</button>
+            <button class="ptz-btn" title="Up-Right" onclick="sendPtzCmd(0.5, 0.5)">↗</button>
+
+            <button class="ptz-btn" title="Left" onclick="sendPtzCmd(-0.5, 0)">◀</button>
+            <button class="ptz-btn stop" title="Stop" onclick="sendStopCmd()">■</button>
+            <button class="ptz-btn" title="Right" onclick="sendPtzCmd(0.5, 0)">▶</button>
+
+            <button class="ptz-btn" title="Down-Left" onclick="sendPtzCmd(-0.5, -0.5)">↙</button>
+            <button class="ptz-btn" title="Down" onclick="sendPtzCmd(0, -0.5)">▼</button>
+            <button class="ptz-btn" title="Down-Right" onclick="sendPtzCmd(0.5, -0.5)">↘</button>
+          </div>
+
+          <div class="zoom-group">
+            <button class="zoom-btn" onclick="sendZoomCmd(0.5)">🔍 Zoom In (+)</button>
+            <button class="zoom-btn" onclick="sendZoomCmd(-0.5)">🔎 Zoom Out (-)</button>
+            <button class="zoom-btn" style="color: var(--accent-danger);" onclick="sendStopCmd()">⏹ Stop</button>
+          </div>
+
+          <div class="slider-wrap">
+            <div class="slider-label">
+              <span>PTZ Speed Velocity</span>
+              <span id="speed-label">0.5</span>
+            </div>
+            <input type="range" id="speed-slider" min="0.1" max="1.0" step="0.1" value="0.5" oninput="document.getElementById('speed-label').innerText = this.value" />
+          </div>
+
+          <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
+              Live Stream Telemetry
+            </div>
+            <table class="schema-table" style="margin-bottom: 0;">
+              <tbody>
+                <tr>
+                  <td style="color: var(--text-muted);">Framerate</td>
+                  <td id="telemetry-fps" style="font-family: var(--font-mono);">-- FPS</td>
+                </tr>
+                <tr>
+                  <td style="color: var(--text-muted);">Resolution</td>
+                  <td id="telemetry-res" style="font-family: var(--font-mono);">--</td>
+                </tr>
+                <tr>
+                  <td style="color: var(--text-muted);">Target IP</td>
+                  <td style="font-family: var(--font-mono);">10.10.1.17:554</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- API Reference Card -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">
-          <span>🚀</span> Ready-to-Use Public API Endpoints
-        </div>
-        <a href="/docs" target="_blank" class="btn btn-outline" style="font-size: 0.75rem;">
-          Buka Swagger UI (Coba API)
-        </a>
-      </div>
-
-      <table class="api-table">
-        <thead>
-          <tr>
-            <th>Method</th>
-            <th>Endpoint</th>
-            <th>Fungsi / Kegunaan</th>
-            <th>Contoh Integrasi</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><span class="method-badge get">GET</span></td>
-            <td><a href="/api/stream" target="_blank" class="endpoint-code">/api/stream</a></td>
-            <td>Live video stream (MJPEG multipart). Langsung ditonton di browser/dashboard.</td>
-            <td><code>&lt;img src="http://IP_VPS:3001/api/stream" /&gt;</code></td>
-          </tr>
-          <tr>
-            <td><span class="method-badge get">GET</span></td>
-            <td><a href="/api/snapshot" target="_blank" class="endpoint-code">/api/snapshot</a></td>
-            <td>Mengambil 1 frame foto JPEG terbaru beresolusi penuh secara instan.</td>
-            <td><code>fetch('/api/snapshot').then(r => r.blob())</code></td>
-          </tr>
-          <tr>
-            <td><span class="method-badge get">GET</span></td>
-            <td><a href="/api/status" target="_blank" class="endpoint-code">/api/status</a></td>
-            <td>Status kesehatan koneksi RTSP, resolusi, FPS terukur, dan error log.</td>
-            <td><code>curl http://IP_VPS:3001/api/status</code></td>
-          </tr>
-          <tr>
-            <td><span class="method-badge get">GET</span></td>
-            <td><a href="/api/onvif/device-info" target="_blank" class="endpoint-code">/api/onvif/device-info</a></td>
-            <td>Informasi perangkat dari ONVIF (Manufacturer, Model, Firmware, Serial).</td>
-            <td><code>curl http://IP_VPS:3001/api/onvif/device-info</code></td>
-          </tr>
-          <tr>
-            <td><span class="method-badge get">GET</span></td>
-            <td><a href="/api/onvif/profiles" target="_blank" class="endpoint-code">/api/onvif/profiles</a></td>
-            <td>Daftar profil encoding video yang didukung oleh kamera.</td>
-            <td><code>curl http://IP_VPS:3001/api/onvif/profiles</code></td>
-          </tr>
-          <tr>
-            <td><span class="method-badge post">POST</span></td>
-            <td><span class="endpoint-code">/api/onvif/ptz/move</span></td>
-            <td>Menggerakkan kamera Continuous Move (Pan, Tilt, Zoom speed).</td>
-            <td><code>{"pan": 0.5, "tilt": 0.0, "zoom": 0.0}</code></td>
-          </tr>
-          <tr>
-            <td><span class="method-badge post">POST</span></td>
-            <td><span class="endpoint-code">/api/onvif/ptz/stop</span></td>
-            <td>Menghentikan pergerakan kamera PTZ seketika.</td>
-            <td><code>POST /api/onvif/ptz/stop</code></td>
-          </tr>
-          <tr>
-            <td><span class="method-badge post">POST</span></td>
-            <td><span class="endpoint-code">/onvif/{service}</span></td>
-            <td>Transparent SOAP Proxy untuk VMS luar (seperti ONVIF Device Manager).</td>
-            <td>Arahkan ONVIF Client ke <code>http://IP_VPS:3001</code></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
   </div>
 
-  <div id="toast">Notifikasi</div>
+  <div id="toast">Notification</div>
 
   <script>
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.innerText = msg;
       t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 3000);
+      setTimeout(() => t.classList.remove('show'), 2500);
     }
 
-    function reloadStream() {
-      const img = document.getElementById('stream-img');
-      img.src = '/api/stream?t=' + new Date().getTime();
-      showToast('Memuat ulang stream video...');
+    function switchView(viewName, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+
+      btn.classList.add('active');
+      document.getElementById('view-' + viewName).classList.add('active');
     }
 
-    function handleStreamError() {
-      const badge = document.getElementById('badge-rtsp');
-      const text = document.getElementById('text-rtsp');
-      badge.className = 'status-badge offline';
-      text.innerText = 'Disconnected';
+    function switchSnippet(btn, targetId) {
+      const panel = btn.closest('.code-viewer-panel');
+      panel.querySelectorAll('.code-tab-btn').forEach(b => b.classList.remove('active'));
+      panel.querySelectorAll('.code-container pre').forEach(p => p.style.display = 'none');
+
+      btn.classList.add('active');
+      document.getElementById(targetId).style.display = 'block';
+    }
+
+    function copyCode(btn) {
+      const pre = btn.parentElement.querySelector('pre:not([style*="display: none"]):not([style*="display:none"])') || btn.parentElement.querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(() => {
+        const orig = btn.innerText;
+        btn.innerText = '✓ Copied';
+        setTimeout(() => btn.innerText = orig, 2000);
+      });
     }
 
     function toggleFullscreen() {
-      const vp = document.getElementById('viewport');
+      const el = document.getElementById('monitor-viewport');
       if (!document.fullscreenElement) {
-        vp.requestFullscreen().catch(err => alert(err.message));
+        el.requestFullscreen().catch(err => alert(err.message));
       } else {
         document.exitFullscreen();
       }
     }
 
-    async function sendPtz(panDir, tiltDir) {
-      const speed = parseFloat(document.getElementById('ptz-speed').value) || 0.5;
+    function reloadVideo() {
+      const img = document.getElementById('monitor-stream-img');
+      img.src = '/api/stream?t=' + Date.now();
+      showToast('Reloading video stream...');
+    }
+
+    // API Testing Handlers
+    async function testSnapshot() {
+      try {
+        const box = document.getElementById('snapshot-result-box');
+        const img = document.getElementById('snapshot-result-img');
+        img.src = '/api/snapshot?t=' + Date.now();
+        box.style.display = 'block';
+        showToast('Frame captured successfully!');
+      } catch (e) {
+        showToast('Error capturing frame');
+      }
+    }
+
+    async function testStatus() {
+      const out = document.getElementById('test-output-status');
+      out.innerText = 'Sending request...';
+      try {
+        const res = await fetch('/api/status');
+        const json = await res.json();
+        out.innerText = JSON.stringify(json, null, 2);
+      } catch (e) {
+        out.innerText = 'Request failed: ' + e;
+      }
+    }
+
+    async function testDeviceInfo() {
+      const out = document.getElementById('test-output-devinfo');
+      out.innerText = 'Sending request...';
+      try {
+        const res = await fetch('/api/onvif/device-info');
+        const json = await res.json();
+        out.innerText = JSON.stringify(json, null, 2);
+      } catch (e) {
+        out.innerText = 'Request failed: ' + e;
+      }
+    }
+
+    async function sendPtzCmd(panDir, tiltDir) {
+      const speed = parseFloat(document.getElementById('speed-slider')?.value || 0.5);
       const pan = panDir * speed;
       const tilt = tiltDir * speed;
+      const out = document.getElementById('test-output-ptz');
       try {
         const res = await fetch('/api/onvif/ptz/move', {
           method: 'POST',
@@ -749,19 +1573,17 @@
           body: JSON.stringify({ pan: pan, tilt: tilt, zoom: 0 })
         });
         const data = await res.json();
-        if (data.status === 'success') {
-          showToast(`PTZ Move: Pan=${pan.toFixed(1)}, Tilt=${tilt.toFixed(1)}`);
-        } else {
-          showToast(`PTZ Error: ${data.message}`);
-        }
-      } catch (err) {
-        showToast(`PTZ Error: ${err.message}`);
+        if (out) out.innerText = JSON.stringify(data, null, 2);
+        showToast(`Move: Pan=${pan.toFixed(1)}, Tilt=${tilt.toFixed(1)}`);
+      } catch (e) {
+        if (out) out.innerText = 'PTZ Error: ' + e;
       }
     }
 
-    async function sendZoom(dir) {
-      const speed = parseFloat(document.getElementById('ptz-speed').value) || 0.5;
+    async function sendZoomCmd(dir) {
+      const speed = parseFloat(document.getElementById('speed-slider')?.value || 0.5);
       const zoom = dir * speed;
+      const out = document.getElementById('test-output-ptz');
       try {
         const res = await fetch('/api/onvif/ptz/move', {
           method: 'POST',
@@ -769,70 +1591,52 @@
           body: JSON.stringify({ pan: 0, tilt: 0, zoom: zoom })
         });
         const data = await res.json();
-        showToast(data.status === 'success' ? `Zoom ${dir > 0 ? 'In' : 'Out'}` : `Error: ${data.message}`);
-      } catch (err) {
-        showToast(`Zoom Error: ${err.message}`);
+        if (out) out.innerText = JSON.stringify(data, null, 2);
+        showToast(`Zoom: ${zoom > 0 ? 'In' : 'Out'}`);
+      } catch (e) {
+        if (out) out.innerText = 'PTZ Error: ' + e;
       }
     }
 
-    async function stopPtz() {
+    async function sendStopCmd() {
+      const out = document.getElementById('test-output-ptz');
       try {
         const res = await fetch('/api/onvif/ptz/stop', { method: 'POST' });
         const data = await res.json();
-        showToast('PTZ Stopped');
-      } catch (err) {
-        showToast(`Stop Error: ${err.message}`);
+        if (out) out.innerText = JSON.stringify(data, null, 2);
+        showToast('PTZ Movement Stopped');
+      } catch (e) {
+        if (out) out.innerText = 'Stop Error: ' + e;
       }
     }
 
-    async function pollStatus() {
+    // Telemetry Poller
+    async function updateTelemetry() {
       try {
         const res = await fetch('/api/status');
         if (res.ok) {
           const s = await res.json();
-          const badge = document.getElementById('badge-rtsp');
-          const text = document.getElementById('text-rtsp');
-          
+          const dot = document.getElementById('header-status-dot');
+          const txt = document.getElementById('header-status-text');
+
           if (s.connected && s.status === 'online') {
-            badge.className = 'status-badge online';
-            text.innerText = 'Online';
+            dot.className = 'indicator-dot online';
+            txt.innerText = 'Online • ' + (s.measured_fps || 0) + ' FPS';
           } else {
-            badge.className = 'status-badge offline';
-            text.innerText = 'Offline';
+            dot.className = 'indicator-dot offline';
+            txt.innerText = 'Camera Offline';
           }
 
-          document.getElementById('stat-fps').innerText = (s.measured_fps || 0) + ' FPS';
-          document.getElementById('stat-res').innerText = s.resolution || '--';
+          const fpsEl = document.getElementById('telemetry-fps');
+          if (fpsEl) fpsEl.innerText = (s.measured_fps || 0) + ' FPS';
+          const resEl = document.getElementById('telemetry-res');
+          if (resEl) resEl.innerText = s.resolution || '1280x720';
         }
-      } catch (e) {
-        console.warn('Status poll error', e);
-      }
+      } catch (e) {}
     }
 
-    async function loadDeviceInfo() {
-      try {
-        const res = await fetch('/api/onvif/device-info');
-        const data = await res.json();
-        const div = document.getElementById('onvif-info');
-        if (data.connected) {
-          div.innerHTML = `
-            <div><b>Model:</b> ${data.model}</div>
-            <div><b>Manufacturer:</b> ${data.manufacturer}</div>
-            <div><b>Firmware:</b> ${data.firmware_version}</div>
-            <div><b>Serial:</b> ${data.serial_number}</div>
-          `;
-        } else {
-          div.innerHTML = `<span style="color: var(--accent-rose);">ONVIF: ${data.error || 'Not connected'}</span>`;
-        }
-      } catch (e) {
-        document.getElementById('onvif-info').innerText = 'Gagal memuat ONVIF info';
-      }
-    }
-
-    // Initial calls & periodic polling
-    pollStatus();
-    loadDeviceInfo();
-    setInterval(pollStatus, 3000);
+    updateTelemetry();
+    setInterval(updateTelemetry, 3000);
   </script>
 </body>
 </html>
