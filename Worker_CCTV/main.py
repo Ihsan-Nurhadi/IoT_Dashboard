@@ -60,9 +60,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Setup templates
-templates_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
-templates = Jinja2Templates(directory=templates_dir)
+# Setup templates directory
+TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
+INDEX_HTML_PATH = os.path.join(TEMPLATES_DIR, "index.html")
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    err_tb = traceback.format_exc()
+    logger.error(f"Unhandled error on {request.method} {request.url}: {exc}\n{err_tb}")
+    return HTMLResponse(
+        content=f"<h3>500 Internal Server Error</h3><p><b>{exc}</b></p><pre>{err_tb}</pre>",
+        status_code=500,
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -70,12 +81,22 @@ templates = Jinja2Templates(directory=templates_dir)
 # -----------------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse, tags=["Web Dashboard"])
-async def dashboard_view(request: Request):
+async def dashboard_view():
     """
     Renders the modern interactive Web Dashboard with live video stream,
     PTZ controls, telemetry stats, and quick links.
     """
-    return templates.TemplateResponse("index.html", {"request": request})
+    if os.path.exists(INDEX_HTML_PATH):
+        try:
+            with open(INDEX_HTML_PATH, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+        except Exception as e:
+            logger.error(f"Error reading index.html: {e}")
+            return HTMLResponse(f"<h3>Error loading index.html: {e}</h3>", status_code=500)
+
+    return HTMLResponse(
+        "<h2>Worker CCTV Gateway</h2><p>index.html not found. <a href='/docs'>Swagger API Docs</a></p>"
+    )
 
 
 @app.get("/api/health", tags=["Telemetry & Status"])
