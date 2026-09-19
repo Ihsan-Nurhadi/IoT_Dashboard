@@ -1,0 +1,26 @@
+services:
+  cctv_gateway:
+    build: .
+    container_name: nms_cctv_gateway
+    restart: always
+    # Mode 1 (Rekomendasi jika OpenVPN aktif di host VPS):
+    # network_mode: "host"
+    # Atau Mode 2 (Port mapping standar):
+    ports:
+      - "${GATEWAY_PORT:-3001}:3001"
+    environment:
+      - TZ=Asia/Jakarta
+      - GATEWAY_HOST=0.0.0.0
+      - GATEWAY_PORT=3001
+      - CAMERA_HOST=10.10.1.17
+      - CAMERA_USER=NMSIOTYOGYA1
+      - CAMERA_PASS=Nayaka2025
+      - RTSP_PORT=554
+      - RTSP_PATH=/stream1
+      - ONVIF_PORT=2020
+      - ONVIF_PATH=/onfiv/device_service
+      - TARGET_FPS=20
+      - STREAM_WIDTH=1280
+      - STREAM_QUALITY=75
+    env_file:
+      - .env

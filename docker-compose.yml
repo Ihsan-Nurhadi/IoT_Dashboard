@@ -158,6 +158,27 @@ services:
     networks:
       - nms_network
 
+  # 2i. CCTV RTSP & ONVIF API Gateway Worker
+  cctv_gateway:
+    build: ./Worker_CCTV
+    container_name: nms_cctv_gateway
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - TZ=Asia/Jakarta
+      - GATEWAY_HOST=0.0.0.0
+      - GATEWAY_PORT=3001
+      - CAMERA_HOST=10.10.1.17
+      - CAMERA_USER=NMSIOTYOGYA1
+      - CAMERA_PASS=Nayaka2025
+      - RTSP_PORT=554
+      - RTSP_PATH=/stream1
+      - ONVIF_PORT=2020
+      - ONVIF_PATH=/onfiv/device_service
+    networks:
+      - nms_network
+
   # 3. Frontend (React)
   frontend:
     build: ./frontend
