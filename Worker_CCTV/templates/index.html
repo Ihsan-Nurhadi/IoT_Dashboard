@@ -963,13 +963,23 @@ imageElement.src = `${streamUrl}?t=${Date.now()}`;</pre>
                   </div>
                 </div>
 
-                <div class="test-box">
+                <div class="test-box" style="margin-top: 14px;">
                   <div class="test-box-header">
-                    <span class="test-box-title">Live Preview Test</span>
-                    <button class="btn-run-api" id="btn-toggle-doc-stream" onclick="toggleDocStream()">▶ Start Live Stream</button>
+                    <span class="test-box-title">Direct Stream Endpoint Link</span>
                   </div>
-                  <div style="aspect-ratio: 16/9; background: #000; border: 1px solid var(--border-color); border-radius: 3px; overflow: hidden; position: relative;">
-                    <img id="doc-stream-img" src="/api/snapshot" style="width: 100%; height: 100%; object-fit: cover;" alt="Live stream preview" />
+                  <div style="padding: 12px; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 3px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                      <code style="word-break: break-all; font-size: 12px; color: #fff;">http://110.232.92.134:3001/api/stream</code>
+                      <button class="btn btn-outline" style="font-size: 11px; white-space: nowrap;" onclick="copyDirectUrl('http://110.232.92.134:3001/api/stream')">📋 Copy URL</button>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                      <a href="/api/stream" target="_blank" class="btn btn-outline" style="font-size: 11px;">
+                        ↗ Open Stream in New Tab
+                      </a>
+                    </div>
+                    <p style="font-size: 11.5px; color: var(--text-secondary); margin: 0; line-height: 1.4;">
+                      ⚡ <b>On-Demand Stream:</b> The camera RTSP session only connects when an external client or <code>&lt;img&gt;</code> actively requests this URL. Zero background lag or buffer buildup.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1410,6 +1420,7 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
           <div class="panel-header">
             <span class="panel-title">📹 Live Camera Feed (MJPEG via HTTP)</span>
             <div style="display: flex; gap: 8px;">
+              <button class="btn btn-primary" id="btn-toggle-monitor-stream" style="font-size: 11px; padding: 4px 10px;" onclick="toggleMonitorStream()">▶ Start Stream</button>
               <button class="btn btn-outline" style="font-size: 11px; padding: 4px 8px;" onclick="reloadVideo()">🔄 Refresh</button>
               <button class="btn btn-outline" style="font-size: 11px; padding: 4px 8px;" onclick="toggleFullscreen()">⛶ Fullscreen</button>
             </div>
@@ -1418,9 +1429,14 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
           <div class="video-viewport" id="monitor-viewport">
             <div class="video-overlay">
               <div class="overlay-tag">10.10.1.17:554/stream1</div>
-              <div class="overlay-tag" style="background: rgba(239, 68, 68, 0.85); color: #fff; border: none; font-weight: 700;">● LIVE</div>
+              <div class="overlay-tag" id="monitor-live-tag" style="display: none; background: rgba(239, 68, 68, 0.85); color: #fff; border: none; font-weight: 700;">● LIVE</div>
             </div>
-            <img id="monitor-stream-img" class="video-feed" src="" alt="Live CCTV Stream (Click tab to view)" />
+            <div id="monitor-placeholder" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0b0b0e; color: var(--text-secondary);">
+              <div style="font-size: 32px;">📹</div>
+              <p style="font-size: 13px;">Stream is Idle (On-Demand Mode)</p>
+              <button class="btn btn-primary" onclick="toggleMonitorStream()">▶ Start Live Stream</button>
+            </div>
+            <img id="monitor-stream-img" class="video-feed" src="" style="display: none;" alt="Live CCTV Stream" />
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 10px;">
@@ -1508,20 +1524,38 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
       setTimeout(() => t.classList.remove('show'), 2500);
     }
 
-    let docStreamActive = false;
-    function toggleDocStream() {
-      const img = document.getElementById('doc-stream-img');
-      const btn = document.getElementById('btn-toggle-doc-stream');
-      if (!docStreamActive) {
+    function copyDirectUrl(url) {
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('Stream URL copied to clipboard!');
+      });
+    }
+
+    let monitorActive = false;
+    function toggleMonitorStream() {
+      const img = document.getElementById('monitor-stream-img');
+      const btn = document.getElementById('btn-toggle-monitor-stream');
+      const placeholder = document.getElementById('monitor-placeholder');
+      const liveTag = document.getElementById('monitor-live-tag');
+      if (!monitorActive) {
         img.src = '/api/stream?t=' + Date.now();
-        btn.innerText = '⏹ Stop Live Stream';
+        img.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+        if (liveTag) liveTag.style.display = 'block';
+        btn.innerText = '⏹ Stop Stream';
+        btn.className = 'btn btn-outline';
         btn.style.color = 'var(--accent-danger)';
-        docStreamActive = true;
+        monitorActive = true;
+        showToast('Live stream started (on-demand)');
       } else {
-        img.src = '/api/snapshot?t=' + Date.now();
-        btn.innerText = '▶ Start Live Stream';
+        img.src = '';
+        img.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+        if (liveTag) liveTag.style.display = 'none';
+        btn.innerText = '▶ Start Stream';
+        btn.className = 'btn btn-primary';
         btn.style.color = '';
-        docStreamActive = false;
+        monitorActive = false;
+        showToast('Stream stopped (idle mode)');
       }
     }
 
@@ -1532,12 +1566,8 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
       btn.classList.add('active');
       document.getElementById('view-' + viewName).classList.add('active');
 
-      const monitorImg = document.getElementById('monitor-stream-img');
-      if (viewName === 'monitor') {
-        monitorImg.src = '/api/stream?t=' + Date.now();
-      } else {
-        // Disconnect monitor stream when viewing docs to save bandwidth & prevent lag
-        monitorImg.src = '';
+      if (viewName !== 'monitor' && monitorActive) {
+        toggleMonitorStream();
       }
     }
 
@@ -1569,9 +1599,13 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
     }
 
     function reloadVideo() {
-      const img = document.getElementById('monitor-stream-img');
-      img.src = '/api/stream?t=' + Date.now();
-      showToast('Reloading video stream...');
+      if (monitorActive) {
+        const img = document.getElementById('monitor-stream-img');
+        img.src = '/api/stream?t=' + Date.now();
+        showToast('Reloading video stream...');
+      } else {
+        toggleMonitorStream();
+      }
     }
 
     // API Testing Handlers
@@ -1669,9 +1703,12 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
           const dot = document.getElementById('header-status-dot');
           const txt = document.getElementById('header-status-text');
 
-          if (s.connected && s.status === 'online') {
+          if (s.running && s.status === 'streaming') {
             dot.className = 'indicator-dot online';
-            txt.innerText = 'Online • ' + (s.measured_fps || 0) + ' FPS';
+            txt.innerText = 'Streaming • ' + (s.measured_fps || 0) + ' FPS (' + (s.active_viewers || 1) + ' viewer)';
+          } else if (s.status === 'idle') {
+            dot.className = 'indicator-dot online';
+            txt.innerText = 'Idle (Ready On-Demand)';
           } else {
             dot.className = 'indicator-dot offline';
             txt.innerText = 'Camera Offline';

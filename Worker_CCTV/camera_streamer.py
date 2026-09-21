@@ -48,6 +48,9 @@ class CameraStreamer:
         self.running = False
         self.thread = None
         self.lock = threading.Lock()
+        self.viewer_lock = threading.Lock()
+        self.active_viewers = 0
+        self.stop_timer = None
 
         self.latest_jpeg = None
         self.latest_frame = None
@@ -58,6 +61,33 @@ class CameraStreamer:
         self.total_frames = 0
         self.reconnect_count = 0
         self.last_error = None
+
+    def add_viewer(self):
+        with self.viewer_lock:
+            if self.stop_timer:
+                self.stop_timer.cancel()
+                self.stop_timer = None
+            self.active_viewers += 1
+            if not self.running:
+                logger.info(f"Viewer connected (total: {self.active_viewers}). Starting on-demand RTSP capture...")
+                self.start()
+
+    def remove_viewer(self):
+        with self.viewer_lock:
+            self.active_viewers = max(0, self.active_viewers - 1)
+            logger.info(f"Viewer disconnected (remaining: {self.active_viewers})")
+            if self.active_viewers == 0:
+                if self.stop_timer:
+                    self.stop_timer.cancel()
+                self.stop_timer = threading.Timer(4.0, self._delayed_stop)
+                self.stop_timer.daemon = True
+                self.stop_timer.start()
+
+    def _delayed_stop(self):
+        with self.viewer_lock:
+            if self.active_viewers == 0 and self.running:
+                logger.info("No active viewers for 4s. Stopping RTSP stream to prevent lag buffer and save bandwidth.")
+                self.stop()
 
     def get_rtsp_url(self, mask_password=False):
         if self.rtsp_url_override:
@@ -85,13 +115,14 @@ class CameraStreamer:
         self.running = False
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=3.0)
-        logger.info("Streamer thread stopped")
+        self.connected = False
+        self.latest_jpeg = None
+        self.latest_frame = None
+        logger.info("Streamer thread stopped (camera connection closed)")
 
     def _capture_loop(self):
-        # Force low-latency, zero-buffer FFmpeg demuxing over TCP
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
-            f"rtsp_transport;{self.rtsp_transport}|fflags;nobuffer|flags;low_delay|max_delay;500000|probesize;32|analyzeduration;0"
-        )
+        # Force low-latency TCP and disable ffmpeg buffering
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;100000|reorder_queue_size;0"
 
         fps_timer = time.time()
         fps_frame_count = 0
@@ -100,7 +131,7 @@ class CameraStreamer:
 
         while self.running:
             rtsp_url = self.get_rtsp_url(mask_password=False)
-            logger.info(f"Connecting to RTSP stream (low-latency): {self.get_rtsp_url(mask_password=True)}")
+            logger.info(f"Connecting to RTSP stream (on-demand low-latency): {self.get_rtsp_url(mask_password=True)}")
 
             cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -109,8 +140,8 @@ class CameraStreamer:
                 self.connected = False
                 self.last_error = "Failed to open RTSP stream"
                 self.reconnect_count += 1
-                logger.warning(f"Unable to open RTSP stream. Reconnecting in 3s... (attempt {self.reconnect_count})")
-                time.sleep(3.0)
+                logger.warning(f"Unable to open RTSP stream. Retrying in 2s... (attempt {self.reconnect_count})")
+                time.sleep(2.0)
                 continue
 
             self.connected = True
@@ -169,50 +200,84 @@ class CameraStreamer:
 
             cap.release()
             self.connected = False
-            time.sleep(1.0)
+            time.sleep(0.5)
 
     def get_snapshot(self):
         """
-        Returns the freshest JPEG bytes immediately.
+        Returns the freshest JPEG bytes. If streamer is idle, grabs a single fresh frame on-demand.
         """
         with self.lock:
-            if self.latest_jpeg is not None:
+            if self.running and self.latest_jpeg is not None:
                 return self.latest_jpeg
 
-        # If background stream hasn't produced a frame yet, fallback placeholder
-        return self._generate_blank_frame("Camera Initializing...")
+        # Standalone single frame grab if streamer is idle
+        try:
+            rtsp_url = self.get_rtsp_url(mask_password=False)
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay"
+            cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            if cap.isOpened():
+                for _ in range(4):
+                    cap.grab()
+                ret, frame = cap.read()
+                cap.release()
+                if ret and frame is not None:
+                    h, w = frame.shape[:2]
+                    if self.stream_width > 0 and w > self.stream_width:
+                        new_h = int(h * (self.stream_width / w))
+                        frame = cv2.resize(frame, (self.stream_width, new_h), interpolation=cv2.INTER_AREA)
+                    success, jpeg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), self.stream_quality])
+                    if success:
+                        return jpeg.tobytes()
+        except Exception as e:
+            logger.error(f"Error capturing on-demand snapshot: {e}")
+
+        return self._generate_blank_frame("Camera Idle - No Signal")
 
     def generate_mjpeg_stream(self):
         """
         Generator for FastAPI StreamingResponse (multipart/x-mixed-replace).
+        Runs strictly on-demand: automatically starts RTSP capture when viewer connects,
+        and stops RTSP capture when viewer disconnects.
         """
+        self.add_viewer()
         frame_interval = 1.0 / max(1, self.target_fps)
         last_sent_time = 0
 
-        while self.running:
-            now = time.time()
-            if now - last_sent_time < frame_interval:
-                time.sleep(0.01)
-                continue
+        # Wait briefly for initial frame if stream just spun up
+        wait_start = time.time()
+        while self.latest_jpeg is None and time.time() - wait_start < 2.5:
+            time.sleep(0.1)
 
-            jpeg_bytes = None
-            with self.lock:
-                if self.latest_jpeg is not None:
-                    jpeg_bytes = self.latest_jpeg
+        try:
+            while self.running:
+                now = time.time()
+                if now - last_sent_time < frame_interval:
+                    time.sleep(0.01)
+                    continue
 
-            if jpeg_bytes is None:
-                jpeg_bytes = self._generate_blank_frame("Connecting to CCTV...")
-                time.sleep(0.5)
+                jpeg_bytes = None
+                with self.lock:
+                    if self.latest_jpeg is not None:
+                        jpeg_bytes = self.latest_jpeg
 
-            last_sent_time = time.time()
+                if jpeg_bytes is None:
+                    jpeg_bytes = self._generate_blank_frame("Connecting to CCTV...")
+                    time.sleep(0.3)
 
-            yield (
-                b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n"
-                b"Content-Length: " + str(len(jpeg_bytes)).encode() + b"\r\n\r\n"
-                + jpeg_bytes
-                + b"\r\n"
-            )
+                last_sent_time = time.time()
+
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n"
+                    b"Content-Length: " + str(len(jpeg_bytes)).encode() + b"\r\n\r\n"
+                    + jpeg_bytes
+                    + b"\r\n"
+                )
+        except (GeneratorExit, Exception) as e:
+            logger.info(f"Stream client disconnected: {type(e).__name__}")
+        finally:
+            self.remove_viewer()
 
     def _generate_blank_frame(self, text="No Signal"):
         blank = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -243,10 +308,13 @@ class CameraStreamer:
 
     def get_status(self):
         age = time.time() - self.latest_frame_time if self.latest_frame_time > 0 else -1
+        is_streaming = self.running and self.connected and (age >= 0 and age < 5.0)
         return {
-            "status": "online" if (self.connected and age < 5.0) else "offline",
+            "status": "streaming" if is_streaming else ("idle" if not self.running else "connecting"),
+            "running": self.running,
             "connected": self.connected,
-            "measured_fps": self.measured_fps,
+            "active_viewers": self.active_viewers,
+            "measured_fps": self.measured_fps if is_streaming else 0.0,
             "target_fps": self.target_fps,
             "resolution": self.resolution,
             "last_frame_age_sec": round(age, 2) if age >= 0 else None,

@@ -27,9 +27,8 @@ onvif_client = OnvifGatewayClient()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: start background RTSP streamer
-    logger.info("Initializing CCTV Gateway Worker...")
-    streamer.start()
+    # Startup in on-demand mode (RTSP connects only when /api/stream is requested)
+    logger.info("Initializing CCTV Gateway Worker (On-Demand Mode)...")
 
     # Attempt background ONVIF handshake
     try:
