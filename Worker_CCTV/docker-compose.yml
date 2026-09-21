@@ -8,6 +8,8 @@ services:
     # Atau Mode 2 (Port mapping standar):
     ports:
       - "${GATEWAY_PORT:-3001}:3001"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
     environment:
       - TZ=Asia/Jakarta
       - GATEWAY_HOST=0.0.0.0

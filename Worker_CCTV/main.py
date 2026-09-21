@@ -4,6 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from camera_streamer import CameraStreamer
 from onvif_client import OnvifGatewayClient
+from go2rtc_manager import Go2rtcManager
 
 # Load environment variables
 load_dotenv()
@@ -23,12 +25,16 @@ logger = logging.getLogger("gateway_main")
 # Initialize global instances
 streamer = CameraStreamer()
 onvif_client = OnvifGatewayClient()
+go2rtc = Go2rtcManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: start background RTSP streamer
+    # Startup: start go2rtc ultra-low latency engine
     logger.info("Initializing CCTV Gateway Worker...")
+    go2rtc.start()
+
+    # Also start fallback OpenCV streamer
     streamer.start()
 
     # Attempt background ONVIF handshake
@@ -41,6 +47,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown: cleanly close resources
     logger.info("Shutting down CCTV Gateway Worker...")
+    go2rtc.stop()
     streamer.stop()
 
 
@@ -113,16 +120,66 @@ async def health_check():
 @app.get("/api/status", tags=["Telemetry & Status"])
 async def get_stream_status():
     """
-    Returns real-time telemetry from the RTSP streamer (FPS, resolution, connection status).
+    Returns real-time telemetry from go2rtc, RTSP streamer, and ONVIF.
     """
-    status_data = streamer.get_status()
+    status_data = go2rtc.get_streams_status()
     status_data["onvif_connected"] = onvif_client.connected
+    if not status_data.get("status") == "online":
+        fallback_data = streamer.get_status()
+        status_data["fallback_fps"] = fallback_data.get("measured_fps", 0)
     return status_data
 
 
 # -----------------------------------------------------------------------------
-# Video Streaming & Snapshot
+# Video Streaming & Snapshot (WebRTC & MSE Low Latency)
 # -----------------------------------------------------------------------------
+
+@app.post("/api/webrtc", tags=["Video Stream"])
+async def handle_webrtc_offer(request: Request):
+    """
+    Negotiates ultra-low latency WebRTC peer connection (< 0.5s latency).
+    Accepts client SDP offer, queries go2rtc, and returns SDP answer.
+    """
+    try:
+        sdp_offer = (await request.body()).decode("utf-8")
+        sdp_answer = await go2rtc.proxy_webrtc_offer(sdp_offer)
+        return Response(content=sdp_answer, media_type="application/sdp")
+    except Exception as e:
+        logger.error(f"WebRTC negotiation error: {e}")
+        raise HTTPException(status_code=502, detail=f"WebRTC negotiation failed: {e}")
+
+
+@app.get("/api/stream.mp4", tags=["Video Stream"])
+async def get_live_mp4_stream():
+    """
+    Streams live fragmented MP4 (H.264 MSE) directly to HTML5 <video> elements.
+    Low-latency (< 0.5s) without any plugins.
+    """
+    client = httpx.AsyncClient(timeout=None)
+    try:
+        req = client.build_request("GET", "http://127.0.0.1:1984/api/stream.mp4?src=cctv")
+        r = await client.send(req, stream=True)
+
+        async def stream_generator():
+            try:
+                async for chunk in r.aiter_bytes():
+                    yield chunk
+            finally:
+                await r.aclose()
+                await client.aclose()
+
+        return StreamingResponse(
+            stream_generator(),
+            media_type="video/mp4",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+            },
+        )
+    except Exception as e:
+        await client.aclose()
+        raise HTTPException(status_code=502, detail=f"MP4 Stream failed: {e}")
+
 
 @app.get("/api/stream", tags=["Video Stream"])
 async def get_live_mjpeg_stream():
@@ -148,6 +205,16 @@ async def get_instant_snapshot():
     """
     Captures and downloads a single real-time JPEG snapshot from the camera stream.
     """
+    img_bytes, ctype = await go2rtc.proxy_snapshot()
+    if img_bytes:
+        return Response(
+            content=img_bytes,
+            media_type=ctype,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Content-Disposition": "inline; filename=snapshot.jpg",
+            },
+        )
     jpeg_bytes = streamer.get_snapshot()
     return Response(
         content=jpeg_bytes,
