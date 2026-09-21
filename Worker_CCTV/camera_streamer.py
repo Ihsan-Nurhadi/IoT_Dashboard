@@ -118,19 +118,25 @@ class CameraStreamer:
             logger.info("RTSP stream successfully connected!")
 
             while self.running:
-                # Continuous grab with NO sleep to constantly drain network buffer and prevent lag buildup
-                ret, frame = cap.read()
-                if not ret or frame is None:
-                    logger.warning("RTSP frame read dropped. Reconnecting...")
+                # 1. Grab packet immediately without decoding (takes ~0.05ms)
+                # This drains the socket buffer at wire speed and prevents ANY queue buildup!
+                ret = cap.grab()
+                if not ret:
+                    logger.warning("RTSP packet grab failed. Reconnecting...")
                     self.connected = False
                     self.reconnect_count += 1
                     break
 
                 now = time.time()
 
-                # Only encode at target_fps to prevent burning CPU
+                # 2. Only decode (retrieve) and encode at target_fps
                 if now - last_encode_time >= encode_interval:
                     last_encode_time = now
+
+                    # Decode ONLY the freshest frame that was just grabbed!
+                    ret_frame, frame = cap.retrieve()
+                    if not ret_frame or frame is None:
+                        continue
 
                     h, w = frame.shape[:2]
                     self.resolution = f"{w}x{h}"

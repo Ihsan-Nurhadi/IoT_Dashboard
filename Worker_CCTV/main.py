@@ -139,6 +139,7 @@ async def get_live_mjpeg_stream():
             "Pragma": "no-cache",
             "Expires": "0",
             "Connection": "close",
+            "X-Accel-Buffering": "no",
         },
     )
 
