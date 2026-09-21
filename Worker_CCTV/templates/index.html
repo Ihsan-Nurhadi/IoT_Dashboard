@@ -279,23 +279,51 @@
 
     /* Docs Layout */
     .docs-layout {
-      display: grid;
-      grid-template-columns: 220px 1fr;
-      gap: 36px;
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
       margin-bottom: 60px;
-    }
-
-    @media (max-width: 1024px) {
-      .docs-layout {
-        grid-template-columns: 1fr;
-      }
+      position: relative;
     }
 
     /* Sidebar */
     .docs-sidebar {
+      width: 240px;
+      min-width: 240px;
+      flex-shrink: 0;
       position: sticky;
       top: 24px;
-      align-self: start;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      padding-right: 16px;
+      border-right: 1px solid var(--border-color);
+      z-index: 10;
+    }
+
+    .docs-content {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 50px;
+    }
+
+    @media (max-width: 1024px) {
+      .docs-layout {
+        flex-direction: column;
+        gap: 24px;
+      }
+      .docs-sidebar {
+        width: 100%;
+        min-width: 100%;
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding-right: 0;
+        padding-bottom: 20px;
+      }
     }
 
     .docs-nav-title {
@@ -423,7 +451,7 @@
       gap: 24px;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1100px) {
       .docs-two-col {
         grid-template-columns: 1fr;
       }
@@ -816,9 +844,6 @@
         </div>
         <a href="/api/snapshot" download="snapshot.jpg" class="btn btn-outline">
           📸 Snapshot Frame
-        </a>
-        <a href="/docs" target="_blank" class="btn btn-primary">
-          ⚡ OpenAPI (Swagger)
         </a>
       </div>
     </header>

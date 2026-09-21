@@ -49,6 +49,9 @@ app = FastAPI(
     description="Microservice worker that bridges VPN-restricted RTSP camera stream and ONVIF controls into public HTTP/REST APIs.",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 # Enable CORS for all origins so React / Vue / external dashboards can consume APIs
@@ -95,7 +98,7 @@ async def dashboard_view():
             return HTMLResponse(f"<h3>Error loading index.html: {e}</h3>", status_code=500)
 
     return HTMLResponse(
-        "<h2>Worker CCTV Gateway</h2><p>index.html not found. <a href='/docs'>Swagger API Docs</a></p>"
+        "<h2>Worker CCTV Gateway</h2><p>index.html not found.</p>"
     )
 
 
