@@ -160,6 +160,11 @@ async def get_live_mp4_stream():
         req = client.build_request("GET", "http://127.0.0.1:1984/api/stream.mp4?src=cctv")
         r = await client.send(req, stream=True)
 
+        if r.status_code != 200:
+            await r.aclose()
+            await client.aclose()
+            raise HTTPException(status_code=r.status_code, detail="go2rtc MP4 stream not ready")
+
         async def stream_generator():
             try:
                 async for chunk in r.aiter_bytes():
@@ -176,8 +181,11 @@ async def get_live_mp4_stream():
                 "Pragma": "no-cache",
             },
         )
+    except HTTPException:
+        raise
     except Exception as e:
         await client.aclose()
+        logger.warning(f"MP4 Stream failed: {e}")
         raise HTTPException(status_code=502, detail=f"MP4 Stream failed: {e}")
 
 
@@ -204,26 +212,44 @@ async def get_live_mjpeg_stream():
 async def get_instant_snapshot():
     """
     Captures and downloads a single real-time JPEG snapshot from the camera stream.
+    Guaranteed to return HTTP 200 image/jpeg without throwing 500 error.
     """
-    img_bytes, ctype = await go2rtc.proxy_snapshot()
-    if img_bytes:
+    try:
+        img_bytes, ctype = await go2rtc.proxy_snapshot()
+        if img_bytes:
+            return Response(
+                content=img_bytes,
+                media_type=ctype,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Content-Disposition": "inline; filename=snapshot.jpg",
+                },
+            )
+    except Exception as e:
+        logger.debug(f"go2rtc snapshot bypassed: {e}")
+
+    try:
+        jpeg_bytes = streamer.get_snapshot()
         return Response(
-            content=img_bytes,
-            media_type=ctype,
+            content=jpeg_bytes,
+            media_type="image/jpeg",
             headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Content-Disposition": "inline; filename=snapshot.jpg",
             },
         )
-    jpeg_bytes = streamer.get_snapshot()
-    return Response(
-        content=jpeg_bytes,
-        media_type="image/jpeg",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Content-Disposition": "inline; filename=snapshot.jpg",
-        },
-    )
+    except Exception as e:
+        logger.error(f"Fallback snapshot failed: {e}")
+        # Return blank frame directly
+        blank_bytes = streamer._generate_blank_frame("Camera Initializing...")
+        return Response(
+            content=blank_bytes,
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Content-Disposition": "inline; filename=snapshot.jpg",
+            },
+        )
 
 
 # -----------------------------------------------------------------------------

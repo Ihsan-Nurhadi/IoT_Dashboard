@@ -1672,18 +1672,41 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
 
+          // Wait for ICE candidates gathering (with 1.2s safety timeout)
+          await new Promise(resolve => {
+            if (pc.iceGatheringState === 'complete') {
+              resolve();
+            } else {
+              const check = () => {
+                if (pc.iceGatheringState === 'complete') {
+                  pc.removeEventListener('icegatheringstatechange', check);
+                  resolve();
+                }
+              };
+              pc.addEventListener('icegatheringstatechange', check);
+              setTimeout(resolve, 1200);
+            }
+          });
+
+          if (pc !== activePeerConnection || pc.signalingState === 'closed') return;
+
           const res = await fetch('/api/webrtc', {
             method: 'POST',
             headers: { 'Content-Type': 'application/sdp' },
-            body: offer.sdp
+            body: pc.localDescription ? pc.localDescription.sdp : offer.sdp
           });
 
+          if (pc !== activePeerConnection || pc.signalingState === 'closed') return;
           if (!res.ok) throw new Error('WebRTC negotiation failed: ' + res.status);
+
           const answerSdp = await res.text();
+          if (pc !== activePeerConnection || pc.signalingState === 'closed') return;
+
           await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
         } catch (err) {
+          if (pc !== activePeerConnection) return;
           console.warn('WebRTC error, falling back to MSE MP4:', err);
-          badge.innerText = '⚠️ WebRTC failed, falling back...';
+          badge.innerText = '⚠️ WebRTC fallback to MSE MP4';
           setStreamMode('mse');
         }
       } else if (activeStreamMode === 'mse') {
@@ -1719,26 +1742,48 @@ curl -X POST http://110.232.92.134:3001/onvif/device_service \
           docPeerConnection = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
           });
-          docPeerConnection.addTransceiver('video', { direction: 'recvonly' });
-          docPeerConnection.ontrack = (event) => {
+          const dpc = docPeerConnection;
+          dpc.addTransceiver('video', { direction: 'recvonly' });
+          dpc.ontrack = (event) => {
             img.style.display = 'none';
             vid.style.display = 'block';
             vid.srcObject = event.streams[0];
             vid.play().catch(() => {});
           };
 
-          const offer = await docPeerConnection.createOffer();
-          await docPeerConnection.setLocalDescription(offer);
+          const offer = await dpc.createOffer();
+          await dpc.setLocalDescription(offer);
+
+          await new Promise(resolve => {
+            if (dpc.iceGatheringState === 'complete') {
+              resolve();
+            } else {
+              const check = () => {
+                if (dpc.iceGatheringState === 'complete') {
+                  dpc.removeEventListener('icegatheringstatechange', check);
+                  resolve();
+                }
+              };
+              dpc.addEventListener('icegatheringstatechange', check);
+              setTimeout(resolve, 1200);
+            }
+          });
+
+          if (dpc !== docPeerConnection || dpc.signalingState === 'closed') return;
 
           const res = await fetch('/api/webrtc', {
             method: 'POST',
             headers: { 'Content-Type': 'application/sdp' },
-            body: offer.sdp
+            body: dpc.localDescription ? dpc.localDescription.sdp : offer.sdp
           });
+
+          if (dpc !== docPeerConnection || dpc.signalingState === 'closed') return;
+          if (!res.ok) throw new Error('WebRTC error: ' + res.status);
+
           const answer = await res.text();
-          await docPeerConnection.setRemoteDescription({ type: 'answer', sdp: answer });
+          if (dpc !== docPeerConnection || dpc.signalingState === 'closed') return;
+          await dpc.setRemoteDescription({ type: 'answer', sdp: answer });
         } catch (e) {
-          // Fallback to MP4 or snapshot
           vid.style.display = 'block';
           img.style.display = 'none';
           vid.src = '/api/stream.mp4?t=' + Date.now();
