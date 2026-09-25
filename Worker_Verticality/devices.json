@@ -78,5 +78,9 @@
   {
     "chip_id": "E32_VER_SUKAMULYA",
     "mac_address": "20:9B:A9:74:18:20"
+  },
+  {
+    "chip_id": "E32_VER_16ULUPLG",
+    "mac_address": "20:50:0D:2B:3A:4C"
   }
 ]
