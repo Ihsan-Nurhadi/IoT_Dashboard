@@ -24,10 +24,6 @@
     "mac_address": "C0:A4:DA:C9:7F:E2"
   },
   {
-    "chip_id": "E32_VER_BEKASIKOTA",
-    "mac_address": "E0:8C:FE:34:84:D4"
-  },
-  {
     "chip_id": "E32_VER_GANGAM",
     "mac_address": "28:05:A5:24:D5:10"
   },
@@ -42,5 +38,45 @@
   {
     "chip_id": "E32_VER_JLABDULSALEH",
     "mac_address": "20:50:0D:29:B6:70"
+  },
+  {
+    "chip_id": "E32_VER_PODOSUGIH",
+    "mac_address": "68:09:47:6F:A9:FC"
+  },
+  {
+    "chip_id": "E32_VER_UNGARAN",
+    "mac_address": "20:50:0D:2A:B5:34"
+  },
+  {
+    "chip_id": "E32_VER_PELEBON",
+    "mac_address": "68:09:47:5F:69:60"
+  },
+  {
+    "chip_id": "E32_VER_GANGGANG",
+    "mac_address": "20:50:0D:2B:00:C4"
+  },
+  {
+    "chip_id": "E32_VER_GAYUNGSARI",
+    "mac_address": "58:2A:BD:80:8A:34"
+  },
+  {
+    "chip_id": "E32_VER_KARMUL",
+    "mac_address": "68:09:47:71:4A:D0"
+  },
+  {
+    "chip_id": "E32_VER_LUBUKAWAH",
+    "mac_address": "20:9B:A9:73:F0:9C"
+  },
+  {
+    "chip_id": "E32_VER_KADUBEREUM",
+    "mac_address": "E0:6F:11:4E:1D:74"
+  },
+  {
+    "chip_id": "E32_VER_JLNJPNPLG",
+    "mac_address": "C8:85:41:C6:25:00"
+  },
+  {
+    "chip_id": "E32_VER_SUKAMULYA",
+    "mac_address": "20:9B:A9:74:18:20"
   }
 ]
