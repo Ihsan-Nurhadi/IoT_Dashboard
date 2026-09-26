@@ -2,7 +2,8 @@
 Unified ESP32-Vertical Simulator Runner with Auto-Reconnect & Supervisor
 Menjalankan simulasi data IoT ESP32 Verticality ke server MQTT (EMQX / NMS).
 Dilengkapi fitur:
-- Auto-reconnect jika koneksi broker MQTT terputus (Paho loop & manual fallback)
+- Accurate publish return code tracking (mencegah log palsu saat broker disconnect)
+- Auto-reconnect agresif dengan socket re-creation jika koneksi terputus
 - Watchdog / Supervisor thread yang otomatis me-restart worker jika thread mati
 - Heartbeat file (/tmp/worker_alive) untuk Docker Healthcheck
 - Graceful shutdown saat menerima sinyal SIGINT/SIGTERM
@@ -63,7 +64,7 @@ def format_uptime(seconds: int) -> str:
 
 
 class VerticalityWorker:
-    """Class simulator untuk satu device ESP32 Verticality dengan auto-recovery."""
+    """Class simulator untuk satu device ESP32 Verticality dengan auto-recovery handal."""
 
     def __init__(self, chip_id: str, mac_address: str):
         self.chip_id = chip_id
@@ -87,7 +88,7 @@ class VerticalityWorker:
         print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{self.chip_id}] {message}", flush=True)
 
     def _init_client(self):
-        """Membuat instance MQTT Client baru dengan konfigurasi reconnect otomatis."""
+        """Membuat instance MQTT Client baru dengan konfigurasi socket bersih."""
         try:
             if self.client:
                 try:
@@ -97,6 +98,8 @@ class VerticalityWorker:
                     pass
         except Exception:
             pass
+
+        self.is_connected = False
 
         try:
             client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=self.chip_id)
@@ -108,9 +111,9 @@ class VerticalityWorker:
         client.on_message = self.on_message
         client.on_disconnect = self.on_disconnect
 
-        # Set reconnect delay agresif jika koneksi socket terputus
+        # Set reconnect delay agresif
         try:
-            client.reconnect_delay_set(min_delay=1, max_delay=30)
+            client.reconnect_delay_set(min_delay=1, max_delay=15)
         except Exception:
             pass
 
@@ -212,13 +215,35 @@ class VerticalityWorker:
         self.is_connected = False
         rc_code = getattr(rc, "value", rc)
         if rc_code != 0:
-            self.log(f"Koneksi terputus tak terduga (rc={rc}). Paho auto-reconnect aktif...")
+            self.log(f"Koneksi terputus tak terduga (rc={rc_code}). Paho auto-reconnect aktif...")
         else:
             self.log("Terputus dari MQTT broker secara normal.")
 
+    def _publish_safe(self, topic: str, payload: dict, label: str) -> bool:
+        """Kirim pesan dengan verifikasi status return code paho-mqtt."""
+        if not self.is_connected:
+            return False
+
+        try:
+            payload_str = json.dumps(payload)
+            pub_res = self.client.publish(topic, payload_str, qos=0)
+            if pub_res.rc == mqtt.MQTT_ERR_SUCCESS:
+                self.log(f"[{label}] -> {payload}")
+                self.last_successful_publish = time.time()
+                touch_health_file()
+                return True
+            else:
+                self.is_connected = False
+                self.log(f"[WARN] Publish {label} gagal (rc={pub_res.rc} - Disconnected). Menunggu reconnect...")
+                return False
+        except Exception as e:
+            self.is_connected = False
+            self.log(f"[ERROR] Exception saat publish {label}: {e}")
+            return False
+
     def run(self):
         """Loop eksekusi utama dengan auto-recovery tanpa batas."""
-        # Random jitter saat start agar 11 device tidak connect serempak
+        # Random jitter saat start agar device tidak connect di milidetik yang persis sama
         time.sleep(random.uniform(0.1, 2.0))
 
         while not self.stop_event.is_set():
@@ -226,7 +251,7 @@ class VerticalityWorker:
                 self._init_client()
                 self._connect_and_loop()
             except Exception as e:
-                self.log(f"Exception di worker loop: {e}. Melakukan reconnect dalam 5 detik...")
+                self.log(f"Exception di worker loop: {e}. Menginisialisasi ulang dalam 5 detik...")
                 self.stop_event.wait(5.0)
 
     def _connect_and_loop(self):
@@ -237,13 +262,14 @@ class VerticalityWorker:
         retry_delay = 3.0
         while not self.stop_event.is_set():
             try:
-                self.client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+                # Keepalive 30s agar ping sering dikirim menjaga stateful NAT VPS tidak timeout
+                self.client.connect(BROKER_HOST, BROKER_PORT, keepalive=30)
                 self.client.loop_start()
                 break
             except Exception as e:
-                self.log(f"Koneksi gagal ({e}). Retry dalam {int(retry_delay)}s...")
+                self.log(f"Koneksi awal gagal ({e}). Retry dalam {int(retry_delay)}s...")
                 self.stop_event.wait(retry_delay)
-                retry_delay = min(retry_delay * 1.5, 30.0)
+                retry_delay = min(retry_delay * 1.5, 20.0)
 
         if self.stop_event.is_set():
             return
@@ -254,46 +280,26 @@ class VerticalityWorker:
         while not self.stop_event.is_set():
             now = time.time()
 
-            # Jika koneksi macet/tidak publish lebih dari 90 detik, trigger reconnect paksa
-            if now - self.last_successful_publish > 120.0 and not self.is_connected:
-                self.log("Koneksi macet terdeteksi (>120s tanpa publish). Memaksa reconnect...")
-                try:
-                    self.client.reconnect()
-                except Exception as e:
-                    self.log(f"Gagal force reconnect: {e}. Menginisialisasi ulang client...")
-                    break  # Keluar ke _init_client() di run()
+            # DETEKSI KONEKSI MACET:
+            # Jika dalam 20 detik tidak ada publish berhasil atau is_connected bernilai False,
+            # keluar dari loop ini agar _init_client() membuat socket koneksi baru yang segar!
+            if not self.is_connected and (now - self.last_successful_publish > 20.0):
+                self.log("Koneksi terputus/stale socket terdeteksi (>20s). Re-creating clean MQTT client...")
+                break
 
             # Kirim Heartbeat berkala
             if now - last_hb_time >= HEARTBEAT_SEC:
                 last_hb_time = now
                 hb = self.create_heartbeat_payload()
-                try:
-                    self.client.publish(self.topic_heartbeat, json.dumps(hb))
-                    self.log(f"[HEARTBEAT] -> {hb}")
-                    self.last_successful_publish = now
-                    touch_health_file()
-                except Exception as e:
-                    self.log(f"Error kirim heartbeat: {e}")
+                self._publish_safe(self.topic_heartbeat, hb, "HEARTBEAT")
 
             # Kirim Data Tilt
             tilt_data = self.create_tilt_payload()
-            try:
-                self.client.publish(self.topic_tilt, json.dumps(tilt_data))
-                self.log(f"[TILT] -> {tilt_data}")
-                self.last_successful_publish = now
-                touch_health_file()
-            except Exception as e:
-                self.log(f"Error kirim tilt: {e}")
+            self._publish_safe(self.topic_tilt, tilt_data, "TILT")
 
             # Kirim Data Wind
             wind_data = self.create_wind_payload()
-            try:
-                self.client.publish(self.topic_wind, json.dumps(wind_data))
-                self.log(f"[WIND] -> {wind_data}")
-                self.last_successful_publish = now
-                touch_health_file()
-            except Exception as e:
-                self.log(f"Error kirim wind: {e}")
+            self._publish_safe(self.topic_wind, wind_data, "WIND")
 
             # Sleep responsif terhadap stop_event
             slept = 0.0
@@ -385,7 +391,6 @@ def main():
 
     # ==========================================================================
     # SUPERVISOR / WATCHDOG LOOP
-    # Memeriksa kesehatan setiap thread berkala dan otomatis me-restart jika mati
     # ==========================================================================
     try:
         while not stop_event.is_set():
@@ -403,7 +408,6 @@ def main():
                         f"Menghidupkan ulang (auto-restart) thread sekarang...",
                         flush=True
                     )
-                    # Buat thread baru untuk worker yang mati
                     new_t = threading.Thread(
                         target=worker.run,
                         name=f"Thread-{worker.chip_id}-restart",
@@ -420,7 +424,6 @@ def main():
     for t in threads:
         t.join(timeout=3.0)
 
-    # Hapus file health saat shutdown bersih
     try:
         if os.path.exists(HEALTH_FILE):
             os.remove(HEALTH_FILE)
