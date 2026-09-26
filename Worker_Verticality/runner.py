@@ -1,8 +1,11 @@
 """
-Unified ESP32-Vertical Simulator Runner
+Unified ESP32-Vertical Simulator Runner with Auto-Reconnect & Supervisor
 Menjalankan simulasi data IoT ESP32 Verticality ke server MQTT (EMQX / NMS).
-Mendukung eksekusi seluruh device (11 device) sekaligus dalam 1 container via threading,
-atau memilih device tertentu via environment variables.
+Dilengkapi fitur:
+- Auto-reconnect jika koneksi broker MQTT terputus (Paho loop & manual fallback)
+- Watchdog / Supervisor thread yang otomatis me-restart worker jika thread mati
+- Heartbeat file (/tmp/worker_alive) untuk Docker Healthcheck
+- Graceful shutdown saat menerima sinyal SIGINT/SIGTERM
 """
 
 import json
@@ -18,7 +21,7 @@ from datetime import datetime
 import paho.mqtt.client as mqtt
 
 # ==============================================================================
-# GLOBAL CONFIGURATION FROM ENVIRONMENT (DENGAN DEFAULT VALUE ASLI)
+# GLOBAL CONFIGURATION FROM ENVIRONMENT
 # ==============================================================================
 BROKER_HOST     = os.getenv("BROKER_HOST", "emqx.nayakanms.com")
 BROKER_PORT     = int(os.getenv("BROKER_PORT", "1884"))
@@ -36,6 +39,17 @@ INTERVAL_SEC    = float(os.getenv("INTERVAL_SEC", "5"))
 HEARTBEAT_SEC   = float(os.getenv("HEARTBEAT_SEC", "60"))
 
 DEVICES_FILE    = os.getenv("DEVICES_FILE", os.path.join(os.path.dirname(__file__), "devices.json"))
+HEALTH_FILE     = os.getenv("HEALTH_FILE", "/tmp/worker_alive")
+
+
+def touch_health_file():
+    """Update file heartbeat untuk Docker Healthcheck."""
+    try:
+        os.makedirs(os.path.dirname(HEALTH_FILE), exist_ok=True)
+        with open(HEALTH_FILE, "w", encoding="utf-8") as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
 
 
 def format_uptime(seconds: int) -> str:
@@ -49,13 +63,16 @@ def format_uptime(seconds: int) -> str:
 
 
 class VerticalityWorker:
-    """Class simulator untuk satu device ESP32 Verticality."""
+    """Class simulator untuk satu device ESP32 Verticality dengan auto-recovery."""
 
     def __init__(self, chip_id: str, mac_address: str):
         self.chip_id = chip_id
         self.mac_address = mac_address
         self.start_time = time.time()
         self.stop_event = threading.Event()
+        self.is_connected = False
+        self.last_successful_publish = time.time()
+        self.client = None
 
         # Format Topik: nms/<client_id>/vertical/<leaf>
         self.topic_prefix = f"nms/{self.chip_id}/{PROJECT}"
@@ -66,19 +83,38 @@ class VerticalityWorker:
         self.topic_config = f"{self.topic_prefix}/config"
         self.topic_audit = f"{self.topic_prefix}/audit"
 
-        # Inisialisasi client MQTT (kompatibel paho-mqtt v1 & v2)
-        try:
-            self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=self.chip_id)
-        except AttributeError:
-            self.client = mqtt.Client(client_id=self.chip_id)
-
-        self.client.username_pw_set(MQTT_USER, MQTT_PASS)
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
-        self.client.on_disconnect = self.on_disconnect
-
     def log(self, message: str):
-        print(f"[{self.chip_id}] {message}", flush=True)
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{self.chip_id}] {message}", flush=True)
+
+    def _init_client(self):
+        """Membuat instance MQTT Client baru dengan konfigurasi reconnect otomatis."""
+        try:
+            if self.client:
+                try:
+                    self.client.loop_stop()
+                    self.client.disconnect()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        try:
+            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=self.chip_id)
+        except AttributeError:
+            client = mqtt.Client(client_id=self.chip_id)
+
+        client.username_pw_set(MQTT_USER, MQTT_PASS)
+        client.on_connect = self.on_connect
+        client.on_message = self.on_message
+        client.on_disconnect = self.on_disconnect
+
+        # Set reconnect delay agresif jika koneksi socket terputus
+        try:
+            client.reconnect_delay_set(min_delay=1, max_delay=30)
+        except Exception:
+            pass
+
+        self.client = client
 
     def create_info_payload(self) -> dict:
         return {
@@ -137,94 +173,147 @@ class VerticalityWorker:
     def on_connect(self, client, userdata, flags, rc, properties=None):
         rc_code = getattr(rc, "value", rc)
         if rc_code == 0:
+            self.is_connected = True
+            self.last_successful_publish = time.time()
             self.log(f"Berhasil terhubung ke broker {BROKER_HOST}:{BROKER_PORT} (MAC: {self.mac_address})")
 
             # 1. Publish Info Retained
-            info_payload = json.dumps(self.create_info_payload())
-            client.publish(self.topic_info, info_payload, retain=True)
-            self.log(f"PUB info (retained): {info_payload}")
+            try:
+                info_payload = json.dumps(self.create_info_payload())
+                client.publish(self.topic_info, info_payload, retain=True)
+                self.log(f"PUB info (retained): {info_payload}")
+            except Exception as e:
+                self.log(f"Gagal publish info: {e}")
 
             # 2. Subscribe ke config & audit
-            client.subscribe(self.topic_config)
-            client.subscribe(self.topic_audit)
-            self.log(f"Subscribed: {self.topic_config} & {self.topic_audit}")
+            try:
+                client.subscribe(self.topic_config)
+                client.subscribe(self.topic_audit)
+                self.log(f"Subscribed: {self.topic_config} & {self.topic_audit}")
+            except Exception as e:
+                self.log(f"Gagal subscribe: {e}")
 
             # 3. Publish Heartbeat awal
-            hb_payload = json.dumps(self.create_heartbeat_payload())
-            client.publish(self.topic_heartbeat, hb_payload)
-            self.log(f"PUB heartbeat awal: {hb_payload}")
+            try:
+                hb_payload = json.dumps(self.create_heartbeat_payload())
+                client.publish(self.topic_heartbeat, hb_payload)
+                self.log(f"PUB heartbeat awal: {hb_payload}")
+            except Exception as e:
+                self.log(f"Gagal publish heartbeat awal: {e}")
         else:
-            self.log(f"Gagal connect, return code: {rc}")
+            self.is_connected = False
+            self.log(f"Gagal connect ke broker, return code: {rc}")
 
     def on_message(self, client, userdata, msg):
         payload = msg.payload.decode('utf-8', errors='ignore')
         self.log(f"PESAN MASUK di {msg.topic}: {payload}")
 
     def on_disconnect(self, client, userdata, rc, properties=None):
-        self.log("Terputus dari MQTT broker.")
+        self.is_connected = False
+        rc_code = getattr(rc, "value", rc)
+        if rc_code != 0:
+            self.log(f"Koneksi terputus tak terduga (rc={rc}). Paho auto-reconnect aktif...")
+        else:
+            self.log("Terputus dari MQTT broker secara normal.")
 
     def run(self):
-        self.log(f"Menghubungkan ke {BROKER_HOST}:{BROKER_PORT}...")
-        try:
-            self.client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
-        except Exception as e:
-            self.log(f"Error koneksi broker: {e}")
+        """Loop eksekusi utama dengan auto-recovery tanpa batas."""
+        # Random jitter saat start agar 11 device tidak connect serempak
+        time.sleep(random.uniform(0.1, 2.0))
+
+        while not self.stop_event.is_set():
+            try:
+                self._init_client()
+                self._connect_and_loop()
+            except Exception as e:
+                self.log(f"Exception di worker loop: {e}. Melakukan reconnect dalam 5 detik...")
+                self.stop_event.wait(5.0)
+
+    def _connect_and_loop(self):
+        """Koneksi ke broker dan loop pengiriman data."""
+        self.log(f"Mencoba menghubungkan ke {BROKER_HOST}:{BROKER_PORT}...")
+        
+        # Loop percobaan connect sampai berhasil atau diminta stop
+        retry_delay = 3.0
+        while not self.stop_event.is_set():
+            try:
+                self.client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+                self.client.loop_start()
+                break
+            except Exception as e:
+                self.log(f"Koneksi gagal ({e}). Retry dalam {int(retry_delay)}s...")
+                self.stop_event.wait(retry_delay)
+                retry_delay = min(retry_delay * 1.5, 30.0)
+
+        if self.stop_event.is_set():
             return
 
-        self.client.loop_start()
-
-        # Sedikit stagger acak agar tidak membanjiri broker pada milidetik yang sama persis
-        time.sleep(random.uniform(0.1, 1.5))
         last_hb_time = time.time()
 
-        try:
-            while not self.stop_event.is_set():
-                now = time.time()
+        # Loop pengiriman sensor dan heartbeat
+        while not self.stop_event.is_set():
+            now = time.time()
 
-                # Kirim Heartbeat berkala
-                if now - last_hb_time >= HEARTBEAT_SEC:
-                    last_hb_time = now
-                    hb = self.create_heartbeat_payload()
+            # Jika koneksi macet/tidak publish lebih dari 90 detik, trigger reconnect paksa
+            if now - self.last_successful_publish > 120.0 and not self.is_connected:
+                self.log("Koneksi macet terdeteksi (>120s tanpa publish). Memaksa reconnect...")
+                try:
+                    self.client.reconnect()
+                except Exception as e:
+                    self.log(f"Gagal force reconnect: {e}. Menginisialisasi ulang client...")
+                    break  # Keluar ke _init_client() di run()
+
+            # Kirim Heartbeat berkala
+            if now - last_hb_time >= HEARTBEAT_SEC:
+                last_hb_time = now
+                hb = self.create_heartbeat_payload()
+                try:
                     self.client.publish(self.topic_heartbeat, json.dumps(hb))
                     self.log(f"[HEARTBEAT] -> {hb}")
+                    self.last_successful_publish = now
+                    touch_health_file()
+                except Exception as e:
+                    self.log(f"Error kirim heartbeat: {e}")
 
-                # Kirim Data Tilt
-                tilt_data = self.create_tilt_payload()
+            # Kirim Data Tilt
+            tilt_data = self.create_tilt_payload()
+            try:
                 self.client.publish(self.topic_tilt, json.dumps(tilt_data))
                 self.log(f"[TILT] -> {tilt_data}")
+                self.last_successful_publish = now
+                touch_health_file()
+            except Exception as e:
+                self.log(f"Error kirim tilt: {e}")
 
-                # Kirim Data Wind
-                wind_data = self.create_wind_payload()
+            # Kirim Data Wind
+            wind_data = self.create_wind_payload()
+            try:
                 self.client.publish(self.topic_wind, json.dumps(wind_data))
                 self.log(f"[WIND] -> {wind_data}")
+                self.last_successful_publish = now
+                touch_health_file()
+            except Exception as e:
+                self.log(f"Error kirim wind: {e}")
 
-                # Sleep dengan interval pendek agar responsif terhadap sinyal stop
-                slept = 0.0
-                while slept < INTERVAL_SEC and not self.stop_event.is_set():
-                    time.sleep(0.5)
-                    slept += 0.5
-
-        except Exception as e:
-            self.log(f"Worker exception: {e}")
-        finally:
-            self.stop()
+            # Sleep responsif terhadap stop_event
+            slept = 0.0
+            while slept < INTERVAL_SEC and not self.stop_event.is_set():
+                time.sleep(0.5)
+                slept += 0.5
 
     def stop(self):
+        """Hentikan worker secara bersih."""
         self.stop_event.set()
         try:
-            self.client.loop_stop()
-            self.client.disconnect()
+            if self.client:
+                self.client.loop_stop()
+                self.client.disconnect()
         except Exception:
             pass
 
 
 def load_devices() -> list:
-    """
-    Menentukan daftar device yang akan dijalankan:
-    1. Jika ENV CHIP_ID & MAC_ADDRESS diset -> jalankan 1 device spesifik tersebut.
-    2. Jika TARGET_CHIPS diset -> filter device dari devices.json sesuai list nama chip.
-    3. Default -> jalankan seluruh device yang ada di devices.json (11 devices).
-    """
+    """Menentukan daftar device yang akan dijalankan."""
     env_chip = os.getenv("CHIP_ID")
     env_mac = os.getenv("MAC_ADDRESS")
 
@@ -251,13 +340,13 @@ def load_devices() -> list:
 
 
 def main():
-    print("=" * 65, flush=True)
-    print("      UNIFIED ESP32 VERTICALITY SIMULATOR (DOCKER RUNNER)", flush=True)
-    print("=" * 65, flush=True)
+    print("=" * 70, flush=True)
+    print("   UNIFIED ESP32 VERTICALITY SIMULATOR (AUTO-RECOVERY & SUPERVISOR)", flush=True)
+    print("=" * 70, flush=True)
     print(f"Broker Target   : {BROKER_HOST}:{BROKER_PORT}", flush=True)
     print(f"MQTT User       : {MQTT_USER}", flush=True)
     print(f"Sensor Interval : {INTERVAL_SEC}s | Heartbeat Interval : {HEARTBEAT_SEC}s", flush=True)
-    print("=" * 65, flush=True)
+    print("=" * 70, flush=True)
 
     devices = load_devices()
     if not devices:
@@ -266,6 +355,7 @@ def main():
 
     workers = []
     threads = []
+    stop_event = threading.Event()
 
     for d in devices:
         chip = d.get("chip_id")
@@ -277,11 +367,8 @@ def main():
         workers.append(worker)
         threads.append(t)
 
-    # Graceful shutdown handler
-    stop_event = threading.Event()
-
     def handle_signal(sig, frame):
-        print(f"\n[RUNNER] Menerima sinyal stop ({sig}). Menghentikan seluruh worker...", flush=True)
+        print(f"\n[SUPERVISOR] Menerima sinyal stop ({sig}). Menghentikan seluruh worker...", flush=True)
         stop_event.set()
         for w in workers:
             w.stop()
@@ -289,24 +376,58 @@ def main():
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
-    # Jalankan semua thread
+    # Jalankan semua thread worker
     for t in threads:
         t.start()
 
-    print(f"[RUNNER] Berhasil menjalankan {len(threads)} worker thread.", flush=True)
+    print(f"[SUPERVISOR] Berhasil menjalankan {len(threads)} worker thread. Watchdog aktif.", flush=True)
+    touch_health_file()
 
-    # Main loop menjaga runner tetap hidup hingga dihentikan
+    # ==========================================================================
+    # SUPERVISOR / WATCHDOG LOOP
+    # Memeriksa kesehatan setiap thread berkala dan otomatis me-restart jika mati
+    # ==========================================================================
     try:
         while not stop_event.is_set():
-            time.sleep(1)
+            time.sleep(5)
+            touch_health_file()
+
+            if stop_event.is_set():
+                break
+
+            # Periksa setiap worker thread
+            for i, (worker, t) in enumerate(zip(workers, threads)):
+                if not t.is_alive() and not stop_event.is_set():
+                    print(
+                        f"[SUPERVISOR ALERT] Thread worker {worker.chip_id} mati! "
+                        f"Menghidupkan ulang (auto-restart) thread sekarang...",
+                        flush=True
+                    )
+                    # Buat thread baru untuk worker yang mati
+                    new_t = threading.Thread(
+                        target=worker.run,
+                        name=f"Thread-{worker.chip_id}-restart",
+                        daemon=True
+                    )
+                    threads[i] = new_t
+                    new_t.start()
+                    print(f"[SUPERVISOR] Thread worker {worker.chip_id} berhasil dihidupkan kembali.", flush=True)
+
     except KeyboardInterrupt:
         handle_signal(signal.SIGINT, None)
 
-    print("[RUNNER] Menunggu seluruh thread selesai...", flush=True)
+    print("[SUPERVISOR] Menunggu seluruh worker selesai...", flush=True)
     for t in threads:
         t.join(timeout=3.0)
 
-    print("[RUNNER] Seluruh worker telah berhenti. Keluar.", flush=True)
+    # Hapus file health saat shutdown bersih
+    try:
+        if os.path.exists(HEALTH_FILE):
+            os.remove(HEALTH_FILE)
+    except Exception:
+        pass
+
+    print("[SUPERVISOR] Seluruh worker telah berhenti. Keluar.", flush=True)
 
 
 if __name__ == "__main__":

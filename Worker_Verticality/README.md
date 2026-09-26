@@ -1,8 +1,14 @@
 # ESP32 Verticality Simulator - Docker Deployment Guide
 
-Modul ini telah di-unified agar **ke-11 device simulator dapat berjalan bersamaan dalam 1 Docker Image & 1 Container yang sangat ringan** (menggunakan multi-threading, konsumsi RAM hanya ~25-35MB).
+Modul ini telah di-unified agar **seluruh device simulator (21 device atau lebih) dapat berjalan bersamaan dalam 1 Docker Image & 1 Container yang sangat ringan** (menggunakan multi-threading, konsumsi RAM hanya ~25-45MB) dengan fitur **Auto-Reconnect & Supervisor Watchdog** agar tidak pernah mati/macet di VPS.
 
 ---
+
+## 🛡️ Fitur Ketahanan (Fault Tolerance & Auto-Recovery)
+1. **Thread Supervisor / Watchdog**: Thread utama terus memonitor status ke-21 worker thread setiap 5 detik. Jika ada thread yang terhenti karena crash/error socket tak terduga, supervisor otomatis menghidupkannya kembali (*auto-restart*).
+2. **Infinite Auto-Reconnect**: Jika broker EMQX restart atau jaringan VPS berkedip, worker tidak akan exit. Worker akan terus mencoba menyambung ulang (*retry loop*) secara otomatis.
+3. **Stale Connection Reset**: Jika koneksi terdeteksi macet (>120s tanpa publish), client MQTT otomatis di-reinisialisasi.
+4. **Docker Healthcheck**: Memantau file detak jantung `/tmp/worker_alive`. Jika seluruh proses Python freeze, Docker otomatis me-restart container (`restart: always`).
 
 ## 📁 Struktur File
 - **`devices.json`**: Daftar 11 device (CHIP_ID & MAC_ADDRESS). Jika ada device baru, cukup tambahkan di sini tanpa edit kode Python.
