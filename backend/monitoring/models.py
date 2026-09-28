@@ -141,6 +141,16 @@ class Site(models.Model):
         default=False,
         help_text='Apakah site disembunyikan secara default?'
     )
+    mac_address = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='MAC Address ESP32 (contoh: 3A:0E:4C:1E:80:6E)'
+    )
+    is_simulated = models.BooleanField(
+        default=True,
+        help_text='Apakah simulasi dummy aktif untuk site ini? (Matikan jika sudah menggunakan alat fisik)'
+    )
 
     class Meta:
         verbose_name = 'Site'
@@ -148,6 +158,25 @@ class Site(models.Model):
 
     def __str__(self):
         return f"Site {self.name} ({self.code})"
+
+
+class VerticalitySimulatorConfig(models.Model):
+    """
+    Model konfigurasi global untuk Worker Simulator Verticality.
+    """
+    is_master_enabled = models.BooleanField(
+        default=True,
+        help_text='Master switch: Hidupkan/matikan seluruh simulator dummy verticality'
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Verticality Simulator Config'
+        verbose_name_plural = 'Verticality Simulator Configs'
+
+    def __str__(self):
+        return f"Simulator Global Switch: {'ACTIVE' if self.is_master_enabled else 'PAUSED'}"
+
 
 
 class SensorReading(models.Model):

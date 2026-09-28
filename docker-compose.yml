@@ -142,7 +142,7 @@ services:
     networks:
       - nms_network
 
-  # 2h. Verticality Simulator (Unified 11 Devices Worker)
+  # 2h. Verticality Simulator (Unified 21 Devices Worker with Admin Panel Sync)
   verticality_simulators:
     build: ./Worker_Verticality
     container_name: nms_verticality_simulators
@@ -153,6 +153,9 @@ services:
       - BROKER_PORT=1884
       - MQTT_USER=nyk_ws
       - MQTT_PASS=ws
+      - BACKEND_SYNC_URL=http://backend:8000/api/verticality/simulator-sync/
+    depends_on:
+      - backend
     volumes:
       - ./Worker_Verticality/devices.json:/app/devices.json:ro
     networks:

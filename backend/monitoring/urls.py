@@ -9,4 +9,9 @@ urlpatterns = [
     path('sensor-data/sites-visibility/', views.SiteVisibilityView.as_view(), name='sensor-data-sites-visibility'),
     path('sensor-data/sites/', views.SiteListCreateView.as_view(), name='site-list'),
     path('sensor-data/sites/<str:pk>/', views.SiteRetrieveUpdateDestroyView.as_view(), name='site-detail'),
+    path('admin/simulator-status/', views.simulator_status_view, name='simulator-status'),
+    path('admin/simulator-toggle/', views.simulator_master_toggle_view, name='simulator-master-toggle'),
+    path('admin/sites/<str:pk>/toggle-simulation/', views.site_toggle_simulation_view, name='site-toggle-simulation'),
+    path('simulator-sync/', views.simulator_sync_view, name='simulator-sync'),
 ]
+

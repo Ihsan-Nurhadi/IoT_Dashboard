@@ -4,7 +4,11 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db.models import Max, Subquery, OuterRef, Count
 from django.utils import timezone
-from .models import SensorData, SiteVisibility, Site, SensorReading, BLEScan, RFIDScan, RegisteredRFIDTag, RegisteredRFIDReader, CableHealthTelemetry
+from .models import (
+    SensorData, SiteVisibility, Site, SensorReading, BLEScan, RFIDScan,
+    RegisteredRFIDTag, RegisteredRFIDReader, CableHealthTelemetry,
+    VerticalitySimulatorConfig
+)
 from .serializers import SensorDataSerializer, SiteVisibilitySerializer, SiteSerializer, SensorReadingSerializer
 
 
@@ -158,6 +162,63 @@ class SiteVisibilityView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+DEFAULT_21_SITES = [
+    {"id": "site-swadaya", "name": "Swadaya", "siteId": "20TS-SWADAYA", "code": "E32_VER_SWADAYA", "mac_address": "3A:0E:4C:1E:80:6E", "lat": -6.2201, "lng": 106.8501, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Selatan", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-pedurenan", "name": "Pedurenan", "siteId": "20TS-PEDURENAN", "code": "E32_VER_PEDURENAN", "mac_address": "D9:DA:D9:08:94:FF", "lat": -6.2305, "lng": 106.8321, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Selatan", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-smu84", "name": "SMU 84", "siteId": "20TS-SMU84", "code": "E32_VER_SMU84", "mac_address": "71:0D:4E:CA:62:6A", "lat": -6.1500, "lng": 106.7100, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Barat", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-jlnmustika", "name": "Jalan Mustika", "siteId": "20TS-JLNMUSTIKA", "code": "E32_VER_JLNMUSTIKA", "mac_address": "12:B7:3C:F5:82:0C", "lat": -6.2800, "lng": 106.9000, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Bekasi", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-cikondang", "name": "Cikondang", "siteId": "20TS-CIKONDANG", "code": "E32_VER_CIKONDANG", "mac_address": "10:B7:C8:81:F0:18", "lat": -6.9200, "lng": 107.6000, "area": "AREA 3", "region": "Jawa Barat", "kabupaten": "Bandung", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-prmanen", "name": "Permanen", "siteId": "20TS-PRMANEN", "code": "ESP32_VER_PRMANEN", "mac_address": "C0:A4:DA:C9:7F:E2", "lat": -6.2100, "lng": 106.8400, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Pusat", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-gangam", "name": "Gang Am", "siteId": "20TS-GANGAM", "code": "E32_VER_GANGAM", "mac_address": "28:05:A5:24:D5:10", "lat": -6.2500, "lng": 106.8700, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Timur", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-siitu", "name": "Siitu", "siteId": "20TS-SIITU", "code": "E32_VER_SIITU", "mac_address": "68:09:47:74:B6:54", "lat": -6.3200, "lng": 106.8100, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Depok", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-bantarsari", "name": "Bantarsari", "siteId": "20TS-BANTARSARI", "code": "E32_VER_BANTARSARI", "mac_address": "58:2A:BD:80:F6:34", "lat": -7.5000, "lng": 108.9000, "area": "AREA 3", "region": "Jawa Tengah", "kabupaten": "Cilacap", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-jlabdulsaleh", "name": "Jl. Abdul Saleh", "siteId": "20TS-JLABDULSALEH", "code": "E32_VER_JLABDULSALEH", "mac_address": "20:50:0D:29:B6:70", "lat": -6.9100, "lng": 107.5900, "area": "AREA 3", "region": "Jawa Barat", "kabupaten": "Bandung", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-podosugih", "name": "Podosugih", "siteId": "20TS-PODOSUGIH", "code": "E32_VER_PODOSUGIH", "mac_address": "68:09:47:6F:A9:FC", "lat": -6.8900, "lng": 109.6700, "area": "AREA 3", "region": "Jawa Tengah", "kabupaten": "Pekalongan", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-pelebon", "name": "Pelebon", "siteId": "20TS-PELEBON", "code": "E32_VER_PELEBON", "mac_address": "68:09:47:5F:69:60", "lat": -7.0000, "lng": 110.4600, "area": "AREA 3", "region": "Jawa Tengah", "kabupaten": "Semarang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-ganggang", "name": "Ganggang", "siteId": "20TS-GANGGANG", "code": "E32_VER_GANGGANG", "mac_address": "20:50:0D:2B:00:C4", "lat": -7.4200, "lng": 112.4400, "area": "AREA 4", "region": "Jawa Timur", "kabupaten": "Mojokerto", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-gayungsari", "name": "Gayungsari", "siteId": "20TS-GAYUNGSARI", "code": "E32_VER_GAYUNGSARI", "mac_address": "58:2A:BD:80:8A:34", "lat": -7.3300, "lng": 112.7200, "area": "AREA 4", "region": "Jawa Timur", "kabupaten": "Surabaya", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-karmul", "name": "Karmul", "siteId": "20TS-KARMUL", "code": "E32_VER_KARMUL", "mac_address": "68:09:47:71:4A:D0", "lat": -6.2100, "lng": 106.8200, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Selatan", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-lubukawah", "name": "Lubukawah", "siteId": "20TS-LUBUKAWAH", "code": "E32_VER_LUBUKAWAH", "mac_address": "20:9B:A9:73:F0:9C", "lat": -0.9200, "lng": 100.3700, "area": "AREA 1", "region": "Sumatera Barat", "kabupaten": "Padang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-kadubereum", "name": "Kadubereum", "siteId": "20TS-KADUBEREUM", "code": "E32_VER_KADUBEREUM", "mac_address": "E0:6F:11:4E:1D:74", "lat": -6.3200, "lng": 106.0500, "area": "AREA 2", "region": "Banten", "kabupaten": "Pandeglang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-jlnjpnplg", "name": "Jalan JPN Palembang", "siteId": "20TS-JLNJPNPLG", "code": "E32_VER_JLNJPNPLG", "mac_address": "C8:85:41:C6:25:00", "lat": -2.9900, "lng": 104.7500, "area": "AREA 1", "region": "Sumatera Selatan", "kabupaten": "Palembang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-sukamulya", "name": "Sukamulya", "siteId": "20TS-SUKAMULYA", "code": "E32_VER_SUKAMULYA", "mac_address": "20:9B:A9:74:18:20", "lat": -6.9500, "lng": 107.5700, "area": "AREA 3", "region": "Jawa Barat", "kabupaten": "Bandung", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-16uluplg", "name": "16 Ulu Palembang", "siteId": "20TS-16ULUPLG", "code": "E32_VER_16ULUPLG", "mac_address": "20:50:0D:2B:3A:4C", "lat": -3.0000, "lng": 104.7700, "area": "AREA 1", "region": "Sumatera Selatan", "kabupaten": "Palembang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
+    {"id": "site-nayakaws", "name": "Nayaka WS", "siteId": "20TS10B1529", "code": "E32_VER_WS", "mac_address": "3A:0E:4C:1E:80:6E", "lat": -6.237318, "lng": 106.919108, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Timur", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True}
+]
+
+
+def purge_verticality_retained_info(chip_ids: list[str]):
+    """
+    Kirim pesan kosong ("") dengan retain=True ke nms/<chip_id>/vertical/info
+    agar broker EMQX langsung menghapus data retained dan tidak 'nyangkut'.
+    """
+    if not chip_ids:
+        return
+    import threading
+    def _do_purge():
+        try:
+            import time
+            import paho.mqtt.client as mqtt
+            try:
+                client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id=f"django_purge_{int(time.time())}")
+            except AttributeError:
+                client = mqtt.Client(client_id=f"django_purge_{int(time.time())}")
+            client.username_pw_set("nyk_ws", "ws")
+            client.connect("emqx.nayakanms.com", 1884, 10)
+            client.loop_start()
+            time.sleep(0.3)
+            for chip in chip_ids:
+                if chip:
+                    client.publish(f"nms/{chip}/vertical/info", "", qos=1, retain=True)
+                    client.publish(f"nms/{chip}/vertical/heartbeat", "", qos=1, retain=True)
+            time.sleep(0.3)
+            client.loop_stop()
+            client.disconnect()
+        except Exception as e:
+            print(f"[PURGE ERROR] Gagal membersihkan retained message di EMQX: {e}")
+    threading.Thread(target=_do_purge, daemon=True).start()
+
+
 class SiteListCreateView(generics.ListCreateAPIView):
     """
     GET  /api/sensor-data/sites/     → List semua site (dengan auto-seeding jika kosong)
@@ -168,30 +229,28 @@ class SiteListCreateView(generics.ListCreateAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        # Auto-seeding jika tabel Site kosong
-        if Site.objects.count() == 0:
+        # Auto-seeding jika tabel Site kosong atau belum lengkap 21 site
+        if Site.objects.count() < len(DEFAULT_21_SITES):
             self.seed_default_sites()
-        return Site.objects.all()
+        return Site.objects.all().order_by('name')
 
     def seed_default_sites(self):
-        default_sites = [
-            {
-                'id': 'ckg-04-031',
-                'name': 'Nayaka WS',
-                'siteId': '20TS10B1529',
-                'code': 'E32_VER_WS',
-                'lat': -6.237318,
-                'lng': 106.919108,
-                'area': 'AREA 2',
-                'region': 'Jabodetabek Provinsi DKI Jakarta',
-                'kabupaten': 'Kota Adm. Jakarta Timur',
-                'status': 'online',
-                'towerType': 'SST',
-                'towerHeight': 42,
-            }
-        ]
-        for s in default_sites:
-            Site.objects.get_or_create(id=s['id'], defaults=s)
+        for s in DEFAULT_21_SITES:
+            site_obj, created = Site.objects.get_or_create(
+                code=s['code'],
+                defaults=s
+            )
+            # Pastikan mac_address & is_simulated terisi
+            if not created:
+                updated = False
+                if not site_obj.mac_address and s.get('mac_address'):
+                    site_obj.mac_address = s['mac_address']
+                    updated = True
+                if site_obj.is_simulated is None:
+                    site_obj.is_simulated = True
+                    updated = True
+                if updated:
+                    site_obj.save()
 
 
 class SiteRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
@@ -202,6 +261,121 @@ class SiteRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = Site.objects.all()
     serializer_class = SiteSerializer
+
+    def perform_destroy(self, instance):
+        chip_code = instance.code
+        super().perform_destroy(instance)
+        # Bersihkan retained message pada broker agar tidak nyangkut
+        purge_verticality_retained_info([chip_code])
+
+
+@api_view(['GET'])
+def simulator_status_view(request):
+    """
+    GET /api/verticality/admin/simulator-status/
+    Mengambil status master switch dan ringkasan site.
+    """
+    config, _ = VerticalitySimulatorConfig.objects.get_or_create(id=1)
+    total_sites = Site.objects.count()
+    simulated_sites = Site.objects.filter(is_simulated=True).count()
+    real_sites = Site.objects.filter(is_simulated=False).count()
+
+    return Response({
+        "is_master_enabled": config.is_master_enabled,
+        "total_sites": total_sites,
+        "simulated_sites": simulated_sites,
+        "real_sites": real_sites,
+        "updated_at": config.updated_at
+    })
+
+
+@api_view(['POST'])
+def simulator_master_toggle_view(request):
+    """
+    POST /api/verticality/admin/simulator-toggle/
+    Nyalakan / Matikan Master Switch simulator.
+    """
+    config, _ = VerticalitySimulatorConfig.objects.get_or_create(id=1)
+    is_enabled = request.data.get('is_master_enabled')
+    if is_enabled is None:
+        config.is_master_enabled = not config.is_master_enabled
+    else:
+        config.is_master_enabled = bool(is_enabled)
+    config.save()
+
+    # Jika dimatikan, bersihkan retained message untuk seluruh site yang disimulasikan
+    if not config.is_master_enabled:
+        chips = list(Site.objects.filter(is_simulated=True).values_list('code', flat=True))
+        purge_verticality_retained_info(chips)
+
+    return Response({
+        "success": True,
+        "is_master_enabled": config.is_master_enabled,
+        "message": "Simulator verticality berhasil dinyalakan" if config.is_master_enabled else "Simulator verticality berhasil dimatikan & cache dibersihkan"
+    })
+
+
+@api_view(['POST'])
+def site_toggle_simulation_view(request, pk):
+    """
+    POST /api/verticality/admin/sites/<pk>/toggle-simulation/
+    Toggle status simulasi per site.
+    """
+    try:
+        site = Site.objects.filter(models.Q(id=pk) | models.Q(code=pk)).first()
+        if not site:
+            return Response({"error": "Site tidak ditemukan"}, status=status.HTTP_404_NOT_FOUND)
+
+        is_sim = request.data.get('is_simulated')
+        if is_sim is None:
+            site.is_simulated = not site.is_simulated
+        else:
+            site.is_simulated = bool(is_sim)
+        site.save()
+
+        # Jika simulasi dinonaktifkan (karena hardware fisik aktif), bersihkan retained message
+        if not site.is_simulated:
+            purge_verticality_retained_info([site.code])
+
+        return Response({
+            "success": True,
+            "id": site.id,
+            "code": site.code,
+            "is_simulated": site.is_simulated,
+            "message": f"Simulasi {site.name} aktif" if site.is_simulated else f"Simulasi {site.name} dimatikan (Mode Real Aktif)"
+        })
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def simulator_sync_view(request):
+    """
+    GET /api/verticality/simulator-sync/
+    Endpoint internal yang di-poll berkala oleh worker simulator container.
+    """
+    config, _ = VerticalitySimulatorConfig.objects.get_or_create(id=1)
+    
+    if not config.is_master_enabled:
+        return Response({
+            "is_master_enabled": False,
+            "devices": []
+        })
+
+    active_sites = Site.objects.filter(is_simulated=True)
+    devices = []
+    for s in active_sites:
+        devices.append({
+            "chip_id": s.code,
+            "mac_address": s.mac_address or "00:00:00:00:00:00",
+            "tower_height": int(s.towerHeight * 1000) if s.towerHeight else 42000
+        })
+
+    return Response({
+        "is_master_enabled": True,
+        "devices": devices
+    })
+
 
 
 class LatestReadingView(APIView):

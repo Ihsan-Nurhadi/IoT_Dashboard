@@ -35,6 +35,32 @@ interface RegisteredRFIDReader {
   created_at?: string;
 }
 
+interface VerticalitySite {
+  id: string;
+  name: string;
+  siteId: string;
+  code: string;
+  mac_address?: string;
+  lat: number;
+  lng: number;
+  area: string;
+  region: string;
+  kabupaten: string;
+  status?: string;
+  towerType: string;
+  towerHeight: number;
+  isHidden?: boolean;
+  is_simulated: boolean;
+}
+
+interface SimulatorStatus {
+  is_master_enabled: boolean;
+  total_sites: number;
+  simulated_sites: number;
+  real_sites: number;
+  updated_at?: string;
+}
+
 const AdminDashboard: React.FC = () => {
   const [devices, setDevices] = useState<BLEDevice[]>([]);
   const [unregistered, setUnregistered] = useState<UnregisteredBeacon[]>([]);
@@ -59,7 +85,7 @@ const AdminDashboard: React.FC = () => {
 
   const [cameras, setCameras] = useState<CCTVCamera[]>([]);
   const [loadingCameras, setLoadingCameras] = useState<boolean>(false);
-  const [activeSection, setActiveSection] = useState<'ble' | 'cctv' | 'rfid'>('ble');
+  const [activeSection, setActiveSection] = useState<'ble' | 'cctv' | 'rfid' | 'verticality'>('ble');
 
   // RFID whitelisting states
   const [rfidTags, setRfidTags] = useState<RegisteredRFIDTag[]>([]);
@@ -80,6 +106,32 @@ const AdminDashboard: React.FC = () => {
   const [formReaderId, setFormReaderId] = useState<string>('');
   const [formReaderName, setFormReaderName] = useState<string>('');
   const [formReaderActive, setFormReaderActive] = useState<boolean>(true);
+
+  // Verticality Sites & Simulator States
+  const [vertSites, setVertSites] = useState<VerticalitySite[]>([]);
+  const [loadingVertSites, setLoadingVertSites] = useState<boolean>(false);
+  const [simulatorStatus, setSimulatorStatus] = useState<SimulatorStatus | null>(null);
+  const [togglingMaster, setTogglingMaster] = useState<boolean>(false);
+  const [togglingSiteId, setTogglingSiteId] = useState<string | null>(null);
+
+  // Verticality Site Modal & Form States
+  const [isSiteModalOpen, setIsSiteModalOpen] = useState<boolean>(false);
+  const [isSiteEditMode, setIsSiteEditMode] = useState<boolean>(false);
+  const [selectedSite, setSelectedSite] = useState<VerticalitySite | null>(null);
+
+  const [formSiteId, setFormSiteId] = useState<string>('');
+  const [formSiteName, setFormSiteName] = useState<string>('');
+  const [formSiteSiteId, setFormSiteSiteId] = useState<string>('');
+  const [formSiteCode, setFormSiteCode] = useState<string>('');
+  const [formSiteMac, setFormSiteMac] = useState<string>('');
+  const [formSiteLat, setFormSiteLat] = useState<number>(-6.22);
+  const [formSiteLng, setFormSiteLng] = useState<number>(106.85);
+  const [formSiteArea, setFormSiteArea] = useState<string>('AREA 2');
+  const [formSiteRegion, setFormSiteRegion] = useState<string>('Jabodetabek');
+  const [formSiteKabupaten, setFormSiteKabupaten] = useState<string>('Jakarta Selatan');
+  const [formSiteTowerType, setFormSiteTowerType] = useState<string>('SST');
+  const [formSiteTowerHeight, setFormSiteTowerHeight] = useState<number>(42);
+  const [formSiteIsSimulated, setFormSiteIsSimulated] = useState<boolean>(true);
 
   // Camera Form & Modal States
   const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
@@ -136,9 +188,12 @@ const AdminDashboard: React.FC = () => {
     fetchCameras();
     fetchRfidTags();
     fetchRfidReaders();
+    fetchVertSites();
+    fetchSimulatorStatus();
     const interval = setInterval(() => {
       fetchUnregistered();
-    }, 10000); // refresh unregistered scans every 10s
+      fetchSimulatorStatus();
+    }, 10000); // refresh scans & simulator status every 10s
     return () => clearInterval(interval);
   }, []);
 
@@ -382,6 +437,190 @@ const AdminDashboard: React.FC = () => {
     } catch (err) {
       console.error(err);
       setError('Kesalahan jaringan saat menghapus RFID Reader');
+    }
+  };
+
+  // Verticality Site & Simulator CRUD Actions
+  const fetchVertSites = async () => {
+    try {
+      setLoadingVertSites(true);
+      const res = await fetch('/api/verticality/sensor-data/sites/');
+      if (res.ok) {
+        const data = await res.json();
+        setVertSites(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingVertSites(false);
+    }
+  };
+
+  const fetchSimulatorStatus = async () => {
+    try {
+      const res = await fetch('/api/verticality/admin/simulator-status/');
+      if (res.ok) {
+        const data = await res.json();
+        setSimulatorStatus(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleMasterSimulator = async () => {
+    try {
+      setTogglingMaster(true);
+      const current = simulatorStatus?.is_master_enabled ?? true;
+      const res = await fetch('/api/verticality/admin/simulator-toggle/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_master_enabled: !current })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuccessMsg(data.message || 'Status simulator berhasil diubah');
+        await fetchSimulatorStatus();
+        await fetchVertSites();
+      } else {
+        setError('Gagal mengubah status master simulator');
+      }
+    } catch (err) {
+      setError('Kesalahan jaringan saat mengubah status simulator');
+    } finally {
+      setTogglingMaster(false);
+    }
+  };
+
+  const handleToggleSiteSimulation = async (site: VerticalitySite) => {
+    try {
+      setTogglingSiteId(site.id);
+      const nextSim = !site.is_simulated;
+      const res = await fetch(`/api/verticality/admin/sites/${encodeURIComponent(site.id)}/toggle-simulation/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_simulated: nextSim })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuccessMsg(data.message || `Status simulasi ${site.name} diperbarui`);
+        await fetchVertSites();
+        await fetchSimulatorStatus();
+      } else {
+        setError(`Gagal mengubah status simulasi ${site.name}`);
+      }
+    } catch (err) {
+      setError('Kesalahan jaringan saat toggle simulasi site');
+    } finally {
+      setTogglingSiteId(null);
+    }
+  };
+
+  const openAddSiteModal = () => {
+    setIsSiteEditMode(false);
+    setSelectedSite(null);
+    const newId = `site-${Date.now().toString(36)}`;
+    setFormSiteId(newId);
+    setFormSiteName('');
+    setFormSiteSiteId('');
+    setFormSiteCode('');
+    setFormSiteMac('');
+    setFormSiteLat(-6.22);
+    setFormSiteLng(106.85);
+    setFormSiteArea('AREA 2');
+    setFormSiteRegion('Jabodetabek');
+    setFormSiteKabupaten('Jakarta Selatan');
+    setFormSiteTowerType('SST');
+    setFormSiteTowerHeight(42);
+    setFormSiteIsSimulated(true);
+    setIsSiteModalOpen(true);
+  };
+
+  const openEditSiteModal = (site: VerticalitySite) => {
+    setIsSiteEditMode(true);
+    setSelectedSite(site);
+    setFormSiteId(site.id);
+    setFormSiteName(site.name);
+    setFormSiteSiteId(site.siteId || '');
+    setFormSiteCode(site.code);
+    setFormSiteMac(site.mac_address || '');
+    setFormSiteLat(site.lat || -6.22);
+    setFormSiteLng(site.lng || 106.85);
+    setFormSiteArea(site.area || 'AREA 2');
+    setFormSiteRegion(site.region || 'Jabodetabek');
+    setFormSiteKabupaten(site.kabupaten || 'Jakarta Selatan');
+    setFormSiteTowerType(site.towerType || 'SST');
+    setFormSiteTowerHeight(site.towerHeight || 42);
+    setFormSiteIsSimulated(site.is_simulated ?? true);
+    setIsSiteModalOpen(true);
+  };
+
+  const handleSiteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formSiteName.trim() || !formSiteCode.trim()) {
+      setError('Nama Site dan Kode Chip ID wajib diisi');
+      return;
+    }
+
+    const payload = {
+      id: formSiteId.trim() || `site-${Date.now().toString(36)}`,
+      name: formSiteName.trim(),
+      siteId: formSiteSiteId.trim() || `20TS-${formSiteCode.trim()}`,
+      code: formSiteCode.trim().toUpperCase(),
+      mac_address: formSiteMac.trim().toUpperCase(),
+      lat: Number(formSiteLat),
+      lng: Number(formSiteLng),
+      area: formSiteArea.trim(),
+      region: formSiteRegion.trim(),
+      kabupaten: formSiteKabupaten.trim(),
+      towerType: formSiteTowerType.trim(),
+      towerHeight: Number(formSiteTowerHeight),
+      is_simulated: Boolean(formSiteIsSimulated)
+    };
+
+    try {
+      const url = isSiteEditMode 
+        ? `/api/verticality/sensor-data/sites/${encodeURIComponent(selectedSite!.id)}/`
+        : '/api/verticality/sensor-data/sites/';
+      const method = isSiteEditMode ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setSuccessMsg(isSiteEditMode ? `Site ${payload.name} berhasil diperbarui` : `Site ${payload.name} berhasil ditambahkan`);
+        setIsSiteModalOpen(false);
+        await fetchVertSites();
+        await fetchSimulatorStatus();
+      } else {
+        const errData = await res.json();
+        setError(JSON.stringify(errData) || 'Gagal menyimpan konfigurasi site');
+      }
+    } catch (err) {
+      setError('Kesalahan jaringan saat menyimpan site');
+    }
+  };
+
+  const handleDeleteSite = async (site: VerticalitySite) => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus site ${site.name} (${site.code})? Cache retained MQTT pada broker akan otomatis dibersihkan.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/verticality/sensor-data/sites/${encodeURIComponent(site.id)}/`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setSuccessMsg(`Site ${site.name} berhasil dihapus & cache dibersihkan`);
+        await fetchVertSites();
+        await fetchSimulatorStatus();
+      } else {
+        setError(`Gagal menghapus site ${site.name}`);
+      }
+    } catch (err) {
+      setError('Kesalahan jaringan saat menghapus site');
     }
   };
 
@@ -1021,6 +1260,13 @@ const AdminDashboard: React.FC = () => {
           </button>
           <button 
             type="button"
+            className={`tab-nav-item ${activeSection === 'verticality' ? 'active' : ''}`}
+            onClick={() => setActiveSection('verticality')}
+          >
+            🗼 Verticality Sites & Simulator
+          </button>
+          <button 
+            type="button"
             className="tab-nav-item portal-link-btn"
             onClick={() => navigate('/')}
           >
@@ -1431,6 +1677,139 @@ const AdminDashboard: React.FC = () => {
                             <div className="table-actions">
                               <button type="button" className="btn-action btn-edit" onClick={() => openEditTagModal(tag)}>Edit</button>
                               <button type="button" className="btn-action btn-delete" onClick={() => handleTagDelete(tag.tag_epc)}>Hapus</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* Section: Verticality Sites & Simulator Control */}
+        {activeSection === 'verticality' && (
+          <div className="verticality-grid">
+            {/* Master Control Card */}
+            <div className="simulator-master-card">
+              <div className="master-card-header">
+                <div className="master-title-group">
+                  <h2>
+                    <span>🗼 Master Switch Simulator Verticality</span>
+                    <span className={`badge ${simulatorStatus?.is_master_enabled ? 'badge-active' : 'badge-inactive'}`}>
+                      {simulatorStatus?.is_master_enabled ? '● RUNNING' : '○ PAUSED'}
+                    </span>
+                  </h2>
+                  <p>Kontrol global untuk menyalakan atau mematikan seluruh data dummy sensor tower secara instan dengan garansi pembersihan cache broker MQTT (Zero State Nyangkut).</p>
+                </div>
+                <button
+                  type="button"
+                  className={`master-toggle-btn ${simulatorStatus?.is_master_enabled ? 'btn-active' : 'btn-inactive'}`}
+                  onClick={handleToggleMasterSimulator}
+                  disabled={togglingMaster}
+                >
+                  {togglingMaster ? 'Memproses...' : simulatorStatus?.is_master_enabled ? '⏹ Matikan Semua Simulator' : '▶ Nyalakan Semua Simulator'}
+                </button>
+              </div>
+
+              <div className="simulator-metrics-row">
+                <div className="metric-pill">
+                  <span className="metric-pill-label">Total Site Terdaftar</span>
+                  <span className="metric-pill-val">{simulatorStatus?.total_sites ?? vertSites.length}</span>
+                </div>
+                <div className="metric-pill">
+                  <span className="metric-pill-label">Simulator Dummy Aktif</span>
+                  <span className="metric-pill-val green">{simulatorStatus?.simulated_sites ?? vertSites.filter(s => s.is_simulated).length}</span>
+                </div>
+                <div className="metric-pill">
+                  <span className="metric-pill-label">Site Hardware Real</span>
+                  <span className="metric-pill-val cyan">{simulatorStatus?.real_sites ?? vertSites.filter(s => !s.is_simulated).length}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Sites Table Card */}
+            <section className="grid-card devices-card">
+              <div className="card-header">
+                <div>
+                  <h2>Daftar Site & Kontrol Per-Device <span className="header-count-badge">{vertSites.length}</span></h2>
+                  <p>Kelola nama site, kode chip ESP32, MAC address, serta toggle simulasi dummy per site jika hardware fisik sudah siap.</p>
+                </div>
+                <button type="button" className="btn-primary" onClick={openAddSiteModal}>
+                  ➕ Tambah Site Baru
+                </button>
+              </div>
+
+              {loadingVertSites ? (
+                <div className="loading-container">
+                  <div className="spinner"></div>
+                  <p>Memuat daftar site verticality...</p>
+                </div>
+              ) : vertSites.length === 0 ? (
+                <div className="empty-state">
+                  <p>Belum ada site verticality yang terdaftar.</p>
+                  <button type="button" className="btn-secondary" style={{ marginTop: '12px' }} onClick={openAddSiteModal}>Tambah Site Pertama</button>
+                </div>
+              ) : (
+                <div className="table-responsive rfid-table-scroll">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Nama Site & ID</th>
+                        <th>Device Code (Chip ID)</th>
+                        <th>MAC Address</th>
+                        <th>Tower</th>
+                        <th>Wilayah</th>
+                        <th>Status Simulasi</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vertSites.map((site) => (
+                        <tr key={site.id}>
+                          <td>
+                            <div className="flex-col" style={{ gap: '2px' }}>
+                              <span className="device-name">{site.name}</span>
+                              <small style={{ color: '#94a3b8', fontSize: '11px' }}>{site.siteId || '-'}</small>
+                            </div>
+                          </td>
+                          <td>
+                            <code className="device-mac" style={{ color: '#38bdf8' }}>{site.code}</code>
+                          </td>
+                          <td>
+                            <code className="device-mac">{site.mac_address || '00:00:00:00:00:00'}</code>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '12px', color: '#cbd5e1' }}>{site.towerType} · {site.towerHeight}m</span>
+                          </td>
+                          <td>
+                            <div className="flex-col" style={{ gap: '2px' }}>
+                              <span style={{ fontSize: '12px', color: '#cbd5e1' }}>{site.kabupaten}</span>
+                              <small style={{ color: '#64748b', fontSize: '10px' }}>{site.region}</small>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span className={site.is_simulated ? 'badge-simulated' : 'badge-real'}>
+                                {site.is_simulated ? '🟢 Dummy Aktif' : '🔵 Hardware Real'}
+                              </span>
+                              <label className="toggle-switch-sm" title={site.is_simulated ? 'Klik untuk matikan dummy (Mode Real)' : 'Klik untuk nyalakan simulasi dummy'}>
+                                <input
+                                  type="checkbox"
+                                  checked={site.is_simulated}
+                                  disabled={togglingSiteId === site.id}
+                                  onChange={() => handleToggleSiteSimulation(site)}
+                                />
+                                <span className="toggle-slider"></span>
+                              </label>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="table-actions">
+                              <button type="button" className="btn-action btn-edit" onClick={() => openEditSiteModal(site)}>Edit</button>
+                              <button type="button" className="btn-action btn-delete" onClick={() => handleDeleteSite(site)}>Hapus</button>
                             </div>
                           </td>
                         </tr>
@@ -1977,6 +2356,172 @@ const AdminDashboard: React.FC = () => {
                 <button type="button" className="btn-secondary" onClick={() => setIsCameraModalOpen(false)}>Batal</button>
                 <button type="submit" className="btn-primary">
                   Simpan Konfigurasi & Zone
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Add / Edit Verticality Site Modal */}
+      {isSiteModalOpen && (
+        <div className="modal-backdrop">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>{isSiteEditMode ? `Edit Site Verticality (${selectedSite?.code})` : 'Tambah Site Verticality Baru'}</h3>
+              <button className="modal-close-btn" onClick={() => setIsSiteModalOpen(false)}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSiteSubmit} className="modal-form">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="site-name">Nama Site *</label>
+                  <input
+                    id="site-name"
+                    type="text"
+                    required
+                    placeholder="Contoh: Swadaya, Pedurenan"
+                    value={formSiteName}
+                    onChange={(e) => setFormSiteName(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-code">Kode Device / Chip ID (MQTT) *</label>
+                  <input
+                    id="site-code"
+                    type="text"
+                    required
+                    placeholder="Contoh: E32_VER_SWADAYA"
+                    value={formSiteCode}
+                    onChange={(e) => setFormSiteCode(e.target.value)}
+                  />
+                  <small className="help-text">Digunakan dalam topik MQTT: <code>nms/[CHIP_ID]/vertical/tilt</code></small>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-mac">MAC Address ESP32</label>
+                  <input
+                    id="site-mac"
+                    type="text"
+                    placeholder="Contoh: 3A:0E:4C:1E:80:6E"
+                    value={formSiteMac}
+                    onChange={(e) => setFormSiteMac(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-siteid">Site ID / NMS ID</label>
+                  <input
+                    id="site-siteid"
+                    type="text"
+                    placeholder="Contoh: 20TS10B1529"
+                    value={formSiteSiteId}
+                    onChange={(e) => setFormSiteSiteId(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-tower-type">Tipe Tower</label>
+                  <select
+                    id="site-tower-type"
+                    value={formSiteTowerType}
+                    onChange={(e) => setFormSiteTowerType(e.target.value)}
+                  >
+                    <option value="SST">SST (Self-Supporting Tower)</option>
+                    <option value="Monopole">Monopole</option>
+                    <option value="Guyed">Guyed Mast</option>
+                    <option value="Rooftop">Rooftop Pole</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-tower-height">Tinggi Tower (Meter)</label>
+                  <input
+                    id="site-tower-height"
+                    type="number"
+                    step="0.5"
+                    value={formSiteTowerHeight}
+                    onChange={(e) => setFormSiteTowerHeight(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-area">Area</label>
+                  <input
+                    id="site-area"
+                    type="text"
+                    placeholder="Contoh: AREA 2"
+                    value={formSiteArea}
+                    onChange={(e) => setFormSiteArea(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-kabupaten">Kabupaten / Kota</label>
+                  <input
+                    id="site-kabupaten"
+                    type="text"
+                    placeholder="Contoh: Jakarta Selatan"
+                    value={formSiteKabupaten}
+                    onChange={(e) => setFormSiteKabupaten(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-region">Provinsi / Region</label>
+                  <input
+                    id="site-region"
+                    type="text"
+                    placeholder="Contoh: Jabodetabek DKI Jakarta"
+                    value={formSiteRegion}
+                    onChange={(e) => setFormSiteRegion(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-lat">Latitude</label>
+                  <input
+                    id="site-lat"
+                    type="number"
+                    step="0.000001"
+                    value={formSiteLat}
+                    onChange={(e) => setFormSiteLat(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="site-lng">Longitude</label>
+                  <input
+                    id="site-lng"
+                    type="number"
+                    step="0.000001"
+                    value={formSiteLng}
+                    onChange={(e) => setFormSiteLng(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="form-group full-width" style={{ marginTop: '10px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formSiteIsSimulated}
+                      onChange={(e) => setFormSiteIsSimulated(e.target.checked)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
+                      Aktifkan Simulasi Dummy untuk Site ini
+                    </span>
+                  </label>
+                  <small className="help-text">
+                    💡 Centang jika site ini belum dipasang alat fisik (akan disimulasikan datanya secara otomatis). Hilangkan centang jika sudah menggunakan sensor ESP32 fisik asli.
+                  </small>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-secondary" onClick={() => setIsSiteModalOpen(false)}>Batal</button>
+                <button type="submit" className="btn-primary">
+                  {isSiteEditMode ? 'Simpan Perubahan Site' : 'Daftarkan Site'}
                 </button>
               </div>
             </form>
