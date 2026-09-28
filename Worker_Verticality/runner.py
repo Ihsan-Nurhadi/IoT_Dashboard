@@ -341,9 +341,14 @@ def fetch_backend_sync() -> dict | None:
         with urllib.request.urlopen(req, timeout=3.5) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode('utf-8'))
+                if getattr(fetch_backend_sync, "had_error", False):
+                    print(f"[SUPERVISOR SYNC] ✓ Berhasil terhubung kembali ke backend ({BACKEND_SYNC_URL})", flush=True)
+                    fetch_backend_sync.had_error = False
                 return data
-    except Exception:
-        pass
+    except Exception as e:
+        if not getattr(fetch_backend_sync, "had_error", False):
+            print(f"[SUPERVISOR SYNC WARN] Gagal sinkronisasi ke backend ({BACKEND_SYNC_URL}): {e}", flush=True)
+            fetch_backend_sync.had_error = True
     return None
 
 

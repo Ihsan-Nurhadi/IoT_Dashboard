@@ -157,7 +157,7 @@ services:
     depends_on:
       - backend
     volumes:
-      - ./Worker_Verticality/devices.json:/app/devices.json:ro
+      - ./Worker_Verticality:/app
     networks:
       - nms_network
 
