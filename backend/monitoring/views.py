@@ -1,8 +1,10 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from django.db.models import Max, Subquery, OuterRef, Count
+from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Max, Subquery, OuterRef, Count, Q
 from django.utils import timezone
 from .models import (
     SensorData, SiteVisibility, Site, SensorReading, BLEScan, RFIDScan,
@@ -227,6 +229,8 @@ class SiteListCreateView(generics.ListCreateAPIView):
     queryset = Site.objects.all()
     serializer_class = SiteSerializer
     pagination_class = None
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         # Auto-seeding jika tabel Site kosong atau belum lengkap 21 site
@@ -261,6 +265,8 @@ class SiteRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = Site.objects.all()
     serializer_class = SiteSerializer
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def perform_destroy(self, instance):
         chip_code = instance.code
@@ -269,7 +275,10 @@ class SiteRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         purge_verticality_retained_info([chip_code])
 
 
+@csrf_exempt
 @api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def simulator_status_view(request):
     """
     GET /api/verticality/admin/simulator-status/
@@ -289,7 +298,10 @@ def simulator_status_view(request):
     })
 
 
+@csrf_exempt
 @api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def simulator_master_toggle_view(request):
     """
     POST /api/verticality/admin/simulator-toggle/
@@ -315,14 +327,17 @@ def simulator_master_toggle_view(request):
     })
 
 
+@csrf_exempt
 @api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def site_toggle_simulation_view(request, pk):
     """
     POST /api/verticality/admin/sites/<pk>/toggle-simulation/
     Toggle status simulasi per site.
     """
     try:
-        site = Site.objects.filter(models.Q(id=pk) | models.Q(code=pk)).first()
+        site = Site.objects.filter(Q(id=pk) | Q(code=pk)).first()
         if not site:
             return Response({"error": "Site tidak ditemukan"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -348,7 +363,10 @@ def site_toggle_simulation_view(request, pk):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@csrf_exempt
 @api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def simulator_sync_view(request):
     """
     GET /api/verticality/simulator-sync/

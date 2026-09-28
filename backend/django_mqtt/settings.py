@@ -78,10 +78,32 @@ SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False  # DEV
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000","http://103.176.45.14",
-]
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF Trusted Origins for frontend access (IP: 110.232.92.134, domain, and localhost)
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3002",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3002",
+    "http://110.232.92.134",
+    "http://110.232.92.134:3000",
+    "http://110.232.92.134:3002",
+]
+csrf_trusted_env = os.environ.get("CSRF_TRUSTED_ORIGINS")
+if csrf_trusted_env:
+    for origin in csrf_trusted_env.split(","):
+        origin = origin.strip()
+        if origin and origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
+# REST Framework settings (disabling SessionAuthentication CSRF check on API endpoints)
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_PERMISSION_CLASSES': [],
+}
+
 
 
 
