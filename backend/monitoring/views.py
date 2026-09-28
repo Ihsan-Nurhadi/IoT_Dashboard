@@ -221,9 +221,12 @@ def purge_verticality_retained_info(chip_ids: list[str]):
     threading.Thread(target=_do_purge, daemon=True).start()
 
 
+_DEFAULT_SITES_INITIALIZED = False
+
+
 class SiteListCreateView(generics.ListCreateAPIView):
     """
-    GET  /api/sensor-data/sites/     → List semua site (dengan auto-seeding jika kosong)
+    GET  /api/sensor-data/sites/     → List semua site
     POST /api/sensor-data/sites/     → Tambah site baru
     """
     queryset = Site.objects.all()
@@ -233,9 +236,13 @@ class SiteListCreateView(generics.ListCreateAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        # Auto-seeding jika tabel Site kosong atau belum lengkap 21 site
-        if Site.objects.count() < len(DEFAULT_21_SITES):
-            self.seed_default_sites()
+        global _DEFAULT_SITES_INITIALIZED
+        # Auto-seeding HANYA jika tabel Site masih 0 (pertama kali inisialisasi)
+        # JANGAN PERNAH re-seed jika site sengaja dihapus oleh admin!
+        if not _DEFAULT_SITES_INITIALIZED:
+            _DEFAULT_SITES_INITIALIZED = True
+            if Site.objects.count() == 0:
+                self.seed_default_sites()
         return Site.objects.all().order_by('name')
 
     def seed_default_sites(self):
@@ -255,6 +262,25 @@ class SiteListCreateView(generics.ListCreateAPIView):
                     updated = True
                 if updated:
                     site_obj.save()
+
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def restore_default_sites_view(request):
+    """
+    POST /api/verticality/admin/restore-default-sites/
+    Memulihkan 21 site default ke database atas permintaan pengguna.
+    """
+    view = SiteListCreateView()
+    view.seed_default_sites()
+    return Response({
+        "success": True,
+        "message": "21 Site default berhasil dipulihkan",
+        "total_sites": Site.objects.count()
+    })
+
 
 
 class SiteRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):

@@ -12,6 +12,7 @@ urlpatterns = [
     path('admin/simulator-status/', views.simulator_status_view, name='simulator-status'),
     path('admin/simulator-toggle/', views.simulator_master_toggle_view, name='simulator-master-toggle'),
     path('admin/sites/<str:pk>/toggle-simulation/', views.site_toggle_simulation_view, name='site-toggle-simulation'),
+    path('admin/restore-default-sites/', views.restore_default_sites_view, name='restore-default-sites'),
     path('simulator-sync/', views.simulator_sync_view, name='simulator-sync'),
 ]
 

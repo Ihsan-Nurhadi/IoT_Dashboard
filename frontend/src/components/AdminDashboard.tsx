@@ -624,6 +624,27 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleRestoreDefaultSites = async () => {
+    if (!window.confirm('Pulihkan ke-21 site default bawaan ke database? Site yang sudah ada tidak akan terhapus.')) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/verticality/admin/restore-default-sites/', {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuccessMsg(data.message || '21 Site default berhasil dipulihkan');
+        await fetchVertSites();
+        await fetchSimulatorStatus();
+      } else {
+        setError('Gagal memulihkan site default');
+      }
+    } catch (err) {
+      setError('Kesalahan jaringan saat memulihkan site');
+    }
+  };
+
   const openAddCameraModal = () => {
     setSelectedCamera(null);
     setIsCameraEditMode(false);
@@ -1737,9 +1758,14 @@ const AdminDashboard: React.FC = () => {
                   <h2>Daftar Site & Kontrol Per-Device <span className="header-count-badge">{vertSites.length}</span></h2>
                   <p>Kelola nama site, kode chip ESP32, MAC address, serta toggle simulasi dummy per site jika hardware fisik sudah siap.</p>
                 </div>
-                <button type="button" className="btn-primary" onClick={openAddSiteModal}>
-                  ➕ Tambah Site Baru
-                </button>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button type="button" className="btn-secondary" onClick={handleRestoreDefaultSites} title="Pulihkan 21 site default pabrik jika terhapus">
+                    🔄 Pulihkan Default
+                  </button>
+                  <button type="button" className="btn-primary" onClick={openAddSiteModal}>
+                    ➕ Tambah Site Baru
+                  </button>
+                </div>
               </div>
 
               {loadingVertSites ? (
@@ -1750,7 +1776,14 @@ const AdminDashboard: React.FC = () => {
               ) : vertSites.length === 0 ? (
                 <div className="empty-state">
                   <p>Belum ada site verticality yang terdaftar.</p>
-                  <button type="button" className="btn-secondary" style={{ marginTop: '12px' }} onClick={openAddSiteModal}>Tambah Site Pertama</button>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                    <button type="button" className="btn-secondary" onClick={handleRestoreDefaultSites}>
+                      🔄 Pulihkan 21 Site Default
+                    </button>
+                    <button type="button" className="btn-primary" onClick={openAddSiteModal}>
+                      Tambah Site Pertama
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="table-responsive rfid-table-scroll">
