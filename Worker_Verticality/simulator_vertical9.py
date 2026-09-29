@@ -82,15 +82,25 @@ def create_heartbeat_payload() -> dict:
 
 
 def create_tilt_payload() -> dict:
-    """Payload data tilt (inklinometer) & sway tower."""
-    # Data dummy dengan sedikit fluktuasi acak realistis di bawah batas toleransi
-    tilt_x = round(random.uniform(-0.08, 0.08), 3)
-    tilt_y = round(random.uniform(-0.08, 0.08), 3)
+    """Payload data tilt (inklinometer) dan sway tower."""
+    MAX_DUMMY_TILT = 0.270
+    target_tilt = round(random.uniform(0.020, MAX_DUMMY_TILT), 3)
+    angle_rad = random.uniform(0, 2 * math.pi)
+
+    tilt_x = round(target_tilt * math.cos(angle_rad), 3)
+    tilt_y = round(target_tilt * math.sin(angle_rad), 3)
     tilt = round(math.sqrt(tilt_x**2 + tilt_y**2), 3)
 
-    # Menghitung goyangan (sway dalam mm) berdasarkan tinggi tower
+    if tilt > MAX_DUMMY_TILT:
+        scale = MAX_DUMMY_TILT / tilt
+        tilt_x = round(tilt_x * scale, 3)
+        tilt_y = round(tilt_y * scale, 3)
+        tilt = MAX_DUMMY_TILT
+
     tilt_rad = math.radians(tilt)
     sway = round(TOWER_HEIGHT_MM * math.tan(tilt_rad), 1)
+    if sway >= SWAY_TOL_MM:
+        sway = round(SWAY_TOL_MM * 0.95, 1)
 
     status = "TOLERANCE" if (tilt <= TILT_TOL_DEG and sway <= SWAY_TOL_MM) else "INTOLERANCE"
 

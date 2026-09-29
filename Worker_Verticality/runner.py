@@ -146,12 +146,34 @@ class VerticalityWorker:
         }
 
     def create_tilt_payload(self) -> dict:
-        tilt_x = round(random.uniform(-0.08, 0.08), 3)
-        tilt_y = round(random.uniform(-0.08, 0.08), 3)
+        # Batasi kemiringan dummy maksimal di 0.270 derajat (di bawah batas toleransi 0.286)
+        # agar menara selalu dalam status aman dan tidak terbaca miring / INTOLERANCE.
+        MAX_DUMMY_TILT = 0.270
+
+        # Kemiringan acak realistis di rentang aman 0.020 s.d 0.270 derajat
+        target_tilt = round(random.uniform(0.020, MAX_DUMMY_TILT), 3)
+        angle_rad = random.uniform(0, 2 * math.pi)
+
+        tilt_x = round(target_tilt * math.cos(angle_rad), 3)
+        tilt_y = round(target_tilt * math.sin(angle_rad), 3)
+
+        # Hitung resultan kemiringan aktual
         tilt = round(math.sqrt(tilt_x**2 + tilt_y**2), 3)
 
+        # Safety clamp: jamin tidak pernah menyentuh atau melebihi 0.270
+        if tilt > MAX_DUMMY_TILT:
+            scale = MAX_DUMMY_TILT / tilt
+            tilt_x = round(tilt_x * scale, 3)
+            tilt_y = round(tilt_y * scale, 3)
+            tilt = MAX_DUMMY_TILT
+
+        # Hitung goyangan (sway dalam mm) berdasarkan tinggi tower
         tilt_rad = math.radians(tilt)
         sway = round(self.tower_height * math.tan(tilt_rad), 1)
+
+        # Pastikan sway juga selalu di bawah batas toleransi
+        if sway >= SWAY_TOL_MM:
+            sway = round(SWAY_TOL_MM * 0.95, 1)
 
         status = "TOLERANCE" if (tilt <= TILT_TOL_DEG and sway <= SWAY_TOL_MM) else "INTOLERANCE"
 
