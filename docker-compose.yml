@@ -182,6 +182,26 @@ services:
     networks:
       - nms_network
 
+  # 2j. Mitratel Hourly Matrix Monitoring Service (Verticality Sites)
+  mitratel_monitor:
+    build:
+      context: ./Worker_Verticality
+      dockerfile: Dockerfile.monitor
+    container_name: nms_mitratel_monitor
+    restart: always
+    environment:
+      - TZ=Asia/Jakarta
+      - PYTHONUNBUFFERED=1
+      - MAIVIEW_API_KEY=${MAIVIEW_API_KEY:-nms_live_0c05c2b6_d09b6897332bcc9fde952de761b6e15ba8cb9366817b22231ca126a2b933106a}
+      - MONITOR_BRANCH=Mitratel Default
+      - EXCEL_OUTPUT=/app/reports/monitoring_mitratel_hourly.xlsx
+      - MEDIA_REPORTS_DIR=/app/media/reports
+    volumes:
+      - ./Worker_Verticality/reports:/app/reports
+      - media_volume:/app/media
+    networks:
+      - nms_network
+
   # 3. Frontend (React)
   frontend:
     build: ./frontend

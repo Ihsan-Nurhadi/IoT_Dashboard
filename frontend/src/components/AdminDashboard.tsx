@@ -85,7 +85,7 @@ const AdminDashboard: React.FC = () => {
 
   const [cameras, setCameras] = useState<CCTVCamera[]>([]);
   const [loadingCameras, setLoadingCameras] = useState<boolean>(false);
-  const [activeSection, setActiveSection] = useState<'ble' | 'cctv' | 'rfid' | 'verticality'>('ble');
+  const [activeSection, setActiveSection] = useState<'ble' | 'cctv' | 'rfid' | 'verticality' | 'mitratel'>('ble');
 
   // RFID whitelisting states
   const [rfidTags, setRfidTags] = useState<RegisteredRFIDTag[]>([]);
@@ -132,6 +132,25 @@ const AdminDashboard: React.FC = () => {
   const [formSiteTowerType, setFormSiteTowerType] = useState<string>('SST');
   const [formSiteTowerHeight, setFormSiteTowerHeight] = useState<number>(42);
   const [formSiteIsSimulated, setFormSiteIsSimulated] = useState<boolean>(true);
+
+  // Mitratel Hourly Matrix Report States
+  interface MitratelReportStatus {
+    exists: boolean;
+    file_name: string;
+    download_url: string;
+    file_size?: string;
+    last_mod_str?: string;
+    last_modified?: string;
+    sheets?: string[];
+    active_sheet?: string;
+    total_sites?: number;
+    recorded_hours?: string[];
+    latest_hour?: string;
+    message?: string;
+  }
+  const [mitratelStatus, setMitratelStatus] = useState<MitratelReportStatus | null>(null);
+  const [loadingMitratel, setLoadingMitratel] = useState<boolean>(false);
+  const [triggeringMitratel, setTriggeringMitratel] = useState<boolean>(false);
 
   // Camera Form & Modal States
   const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
@@ -190,10 +209,12 @@ const AdminDashboard: React.FC = () => {
     fetchRfidReaders();
     fetchVertSites();
     fetchSimulatorStatus();
+    fetchMitratelStatus();
     const interval = setInterval(() => {
       fetchUnregistered();
       fetchSimulatorStatus();
-    }, 10000); // refresh scans & simulator status every 10s
+      fetchMitratelStatus();
+    }, 15000); // refresh scans, simulator, & report status every 15s
     return () => clearInterval(interval);
   }, []);
 
@@ -643,6 +664,49 @@ const AdminDashboard: React.FC = () => {
     } catch (err) {
       setError('Kesalahan jaringan saat memulihkan site');
     }
+  };
+
+  // Mitratel Report Handlers
+  const fetchMitratelStatus = async () => {
+    try {
+      setLoadingMitratel(true);
+      const res = await fetch('/api/verticality/mitratel-report/status/');
+      if (res.ok) {
+        const data = await res.json();
+        setMitratelStatus(data);
+      }
+    } catch (err) {
+      console.error('Error fetching Mitratel report status:', err);
+    } finally {
+      setLoadingMitratel(false);
+    }
+  };
+
+  const handleTriggerMitratelSync = async () => {
+    try {
+      setTriggeringMitratel(true);
+      setError('');
+      const res = await fetch('/api/verticality/mitratel-report/trigger/', {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showSuccess(data.message || 'Data monitoring Mitratel berhasil diperbarui!');
+        await fetchMitratelStatus();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || 'Gagal melakukan sinkronisasi Mitratel manual');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Kesalahan koneksi saat trigger sinkronisasi Mitratel');
+    } finally {
+      setTriggeringMitratel(false);
+    }
+  };
+
+  const handleDownloadExcel = () => {
+    window.open('/api/verticality/mitratel-report/download/', '_blank');
   };
 
   const openAddCameraModal = () => {
@@ -1288,6 +1352,16 @@ const AdminDashboard: React.FC = () => {
           </button>
           <button 
             type="button"
+            className={`tab-nav-item ${activeSection === 'mitratel' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveSection('mitratel');
+              fetchMitratelStatus();
+            }}
+          >
+            📊 Mitratel Hourly Matrix
+          </button>
+          <button 
+            type="button"
             className="tab-nav-item portal-link-btn"
             onClick={() => navigate('/')}
           >
@@ -1851,6 +1925,189 @@ const AdminDashboard: React.FC = () => {
                   </table>
                 </div>
               )}
+            </section>
+          </div>
+        )}
+
+        {/* Section: Mitratel Hourly Matrix Monitoring */}
+        {activeSection === 'mitratel' && (
+          <div className="mitratel-dashboard-grid">
+            {/* Header Card */}
+            <div className="mitratel-header-card">
+              <div className="mitratel-header-left">
+                <div className="mitratel-icon-wrap">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mitratel-main-icon">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </div>
+                <div>
+                  <div className="mitratel-title-row">
+                    <h2>Monitoring Status Site Mitratel (Hourly Matrix Excel)</h2>
+                    <span className="badge badge-active">
+                      ● DOCKER SERVICE 24/7
+                    </span>
+                  </div>
+                  <p className="mitratel-subtitle">
+                    Layanan otomatis penarikan status site (Mitratel Default + 7 site tambahan) dari API MaiView setiap 1 jam sekali (diselaraskan pada menit :00) dan disimpan ke dalam file Excel matriks horizontal.
+                  </p>
+                </div>
+              </div>
+              <div className="mitratel-header-actions">
+                <button
+                  type="button"
+                  className="btn-download-primary"
+                  onClick={handleDownloadExcel}
+                  disabled={loadingMitratel}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="btn-icon">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Download File Excel (.xlsx)
+                </button>
+                <button
+                  type="button"
+                  className="btn-sync-secondary"
+                  onClick={handleTriggerMitratelSync}
+                  disabled={triggeringMitratel}
+                >
+                  {triggeringMitratel ? (
+                    <>
+                      <div className="spinner-mini"></div>
+                      Sedang Menarik Data...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="btn-icon">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                      </svg>
+                      Tarik Data Sekarang (Manual Sync)
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Metrics & Info Cards */}
+            <div className="mitratel-cards-row">
+              <div className="mitratel-info-card">
+                <span className="info-card-label">NAMA FILE LAPORAN</span>
+                <span className="info-card-val code-font">{mitratelStatus?.file_name || 'monitoring_mitratel_hourly.xlsx'}</span>
+                <span className="info-card-sub">Format Excel Matriks Horizontal (.xlsx)</span>
+              </div>
+              <div className="mitratel-info-card">
+                <span className="info-card-label">TERAKHIR DIUPDATE</span>
+                <span className="info-card-val green">{mitratelStatus?.last_modified || '-'}</span>
+                <span className="info-card-sub">Sinkronisasi otomatis per jam</span>
+              </div>
+              <div className="mitratel-info-card">
+                <span className="info-card-label">TOTAL SITE TERPANTAU</span>
+                <span className="info-card-val cyan">{mitratelStatus?.total_sites ? `${mitratelStatus.total_sites} Site` : '61 Site'}</span>
+                <span className="info-card-sub">Mitratel Default + 7 Site Khusus</span>
+              </div>
+              <div className="mitratel-info-card">
+                <span className="info-card-label">KOLOM JAM TERAKHIR</span>
+                <span className="info-card-val yellow">{mitratelStatus?.latest_hour || '-'}</span>
+                <span className="info-card-sub">Sheet: {mitratelStatus?.active_sheet || 'Hari Ini'}</span>
+              </div>
+            </div>
+
+            {/* Recorded Hours Section */}
+            <section className="grid-card">
+              <div className="card-header">
+                <div>
+                  <h2>Jam Pemantauan Tercatat Hari Ini ({mitratelStatus?.active_sheet || 'Hari Ini'})</h2>
+                  <p>Kolom jam yang telah berhasil ditarik dan dicatat ke dalam matriks sheet Excel hari ini.</p>
+                </div>
+                <button type="button" className="btn-secondary" onClick={fetchMitratelStatus}>
+                  🔄 Refresh Status
+                </button>
+              </div>
+              <div className="mitratel-hours-container">
+                {mitratelStatus?.recorded_hours && mitratelStatus.recorded_hours.length > 0 ? (
+                  mitratelStatus.recorded_hours.map((jam, i) => (
+                    <div key={i} className="hour-pill">
+                      <span className="hour-dot"></span>
+                      <span className="hour-text">{jam} WIB</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="empty-text">Belum ada kolom jam tercatat untuk hari ini atau service baru dijalankan.</p>
+                )}
+              </div>
+            </section>
+
+            {/* Extra Sites List Card */}
+            <section className="grid-card">
+              <div className="card-header">
+                <div>
+                  <h2>7 Site Tambahan Khusus di Luar Branch Default</h2>
+                  <p>Site berikut secara otomatis di-include dalam penarikan data hourly matrix bersama branch Mitratel Default.</p>
+                </div>
+              </div>
+              <div className="table-responsive">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Nama Site</th>
+                      <th>Kode Site</th>
+                      <th>Site UUID</th>
+                      <th>Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>DMT NEW IKN</strong></td>
+                      <td><code>DMT_NEW_IKN</code></td>
+                      <td><code>bd3deb2d-6e81-5540-9eed-04fd397d5ca6</code></td>
+                      <td><span className="badge badge-active">Site Khusus</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>DMT ISAT TAMANGAPA</strong></td>
+                      <td><code>DMT ISAT_TAMANGAPA</code></td>
+                      <td><code>83a838ed-698f-414a-a37c-5669f5a1e4b6</code></td>
+                      <td><span className="badge badge-active">Site Khusus</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>MARGODADI</strong></td>
+                      <td><code>MARGODADI</code></td>
+                      <td><code>347e50b4-eabb-46f0-a96d-a9da03934119</code></td>
+                      <td><span className="badge badge-active">Site Khusus</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>PELAB AJIBATA</strong></td>
+                      <td><code>PELAB AJIBATA</code></td>
+                      <td><code>575e8551-5e53-5c3d-abb2-39984e5cd8db</code></td>
+                      <td><span className="badge badge-active">Site Khusus</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>DAGANG KELAMBIR</strong></td>
+                      <td><code>Dagang Kelambir</code></td>
+                      <td><code>c6dc7fe4-8d26-5587-9101-1ead5d9faf65</code></td>
+                      <td><span className="badge badge-active">Site Khusus</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>PERMANENISASI</strong></td>
+                      <td><code>PERMANENISASICIOKONGSUKARESIKSIDAMULIH</code></td>
+                      <td><code>ea5ae5e7-a752-501a-99db-b0738bf9daa2</code></td>
+                      <td><span className="badge badge-active">Site Khusus</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>JALANMUSTIKASARI</strong></td>
+                      <td><code>JALANMUSTIKASARI</code></td>
+                      <td><code>661cc75b-37ec-539d-9197-853f91dd7f16</code></td>
+                      <td><span className="badge badge-active">Site Khusus</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </section>
           </div>
         )}

@@ -1,0 +1,22 @@
+# Gunakan base image Python yang ringan
+FROM python:3.10-slim
+
+# Hindari pembuatan file .pyc dan aktifkan log output langsung tanpa buffer
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV TZ=Asia/Jakarta
+
+WORKDIR /app
+
+# Install dependensi
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy seluruh script ke dalam container
+COPY . .
+
+# Buat direktori reports
+RUN mkdir -p /app/reports
+
+# Default command: jalankan service loop otomatis 24/7 selaras menit 00
+CMD ["python", "monitor_mitratel_default.py", "--loop", "--align-hour"]

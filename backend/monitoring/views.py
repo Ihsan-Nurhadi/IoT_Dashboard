@@ -1620,4 +1620,140 @@ def cablesense_history_logs(request):
     return Response(results)
 
 
+# ==============================================================================
+# MITRATEL HOURLY MATRIX REPORT (DOWNLOAD & STATUS API)
+# ==============================================================================
+import os
+import datetime
+from django.conf import settings
+from django.http import FileResponse, Http404
 
+
+def get_mitratel_excel_path():
+    possible_paths = [
+        os.path.join(settings.MEDIA_ROOT, 'reports', 'monitoring_mitratel_hourly.xlsx'),
+        os.path.join(settings.BASE_DIR, 'media', 'reports', 'monitoring_mitratel_hourly.xlsx'),
+        os.path.join(settings.BASE_DIR.parent, 'Worker_Verticality', 'reports', 'monitoring_mitratel_hourly.xlsx'),
+        os.path.join(settings.BASE_DIR.parent, 'Worker_Verticality', 'monitoring_mitratel_hourly.xlsx'),
+    ]
+    for p in possible_paths:
+        if os.path.exists(p):
+            return p
+    return possible_paths[0]
+
+
+@api_view(['GET'])
+def mitratel_report_status(request):
+    """
+    GET /api/verticality/mitratel-report/status/
+    Mengembalikan metadata file excel monitoring Mitratel hourly matrix.
+    """
+    file_path = get_mitratel_excel_path()
+    if not os.path.exists(file_path):
+        return Response({
+            'exists': False,
+            'message': 'File excel belum ditemukan. Pastikan service mitratel_monitor sudah berjalan.',
+            'file_name': 'monitoring_mitratel_hourly.xlsx',
+            'download_url': '/api/verticality/mitratel-report/download/'
+        })
+
+    stat = os.stat(file_path)
+    file_size_kb = round(stat.st_size / 1024, 1)
+    
+    dt = datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.timezone(datetime.timedelta(hours=7)))
+    last_mod_str = dt.strftime('%Y-%m-%d %H:%M:%S WIB')
+
+    sheets = []
+    recorded_hours = []
+    total_sites = 0
+    latest_hour = '-'
+    active_sheet = '-'
+
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(file_path, read_only=True)
+        sheets = wb.sheetnames
+        if sheets:
+            active_sheet = sheets[-1]
+            ws = wb[active_sheet]
+            headers = []
+            for row in ws.iter_rows(min_row=1, max_row=1, values_only=True):
+                headers = list(row)
+                break
+            for h in headers[2:]:
+                if h is not None:
+                    recorded_hours.append(str(h))
+            if recorded_hours:
+                latest_hour = recorded_hours[-1]
+            
+            row_count = 0
+            for _ in ws.iter_rows(min_row=2, min_col=1, max_col=1, values_only=True):
+                row_count += 1
+            total_sites = row_count
+        wb.close()
+    except Exception as e:
+        print(f"Error reading excel metadata: {e}")
+
+    return Response({
+        'exists': True,
+        'file_name': 'monitoring_mitratel_hourly.xlsx',
+        'download_url': '/api/verticality/mitratel-report/download/',
+        'file_size': f"{file_size_kb} KB",
+        'last_modified': last_mod_str,
+        'sheets': sheets,
+        'active_sheet': active_sheet,
+        'total_sites': total_sites,
+        'recorded_hours': recorded_hours,
+        'latest_hour': latest_hour,
+    })
+
+
+@api_view(['GET'])
+def mitratel_report_download(request):
+    """
+    GET /api/verticality/mitratel-report/download/
+    Mengunduh file Excel monitoring matriks jam Mitratel.
+    """
+    file_path = get_mitratel_excel_path()
+    if not os.path.exists(file_path):
+        raise Http404("File monitoring Excel belum tersedia di server.")
+    
+    response = FileResponse(
+        open(file_path, 'rb'),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="monitoring_mitratel_hourly.xlsx"'
+    return response
+
+
+@api_view(['POST'])
+def mitratel_report_trigger(request):
+    """
+    POST /api/verticality/mitratel-report/trigger/
+    Trigger manual penarikan data Mitratel sekarang juga tanpa menunggu menit :00 berikutnya.
+    """
+    import sys
+    worker_path = os.path.join(settings.BASE_DIR.parent, 'Worker_Verticality')
+    if worker_path not in sys.path:
+        sys.path.insert(0, worker_path)
+    
+    try:
+        from monitor_mitratel_default import run_single_monitoring
+        output_file = get_mitratel_excel_path()
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
+        
+        saved = run_single_monitoring(
+            file_path=output_file,
+            align_hour=True,
+            media_dir=media_dir
+        )
+        return Response({
+            'success': True,
+            'message': 'Berhasil memperbarui data matriks monitoring Mitratel.',
+            'saved_file': saved
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

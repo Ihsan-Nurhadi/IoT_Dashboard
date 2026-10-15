@@ -14,5 +14,8 @@ urlpatterns = [
     path('admin/sites/<str:pk>/toggle-simulation/', views.site_toggle_simulation_view, name='site-toggle-simulation'),
     path('admin/restore-default-sites/', views.restore_default_sites_view, name='restore-default-sites'),
     path('simulator-sync/', views.simulator_sync_view, name='simulator-sync'),
+    path('mitratel-report/status/', views.mitratel_report_status, name='mitratel-report-status'),
+    path('mitratel-report/download/', views.mitratel_report_download, name='mitratel-report-download'),
+    path('mitratel-report/trigger/', views.mitratel_report_trigger, name='mitratel-report-trigger'),
 ]
 

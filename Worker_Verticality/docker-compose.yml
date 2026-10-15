@@ -14,3 +14,18 @@ services:
     # Jika ingin me-mount devices.json agar bisa diupdate tanpa rebuild image:
     volumes:
       - ./devices.json:/app/devices.json:ro
+
+  mitratel_monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    container_name: nms_mitratel_monitor_standalone
+    restart: always
+    environment:
+      - TZ=Asia/Jakarta
+      - PYTHONUNBUFFERED=1
+      - MAIVIEW_API_KEY=${MAIVIEW_API_KEY:-nms_live_0c05c2b6_d09b6897332bcc9fde952de761b6e15ba8cb9366817b22231ca126a2b933106a}
+      - MONITOR_BRANCH=Mitratel Default
+      - EXCEL_OUTPUT=/app/reports/monitoring_mitratel_hourly.xlsx
+    volumes:
+      - ./reports:/app/reports
