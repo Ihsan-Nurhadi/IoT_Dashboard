@@ -79,7 +79,7 @@ class Command(BaseCommand):
         USER = settings.MQTT_USER
         PASSWORD = settings.MQTT_PASSWORD
 
-        TOPIC_BLACKBOX = "nms/E32_WB_TBGTEST/whitebox/#"
+        TOPIC_BLACKBOX = getattr(settings, 'MQTT_TOPIC_PUB2', 'nms/E32_WB_26/whitebox/#')
         TOPIC_SPEAKER = "nms/esp32-speaker-003734fe8ce0/speaker/#"
         # TOPIC_PIR = "nms/E32_PIR_WS/pir/#"  # [DISABLED] Standalone ESP32 PIR dinonaktifkan
 
