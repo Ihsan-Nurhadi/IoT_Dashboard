@@ -1624,7 +1624,8 @@ def mitratel_report_status(request):
             'exists': False,
             'message': 'File excel belum ditemukan. Pastikan service mitratel_monitor sudah berjalan.',
             'file_name': 'monitoring_mitratel_hourly.xlsx',
-            'download_url': '/api/verticality/mitratel-report/download/'
+            'download_url': '/api/verticality/mitratel-report/download/',
+            'spreadsheet_url': os.getenv('GSHEET_SPREADSHEET_URL', '')
         })
 
     stat = os.stat(file_path)
@@ -1668,6 +1669,7 @@ def mitratel_report_status(request):
         'exists': True,
         'file_name': 'monitoring_mitratel_hourly.xlsx',
         'download_url': '/api/verticality/mitratel-report/download/',
+        'spreadsheet_url': os.getenv('GSHEET_SPREADSHEET_URL', ''),
         'file_size': f"{file_size_kb} KB",
         'last_modified': last_mod_str,
         'sheets': sheets,

@@ -138,6 +138,7 @@ const AdminDashboard: React.FC = () => {
     exists: boolean;
     file_name: string;
     download_url: string;
+    spreadsheet_url?: string;
     file_size?: string;
     last_mod_str?: string;
     last_modified?: string;
@@ -151,6 +152,9 @@ const AdminDashboard: React.FC = () => {
   const [mitratelStatus, setMitratelStatus] = useState<MitratelReportStatus | null>(null);
   const [loadingMitratel, setLoadingMitratel] = useState<boolean>(false);
   const [triggeringMitratel, setTriggeringMitratel] = useState<boolean>(false);
+  const [customSpreadsheetUrl, setCustomSpreadsheetUrl] = useState<string>(() => {
+    return localStorage.getItem('mitratel_gsheet_url') || '';
+  });
 
   // Camera Form & Modal States
   const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
@@ -707,6 +711,46 @@ const AdminDashboard: React.FC = () => {
 
   const handleDownloadExcel = () => {
     window.open('/api/verticality/mitratel-report/download/', '_blank');
+  };
+
+  const getEffectiveSpreadsheetUrl = () => {
+    return customSpreadsheetUrl || mitratelStatus?.spreadsheet_url || '';
+  };
+
+  const handleOpenGoogleSheet = () => {
+    const currentUrl = getEffectiveSpreadsheetUrl();
+    if (currentUrl) {
+      window.open(currentUrl, '_blank');
+    } else {
+      const input = window.prompt(
+        'Masukkan URL Google Spreadsheet Monitoring Mitratel Anda:\n(Contoh: https://docs.google.com/spreadsheets/d/1AbC.../edit)',
+        ''
+      );
+      if (input && input.trim()) {
+        const clean = input.trim();
+        localStorage.setItem('mitratel_gsheet_url', clean);
+        setCustomSpreadsheetUrl(clean);
+        showSuccess('URL Google Spreadsheet berhasil disimpan!');
+        window.open(clean, '_blank');
+      }
+    }
+  };
+
+  const handleEditSpreadsheetUrl = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentUrl = getEffectiveSpreadsheetUrl();
+    const input = window.prompt(
+      'Ubah / Masukkan URL Google Spreadsheet Monitoring Mitratel Anda:',
+      currentUrl || 'https://docs.google.com/spreadsheets/d/'
+    );
+    if (input !== null) {
+      const clean = input.trim();
+      localStorage.setItem('mitratel_gsheet_url', clean);
+      setCustomSpreadsheetUrl(clean);
+      if (clean) {
+        showSuccess('URL Google Spreadsheet berhasil diperbarui!');
+      }
+    }
   };
 
   const openAddCameraModal = () => {
@@ -1946,17 +1990,39 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <div className="mitratel-title-row">
-                    <h2>Monitoring Status Site Mitratel (Hourly Matrix Excel)</h2>
+                    <h2>Monitoring Status Site Mitratel (MQTT Listener 5-Menit & GSheet)</h2>
                     <span className="badge badge-active">
-                      ● DOCKER SERVICE 24/7
+                      ● DOCKER SERVICE 24/7 (MQTT)
                     </span>
                   </div>
                   <p className="mitratel-subtitle">
-                    Layanan otomatis penarikan status site (Mitratel Default + 7 site tambahan) dari API MaiView setiap 1 jam sekali (diselaraskan pada menit :00) dan disimpan ke dalam file Excel matriks horizontal.
+                    Layanan monitoring real-time berbasis MQTT Listener (5 menit window tiap pergantian jam) untuk 61 site Mitratel, otomatis disinkronisasi ke Google Spreadsheet & file Excel lokal.
                   </p>
                 </div>
               </div>
               <div className="mitratel-header-actions">
+                <div className="mitratel-action-row">
+                  <button
+                    type="button"
+                    className="btn-gsheet-primary"
+                    onClick={handleOpenGoogleSheet}
+                    title={getEffectiveSpreadsheetUrl() ? "Buka Google Spreadsheet Monitoring di Tab Baru" : "Klik untuk Menghubungkan Google Spreadsheet"}
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" className="btn-icon">
+                      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-2h2v2zm0-4H7v-2h2v2zm0-4H7V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+                    </svg>
+                    Buka Google Spreadsheet
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-link-config"
+                    onClick={handleEditSpreadsheetUrl}
+                    title="Ubah / Masukkan URL Google Spreadsheet"
+                  >
+                    ⚙️
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   className="btn-download-primary"
@@ -1979,7 +2045,7 @@ const AdminDashboard: React.FC = () => {
                   {triggeringMitratel ? (
                     <>
                       <div className="spinner-mini"></div>
-                      Sedang Menarik Data...
+                      Sedang Menjalankan Listener (20s)...
                     </>
                   ) : (
                     <>
@@ -1988,7 +2054,7 @@ const AdminDashboard: React.FC = () => {
                         <polyline points="1 20 1 14 7 14"></polyline>
                         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                       </svg>
-                      Tarik Data Sekarang (Manual Sync)
+                      Jalankan Listener Sekarang (Manual Sync)
                     </>
                   )}
                 </button>
@@ -1997,10 +2063,14 @@ const AdminDashboard: React.FC = () => {
 
             {/* Metrics & Info Cards */}
             <div className="mitratel-cards-row">
-              <div className="mitratel-info-card">
-                <span className="info-card-label">NAMA FILE LAPORAN</span>
-                <span className="info-card-val code-font">{mitratelStatus?.file_name || 'monitoring_mitratel_hourly.xlsx'}</span>
-                <span className="info-card-sub">Format Excel Matriks Horizontal (.xlsx)</span>
+              <div className="mitratel-info-card" style={{ cursor: 'pointer' }} onClick={handleOpenGoogleSheet}>
+                <span className="info-card-label">GOOGLE SPREADSHEET</span>
+                <span className="info-card-val green">
+                  {getEffectiveSpreadsheetUrl() ? '🟢 Terhubung' : '⚠️ Klik untuk Atur URL'}
+                </span>
+                <span className="info-card-sub">
+                  {getEffectiveSpreadsheetUrl() ? 'Klik untuk buka di tab baru' : 'Simpan link Google Sheets Anda'}
+                </span>
               </div>
               <div className="mitratel-info-card">
                 <span className="info-card-label">TERAKHIR DIUPDATE</span>
@@ -2009,8 +2079,8 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="mitratel-info-card">
                 <span className="info-card-label">TOTAL SITE TERPANTAU</span>
-                <span className="info-card-val cyan">{mitratelStatus?.total_sites ? `${mitratelStatus.total_sites} Site` : '61 Site'}</span>
-                <span className="info-card-sub">Mitratel Default + 7 Site Khusus</span>
+                <span className="info-card-val cyan">61 Site</span>
+                <span className="info-card-sub">Mitratel Default (Verticality)</span>
               </div>
               <div className="mitratel-info-card">
                 <span className="info-card-label">KOLOM JAM TERAKHIR</span>
