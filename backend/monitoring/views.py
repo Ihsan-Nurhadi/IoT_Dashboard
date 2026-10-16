@@ -1771,3 +1771,116 @@ def mitratel_report_trigger(request):
             'success': False,
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ==============================================================================
+# FATIGUE / VERTICALITY 30-MINUTE MATRIX MONITORING VIEWS
+# ==============================================================================
+
+@api_view(['GET'])
+def fatigue_report_status(request):
+    """
+    GET /api/verticality/fatigue-report/status/
+    Mengembalikan metadata file excel monitoring fatigue 30-minute matrix.
+    """
+    from .fatigue_monitor import get_fatigue_excel_path, start_fatigue_matrix_background_scheduler
+    start_fatigue_matrix_background_scheduler()
+
+    file_path = get_fatigue_excel_path()
+    if not os.path.exists(file_path):
+        return Response({
+            'exists': False,
+            'message': 'File excel belum ditemukan. Tekan Tarik Data Sekarang untuk membuat file awal.',
+            'file_name': 'monitoring_fatigue_30min.xlsx',
+            'download_url': '/api/verticality/fatigue-report/download/'
+        })
+
+    stat = os.stat(file_path)
+    file_size_kb = round(stat.st_size / 1024, 1)
+
+    dt = datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.timezone(datetime.timedelta(hours=7)))
+    last_mod_str = dt.strftime('%Y-%m-%d %H:%M:%S WIB')
+
+    sheets = []
+    recorded_intervals = []
+    total_sites = 0
+    latest_interval = '-'
+    active_sheet = '-'
+
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(file_path, read_only=True)
+        sheets = wb.sheetnames
+        if sheets:
+            active_sheet = sheets[-1]
+            ws = wb[active_sheet]
+            headers = []
+            for row in ws.iter_rows(min_row=1, max_row=1, values_only=True):
+                headers = list(row)
+                break
+            for h in headers[3:]:  # Col 1: Nama, Col 2: Site ID, Col 3: Code
+                if h is not None:
+                    recorded_intervals.append(str(h))
+            if recorded_intervals:
+                latest_interval = recorded_intervals[-1]
+
+            row_count = 0
+            for _ in ws.iter_rows(min_row=2, min_col=1, max_col=1, values_only=True):
+                row_count += 1
+            total_sites = row_count
+        wb.close()
+    except Exception as e:
+        print(f"Error reading fatigue excel metadata: {e}")
+
+    return Response({
+        'exists': True,
+        'file_name': 'monitoring_fatigue_30min.xlsx',
+        'download_url': '/api/verticality/fatigue-report/download/',
+        'file_size': f"{file_size_kb} KB",
+        'last_modified': last_mod_str,
+        'sheets': sheets,
+        'active_sheet': active_sheet,
+        'total_sites': total_sites or 21,
+        'recorded_intervals': recorded_intervals,
+        'latest_interval': latest_interval,
+    })
+
+
+@api_view(['GET'])
+def fatigue_report_download(request):
+    """
+    GET /api/verticality/fatigue-report/download/
+    Mengunduh file Excel monitoring matriks 30 menit fatigue site.
+    """
+    from .fatigue_monitor import get_fatigue_excel_path
+    file_path = get_fatigue_excel_path()
+    if not os.path.exists(file_path):
+        raise Http404("File monitoring Excel fatigue belum tersedia di server.")
+
+    response = FileResponse(
+        open(file_path, 'rb'),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="monitoring_fatigue_30min.xlsx"'
+    return response
+
+
+@api_view(['POST'])
+def fatigue_report_trigger(request):
+    """
+    POST /api/verticality/fatigue-report/trigger/
+    Trigger manual penarikan data status fatigue sites sekarang juga per 30 menit.
+    """
+    from .fatigue_monitor import update_fatigue_excel_matrix
+    try:
+        res = update_fatigue_excel_matrix(align_30min=True)
+        return Response({
+            'success': True,
+            'message': f"Berhasil memperbarui matriks monitoring fatigue slot '{res.get('slot')} WIB'.",
+            'data': res
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

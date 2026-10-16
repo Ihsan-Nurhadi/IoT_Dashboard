@@ -4,6 +4,7 @@ import HeroCard from './ui/HeroCard';
 import TelemetrySection from './ui/TelemetrySection';
 import TrendAnalysis from './ui/TrendAnalysis';
 import HistoryTable from './ui/HistoryTable';
+import FatigueMatrixCard from './FatigueMatrixCard';
 import { useSensorData } from '../hooks/useSensorData';
 import { useSitesStatus } from '../hooks/useSitesStatus';
 import { useSites } from '../hooks/useSites';
@@ -51,6 +52,7 @@ const VerticalityDetail: React.FC = () => {
   return (
     <div className="dashboard-container">
       <HeroCard latest={latest} isConnected={isConnected} site={site} deviceId={activeDeviceId} />
+      <FatigueMatrixCard />
       <TelemetrySection latest={latest} isConnected={isConnected} site={site} />
       <TrendAnalysis history={history} />
       <HistoryTable history={history} />

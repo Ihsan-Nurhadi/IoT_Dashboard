@@ -17,5 +17,8 @@ urlpatterns = [
     path('mitratel-report/status/', views.mitratel_report_status, name='mitratel-report-status'),
     path('mitratel-report/download/', views.mitratel_report_download, name='mitratel-report-download'),
     path('mitratel-report/trigger/', views.mitratel_report_trigger, name='mitratel-report-trigger'),
+    path('fatigue-report/status/', views.fatigue_report_status, name='fatigue-report-status'),
+    path('fatigue-report/download/', views.fatigue_report_download, name='fatigue-report-download'),
+    path('fatigue-report/trigger/', views.fatigue_report_trigger, name='fatigue-report-trigger'),
 ]
 
