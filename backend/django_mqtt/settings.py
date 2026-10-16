@@ -143,8 +143,8 @@ NEW_MQTT_PASSWORD = MQTT_PASSWORD
 NEW_MQTT_TOPIC_SUB = MQTT_TOPIC_SUB
 
 # Verticality MQTT settings
-MQTT_TOPIC_TILT = os.environ.get("MQTT_TOPIC_TILT", "nms/E32_VER_WS/vertical/tilt")
-MQTT_TOPIC_WIND = os.environ.get("MQTT_TOPIC_WIND", "nms/E32_VER_WS/vertical/wind")
+MQTT_TOPIC_TILT = os.environ.get("MQTT_TOPIC_TILT", "nms/E32_VER_WEES/vertical/tilt")
+MQTT_TOPIC_WIND = os.environ.get("MQTT_TOPIC_WIND", "nms/E32_VER_WEES/vertical/wind")
 
 # AQMS MQTT settings
 MQTT_TOPIC_AQMS = os.environ.get("MQTT_TOPIC_AQMS", "wqx/E32_WS/data")
