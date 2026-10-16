@@ -6,6 +6,7 @@ services:
     restart: always
     volumes:
       - ./backend:/app
+      - ./Worker_Verticality:/app/Worker_Verticality:ro
       - static_volume:/app/static
       - media_volume:/app/media
     environment:

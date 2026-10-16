@@ -1633,8 +1633,12 @@ def get_mitratel_excel_path():
     possible_paths = [
         os.path.join(settings.MEDIA_ROOT, 'reports', 'monitoring_mitratel_hourly.xlsx'),
         os.path.join(settings.BASE_DIR, 'media', 'reports', 'monitoring_mitratel_hourly.xlsx'),
+        os.path.join(settings.BASE_DIR, 'Worker_Verticality', 'reports', 'monitoring_mitratel_hourly.xlsx'),
+        os.path.join(settings.BASE_DIR, 'Worker_Verticality', 'monitoring_mitratel_hourly.xlsx'),
         os.path.join(settings.BASE_DIR.parent, 'Worker_Verticality', 'reports', 'monitoring_mitratel_hourly.xlsx'),
         os.path.join(settings.BASE_DIR.parent, 'Worker_Verticality', 'monitoring_mitratel_hourly.xlsx'),
+        '/app/Worker_Verticality/reports/monitoring_mitratel_hourly.xlsx',
+        '/app/media/reports/monitoring_mitratel_hourly.xlsx',
     ]
     for p in possible_paths:
         if os.path.exists(p):
@@ -1733,14 +1737,24 @@ def mitratel_report_trigger(request):
     Trigger manual penarikan data Mitratel sekarang juga tanpa menunggu menit :00 berikutnya.
     """
     import sys
-    worker_path = os.path.join(settings.BASE_DIR.parent, 'Worker_Verticality')
-    if worker_path not in sys.path:
-        sys.path.insert(0, worker_path)
+    
+    # Daftarkan semua kemungkinan direktori yang memuat monitor_mitratel_default
+    candidate_paths = [
+        os.path.join(settings.BASE_DIR, 'Worker_Verticality'),
+        os.path.join(settings.BASE_DIR.parent, 'Worker_Verticality'),
+        '/app/Worker_Verticality',
+        '/Worker_Verticality',
+        str(settings.BASE_DIR),
+    ]
+    for cp in candidate_paths:
+        if os.path.exists(cp) and cp not in sys.path:
+            sys.path.insert(0, cp)
     
     try:
         from monitor_mitratel_default import run_single_monitoring
         output_file = get_mitratel_excel_path()
         media_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
+        os.makedirs(media_dir, exist_ok=True)
         
         saved = run_single_monitoring(
             file_path=output_file,
