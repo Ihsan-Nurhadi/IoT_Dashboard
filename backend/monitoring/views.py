@@ -1719,7 +1719,11 @@ def mitratel_report_trigger(request):
             sys.path.insert(0, cp)
     
     try:
+        import importlib
+        import monitor_mitratel_default
+        importlib.reload(monitor_mitratel_default)
         from monitor_mitratel_default import run_single_monitoring
+
         output_file = get_mitratel_excel_path()
         media_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
         os.makedirs(media_dir, exist_ok=True)

@@ -153,22 +153,35 @@ def run_mqtt_window_listener(
             print(f"[!] Gagal koneksi ke MQTT broker, rc = {rc}")
 
     def on_message(c, userdata, msg):
-        now_str = datetime.now(WIB).strftime("%H:%M:%S")
+        # 1. ABAIKAN pesan retained (pesan lama yang tersimpan di broker dari masa lalu)
+        # Hanya hitung data live yang benar-benar dikirimkan perangkat selama window 5 menit
+        if getattr(msg, "retain", False):
+            return
+
         topic = msg.topic
         parts = topic.split("/")
         if len(parts) >= 2 and parts[0] == "nms":
             cid = parts[1].strip()
+            leaf = parts[3].lower() if len(parts) >= 4 else (parts[2].lower() if len(parts) >= 3 else "")
+            now_str = datetime.now(WIB).strftime("%H:%M:%S")
+
             if cid not in received_telemetry:
                 received_telemetry[cid] = {
                     "count": 1,
                     "first_seen": now_str,
                     "last_seen": now_str,
                     "last_topic": topic,
+                    "has_tilt": "tilt" in leaf,
+                    "has_wind": "wind" in leaf,
                 }
             else:
                 received_telemetry[cid]["count"] += 1
                 received_telemetry[cid]["last_seen"] = now_str
                 received_telemetry[cid]["last_topic"] = topic
+                if "tilt" in leaf:
+                    received_telemetry[cid]["has_tilt"] = True
+                if "wind" in leaf:
+                    received_telemetry[cid]["has_wind"] = True
 
     client.on_connect = on_connect
     client.on_message = on_message
@@ -228,12 +241,12 @@ def evaluate_sites(sites: list[dict], telemetry_data: dict[str, dict]) -> tuple[
         matched_telemetry = None
 
         # 1. Cek exact client_id
-        if client_id.upper() in upper_telemetry:
+        if client_id and client_id.upper() in upper_telemetry:
             matched_telemetry = upper_telemetry[client_id.upper()]
         else:
             # 2. Cek aliases jika ada
             for alias in aliases:
-                if str(alias).strip().upper() in upper_telemetry:
+                if alias and str(alias).strip().upper() in upper_telemetry:
                     matched_telemetry = upper_telemetry[str(alias).strip().upper()]
                     break
 
