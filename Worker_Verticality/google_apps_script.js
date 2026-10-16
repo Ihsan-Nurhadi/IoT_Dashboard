@@ -46,7 +46,7 @@ function doPost(e) {
     // 2. Inisialisasi Header dan Metadata Site jika sheet baru
     if (isNew || sheet.getLastRow() < 2) {
       sheet.clear();
-      
+
       // Header Baris 1
       var baseHeaders = ["No", "Site ID", "Nama Site", "Regional", "Client ID (MQTT)"];
       var hourHeaders = [
@@ -56,9 +56,9 @@ function doPost(e) {
         "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
       ];
       var allHeaders = baseHeaders.concat(hourHeaders);
-      
+
       sheet.getRange(1, 1, 1, allHeaders.length).setValues([allHeaders]);
-      
+
       // Styling Header Utama
       var headerRange = sheet.getRange(1, 1, 1, allHeaders.length);
       headerRange.setBackground("#1B365D");
@@ -83,14 +83,14 @@ function doPost(e) {
           s.client_id || ""
         ]);
       }
-      
+
       if (rowData.length > 0) {
         sheet.getRange(2, 1, rowData.length, 5).setValues(rowData);
         var metaRange = sheet.getRange(2, 1, rowData.length, 5);
         metaRange.setFontFamily("Calibri");
         metaRange.setFontSize(10);
         metaRange.setVerticalAlignment("middle");
-        
+
         // Alignment
         sheet.getRange(2, 1, rowData.length, 1).setHorizontalAlignment("center"); // No
         sheet.getRange(2, 2, rowData.length, 1).setHorizontalAlignment("center"); // Site ID
@@ -108,10 +108,10 @@ function doPost(e) {
     var lastCol = Math.max(sheet.getLastColumn(), 29);
     var headerValues = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
     var targetColIndex = -1;
-    
+
     // Normalisasi hourStr ke format "HH:00"
     var cleanHour = hourStr.indexOf(":") > -1 ? hourStr.split(":")[0] + ":00" : hourStr;
-    
+
     for (var c = 0; c < headerValues.length; c++) {
       if (String(headerValues[c]).trim() === cleanHour) {
         targetColIndex = c + 1;
@@ -131,7 +131,7 @@ function doPost(e) {
 
     // 4. Hitung jumlah site murni (default 61 site Mitratel)
     var numSites = (sites && sites.length > 0) ? sites.length : 61;
-    
+
     // Baca metadata site yang sudah ada di Sheet (hanya baris site, 2 s.d numSites + 1)
     var existingMeta = sheet.getRange(2, 2, numSites, 4).getValues(); // Col 2 (Site ID) to Col 5 (Client ID)
     var rowLookup = {};
@@ -161,13 +161,13 @@ function doPost(e) {
       var sId = String(site.site_id || "").trim().toUpperCase();
       var cId = String(site.client_id || "").trim().toUpperCase();
       var sName = String(site.name || "").trim().toUpperCase();
-      
+
       var rowIdx = rowLookup[cId] || rowLookup[sId] || rowLookup[sName] || (site.no ? (site.no + 1) : null);
       if (rowIdx && rowIdx >= 2 && rowIdx <= (numSites + 1)) {
         var arrayIndex = rowIdx - 2;
         var st = String(site.status || "-").toUpperCase();
         statusUpdates[arrayIndex] = [st];
-        
+
         if (st === "ONLINE") {
           bgColors[arrayIndex] = ["#E8F5E9"];  // Hijau muda
           fontColors[arrayIndex] = ["#2E7D32"]; // Hijau tua bold
@@ -192,41 +192,37 @@ function doPost(e) {
     targetCellRange.setHorizontalAlignment("center");
     targetCellRange.setVerticalAlignment("middle");
 
-    // 6. Tulis Summary di bawah tabel (BARIS TETAP / IN-PLACE, TIDAK BERTAMBAH KE BAWAH)
-    var summaryRow = numSites + 3; // Contoh: untuk 61 site, summaryRow adalah baris 64
+    // 6. Summary: HANYA SATU BLOK RINGKASAN & SELALU DI-UPDATE DI BARIS INI
+    var summaryRow = numSites + 3; // Baris 64 untuk 61 site (tepat 2 baris setelah site terakhir)
 
-    // Bersihkan baris-baris berlebih di bawahnya jika ada sisa duplikasi dari versi sebelumnya
+    // A. Bersihkan seluruh baris sisa di bawahnya jika ada tumpukan dari jam-jam sebelumnya
     var maxSheetRows = sheet.getLastRow();
-    if (maxSheetRows > (summaryRow + 3)) {
-      sheet.getRange(summaryRow + 4, 1, maxSheetRows - (summaryRow + 3), sheet.getLastColumn()).clear();
+    if (maxSheetRows > (summaryRow + 2)) {
+      sheet.getRange(summaryRow + 3, 1, maxSheetRows - (summaryRow + 2), sheet.getLastColumn()).clear();
     }
 
-    // Tulis Label & Angka Terakhir di Kolom C & D (selalu overwrite di baris yang sama persis)
-    sheet.getRange(summaryRow, 3).setValue("Total Online:").setFontWeight("bold");
+    // B. Bersihkan area kolom jam (kolom 6 ke kanan) di baris summary agar tetap bersih
+    if (sheet.getLastColumn() >= 6) {
+      sheet.getRange(summaryRow, 6, 3, sheet.getLastColumn() - 5).clear();
+    }
+
+    // C. Pastikan lebar kolom Nama Site (Col 3) cukup agar label summary tidak terpotong
+    if (sheet.getColumnWidth(3) < 210) {
+      sheet.setColumnWidth(3, 210);
+    }
+
+    // D. Update nilai summary jam terkini (hanya satu blok ini saja yang selalu diperbarui)
+    sheet.getRange(summaryRow, 3).setValue("Total Online (" + cleanHour + "):").setFontWeight("bold");
     sheet.getRange(summaryRow, 4).setValue(summary.online != null ? summary.online : 0)
       .setFontWeight("bold").setFontColor("#2E7D32").setHorizontalAlignment("center");
-    
-    sheet.getRange(summaryRow + 1, 3).setValue("Total Offline:").setFontWeight("bold");
+
+    sheet.getRange(summaryRow + 1, 3).setValue("Total Offline (" + cleanHour + "):").setFontWeight("bold");
     sheet.getRange(summaryRow + 1, 4).setValue(summary.offline != null ? summary.offline : 0)
       .setFontWeight("bold").setFontColor("#C62828").setHorizontalAlignment("center");
 
     sheet.getRange(summaryRow + 2, 3).setValue("Availability Rate:").setFontWeight("bold");
     sheet.getRange(summaryRow + 2, 4).setValue(summary.availability || "0%")
       .setFontWeight("bold").setHorizontalAlignment("center");
-
-    sheet.getRange(summaryRow + 3, 3).setValue("Update Terakhir:").setFontWeight("bold");
-    sheet.getRange(summaryRow + 3, 4).setValue(cleanHour + " WIB")
-      .setFontWeight("bold").setFontColor("#1B365D").setHorizontalAlignment("center");
-
-    // Tulis juga Total Online, Offline, dan Availability Rate pada kolom jam bersangkutan!
-    sheet.getRange(summaryRow, targetColIndex).setValue(summary.online != null ? summary.online : 0)
-      .setFontWeight("bold").setFontColor("#2E7D32").setHorizontalAlignment("center").setBackground("#E8F5E9");
-
-    sheet.getRange(summaryRow + 1, targetColIndex).setValue(summary.offline != null ? summary.offline : 0)
-      .setFontWeight("bold").setFontColor("#C62828").setHorizontalAlignment("center").setBackground("#FFEBEE");
-
-    sheet.getRange(summaryRow + 2, targetColIndex).setValue(summary.availability || "0%")
-      .setFontWeight("bold").setHorizontalAlignment("center").setBackground("#F5F5F5");
 
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
