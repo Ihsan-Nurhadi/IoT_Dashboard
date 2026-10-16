@@ -33,6 +33,7 @@ EXTRA_SITE_IDS = [
     "c6dc7fe4-8d26-5587-9101-1ead5d9faf65",  # dagang kelambir (Dagang Kelambir)
     "ea5ae5e7-a752-501a-99db-b0738bf9daa2",  # permanenisasi (PERMANENISASICIOKONGSUKARESIKSIDAMULIH)
     "661cc75b-37ec-539d-9197-853f91dd7f16",  # jalanmustikasari (JALANMUSTIKASARI)
+    "ee11245f-deb1-43fe-abc1-d5d52d399053",  # nayakaws
 ]
 
 # Zona waktu Indonesia Barat (WIB = UTC+7)
