@@ -53,6 +53,9 @@ MANUAL_WINDOW_SECONDS = int(os.getenv("MANUAL_WINDOW_SECONDS", "20"))
 # Google Spreadsheet Webhook URL (Apps Script)
 GSHEET_WEBHOOK_URL = os.getenv("GSHEET_WEBHOOK_URL", "")
 
+# Filter simulator dummy: abaikan paket dari container simulator (IP 192.168.1.150 / fake online)
+IGNORE_SIMULATOR_PACKETS = os.getenv("IGNORE_SIMULATOR_PACKETS", "true").lower() in ("true", "1", "yes")
+
 # Path file output Excel lokal
 DEFAULT_EXCEL_FILE = os.getenv(
     "EXCEL_OUTPUT",
@@ -157,6 +160,21 @@ def run_mqtt_window_listener(
         # Hanya hitung data live yang benar-benar dikirimkan perangkat selama window 5 menit
         if getattr(msg, "retain", False):
             return
+
+        # 2. ABAIKAN paket dari simulator dashboard ("fake online" / IP 192.168.1.150)
+        # Menjamin hanya perangkat keras lapangan asli yang tercatat ONLINE
+        if IGNORE_SIMULATOR_PACKETS:
+            try:
+                payload_str = msg.payload.decode('utf-8', errors='ignore').strip()
+                if payload_str.startswith("{") and payload_str.endswith("}"):
+                    data = json.loads(payload_str)
+                    if isinstance(data, dict):
+                        src_ip = str(data.get("ip") or data.get("IP") or "")
+                        if src_ip == "192.168.1.150":
+                            # Paket berasal dari simulator (bukan hardware fisik), abaikan!
+                            return
+            except Exception:
+                pass
 
         topic = msg.topic
         parts = topic.split("/")
