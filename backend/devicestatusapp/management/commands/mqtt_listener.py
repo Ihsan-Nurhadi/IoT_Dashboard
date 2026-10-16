@@ -170,73 +170,22 @@ class Command(BaseCommand):
                             # Nonaktifkan Motion Sensor 4 jika ada di database dari sistem standalone lama
                             DeviceState.objects.filter(device_name="Motion Sensor 4").update(status="Standby", last_updated=now_time)
 
-                            # Logika Alarm Kabel Dicabut:
-                            # Jika PIR bernilai [0, 0, 0] (kabel dicabut / semua sensor 0) -> Trigger sirine / rotary 10s
-                            # Jika PIR bernilai normal e.g. [1, 0, 0] -> Status normal
-                            is_alarm_triggered = len(normalized_s) == 3 and all(x == 0 for x in normalized_s)
-                            is_state_transition = (self.last_pir_s != normalized_s)
+                            # Status PIR normal (Standby / Connected)
                             self.last_pir_s = normalized_s
+                            DeviceState.objects.update_or_create(
+                                device_name="PIR Cable State",
+                                defaults={'status': 'CONNECTED', 'last_updated': now_time}
+                            )
+                            DeviceState.objects.update_or_create(
+                                device_name="PIR Alarm",
+                                defaults={'status': 'STANDBY', 'last_updated': now_time}
+                            )
 
-                            if is_alarm_triggered:
-                                current_epoch = time.time()
-                                DeviceState.objects.update_or_create(
-                                    device_name="PIR Cable State",
-                                    defaults={'status': 'DISCONNECTED', 'last_updated': now_time}
-                                )
-                                DeviceState.objects.update_or_create(
-                                    device_name="PIR Alarm",
-                                    defaults={'status': 'ALARM_ACTIVE', 'last_updated': now_time}
-                                )
-
-                                # Trigger sirine jika:
-                                # 1. Relay saat ini sedang MATI (sudah selesai timeout 10s), ATAU
-                                # 2. Terjadi perubahan status baru (misal dari normal 1,0,0 ke 0,0,0), ATAU
-                                # 3. Sudah lewat jeda 10 detik
-                                should_trigger = (not self.relay_active) or is_state_transition or (current_epoch - self.last_siren_trigger_time >= 10.0)
-
-                                if should_trigger:
-                                    self.last_siren_trigger_time = current_epoch
-                                    self.relay_active = True
-                                    self.stdout.write(self.style.WARNING(f"[ALARM KABEL DICABUT] Saluran PIR bernilai [0, 0, 0]! Mengaktifkan sirine relay 10s..."))
-                                    
-                                    # Catat Security Alert ke Database agar masuk ke notifikasi Lonceng Header
-                                    SecurityAlertLog.objects.create(
-                                        alert_type="pir_disconnect",
-                                        title="PERINGATAN: Sensor PIR Terputus / Kabel Dicabut!",
-                                        message="Seluruh saluran PIR Whitebox bernilai 0,0,0. Sirine Rotary menyala.",
-                                        timestamp=now_time
-                                    )
-
-                                    relay_cmd = json.dumps({"relay": {"state": True, "timeout_ms": 10000}})
-                                    
-                                    target_config_topics = []
-                                    if "/" in msg.topic:
-                                        base_prefix = msg.topic.rsplit('/', 1)[0]
-                                        target_config_topics.append(f"{base_prefix}/config")
-                                    if hasattr(settings, 'MQTT_TOPIC_SUB') and settings.MQTT_TOPIC_SUB:
-                                        if settings.MQTT_TOPIC_SUB not in target_config_topics:
-                                            target_config_topics.append(settings.MQTT_TOPIC_SUB)
-                                    
-                                    for cfg_topic in target_config_topics:
-                                        client.publish(cfg_topic, relay_cmd, qos=0)
-                                        self.stdout.write(self.style.SUCCESS(f"[MQTT Action] Published to {cfg_topic}: {relay_cmd}"))
-                                    
-                                    trigger_pir_cctv_snapshot(self.stdout)
-                                else:
-                                    self.stdout.write(f"[ALARM SIRINE] Sirine masih aktif/cooldown (s={normalized_s}, relay_active={self.relay_active})")
+                            if has_detection:
+                                self.stdout.write(f"[PIR Motion] Motion detected (s={normalized_s})! Triggering CCTV snapshot...")
+                                trigger_pir_cctv_snapshot(self.stdout)
                             else:
-                                DeviceState.objects.update_or_create(
-                                    device_name="PIR Cable State",
-                                    defaults={'status': 'CONNECTED', 'last_updated': now_time}
-                                )
-                                DeviceState.objects.update_or_create(
-                                    device_name="PIR Alarm",
-                                    defaults={'status': 'STANDBY', 'last_updated': now_time}
-                                )
-                                self.stdout.write(f"[PIR Normal] Kondisi PIR normal (s={normalized_s})")
-                                if has_detection:
-                                    self.stdout.write("[PIR] Motion detected! Triggering CCTV snapshot...")
-                                    trigger_pir_cctv_snapshot(self.stdout)
+                                self.stdout.write(f"[PIR Standby] Kondisi PIR standby / tidak ada gerakan (s={normalized_s})")
                                 
                     # 4. Speaker status -> nms/esp32-speaker-003734fe8ce0/speaker/speaker
                     elif "/speaker/speaker" in msg.topic:

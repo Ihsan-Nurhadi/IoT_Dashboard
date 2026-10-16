@@ -13,7 +13,8 @@ import paho.mqtt.client as mqtt
 
 def run_simulation(state_arg=None):
     # Default topic from whitebox node
-    topic = "nms/E32_WB_TBGTEST/whitebox/motion_pir"
+    base_topic = getattr(settings, 'MQTT_TOPIC_PUB2', 'nms/E32_WB_26/whitebox/#').replace('/#', '')
+    topic = f"{base_topic}/motion_pir"
     
     # Tentukan state sensor
     if state_arg in ["alarm", "danger", "kabel", "kabel_dicabut", "0,0,0", "0"]:
