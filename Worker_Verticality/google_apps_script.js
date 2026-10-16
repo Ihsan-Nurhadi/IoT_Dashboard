@@ -1,23 +1,24 @@
 /**
  * GOOGLE APPS SCRIPT: NMS Mitratel Hourly Matrix Monitoring Sync
  * 
- * CARA PEMASANGAN (Hanya 2 Menit):
- * 1. Buka Google Spreadsheet baru atau yang sudah ada untuk monitoring Mitratel.
- * 2. Di menu atas, klik "Extensions" (Ekstensi) > "Apps Script".
- * 3. Hapus semua kode default di editor, lalu PASTE SELURUH KODE DI BAWAH INI.
- * 4. Klik tombol "Save" (ikon disket) atau Ctrl+S.
- * 5. Di kanan atas, klik tombol biru "Deploy" > "New deployment".
- * 6. Pilih type: "Web app" (ikon globe).
- * 7. Isi konfigurasi:
- *    - Description: "Mitratel Hourly Monitor Webhook"
- *    - Execute as: "Me" (email Anda)
- *    - Who has access: "Anyone" (Siapa saja, agar server bisa mengirim data tanpa login browser)
- * 8. Klik "Deploy", izinkan hak akses (Authorize access jika diminta).
- * 9. Salin "Web app URL" (bentuknya: https://script.google.com/macros/s/AKfycb.../exec).
- * 10. Masukkan URL tersebut ke file .env / docker-compose:
- *     GSHEET_WEBHOOK_URL="https://script.google.com/macros/s/AKfycb.../exec"
+ * PEMBARUAN:
+ * 1. Tidak lagi membuat 24 kolom jam kosong (00:00 - 23:00) di awal!
+ * 2. Kolom jam hanya dibuat secara dinamis saat data jam tersebut tiba, dan diurutkan kronologis.
+ * 3. Fitur Pembersihan Otomatis (Cleanup): Menghapus seluruh kolom jam kosong untuk hari sebelumnya maupun ke depannya.
+ * 4. Menu Spreadsheet: Menu '⚡ NMS Mitratel' di toolbar untuk 1-klik membersihkan kolom kosong semua sheet.
+ * 5. Summary hanya 1 blok tetap (Row 64-66) yang selalu update in-place.
+ * 
+ * CARA UPDATE (Hanya 1 Menit):
+ * 1. Buka Google Spreadsheet Anda.
+ * 2. Di menu atas: Extensions (Ekstensi) > Apps Script.
+ * 3. Hapus semua isi kode lama, paste SELURUH kode di bawah ini.
+ * 4. Tekan Ctrl+S (ikon simpan).
+ * 5. Klik Deploy > Manage deployments > Edit (ikon pensil) > Version: New version > Klik Deploy.
  */
 
+// ==============================================================================
+// 1. WEBHOOK POST (Menerima Data Tiap Jam dari Monitoring Mitratel)
+// ==============================================================================
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -43,24 +44,16 @@ function doPost(e) {
       isNew = true;
     }
 
-    // 2. Inisialisasi Header dan Metadata Site jika sheet baru
+    // 2. Inisialisasi Header Dasar (HANYA 5 KOLOM METADATA, TANPA KOLOM JAM KOSONG!)
     if (isNew || sheet.getLastRow() < 2) {
       sheet.clear();
 
-      // Header Baris 1
+      // Header Baris 1: Hanya 5 kolom metadata dasar
       var baseHeaders = ["No", "Site ID", "Nama Site", "Regional", "Client ID (MQTT)"];
-      var hourHeaders = [
-        "00:00", "01:00", "02:00", "03:00", "04:00", "05:00",
-        "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
-        "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
-        "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
-      ];
-      var allHeaders = baseHeaders.concat(hourHeaders);
-
-      sheet.getRange(1, 1, 1, allHeaders.length).setValues([allHeaders]);
+      sheet.getRange(1, 1, 1, baseHeaders.length).setValues([baseHeaders]);
 
       // Styling Header Utama
-      var headerRange = sheet.getRange(1, 1, 1, allHeaders.length);
+      var headerRange = sheet.getRange(1, 1, 1, baseHeaders.length);
       headerRange.setBackground("#1B365D");
       headerRange.setFontColor("#FFFFFF");
       headerRange.setFontWeight("bold");
@@ -68,10 +61,7 @@ function doPost(e) {
       headerRange.setVerticalAlignment("middle");
       sheet.setRowHeight(1, 32);
 
-      // Warna pembeda untuk kolom jam
-      sheet.getRange(1, 6, 1, hourHeaders.length).setBackground("#2C5E8A");
-
-      // Tulis baris dasar seluruh site
+      // Tulis baris dasar seluruh 61 site
       var rowData = [];
       for (var i = 0; i < sites.length; i++) {
         var s = sites[i];
@@ -91,7 +81,7 @@ function doPost(e) {
         metaRange.setFontSize(10);
         metaRange.setVerticalAlignment("middle");
 
-        // Alignment
+        // Alignment kolom metadata
         sheet.getRange(2, 1, rowData.length, 1).setHorizontalAlignment("center"); // No
         sheet.getRange(2, 2, rowData.length, 1).setHorizontalAlignment("center"); // Site ID
         sheet.getRange(2, 3, rowData.length, 1).setHorizontalAlignment("left");   // Name
@@ -104,36 +94,65 @@ function doPost(e) {
       sheet.setFrozenColumns(5);
     }
 
-    // 3. Cari Index Kolom untuk Jam Ini (misal: "08:00")
-    var lastCol = Math.max(sheet.getLastColumn(), 29);
-    var headerValues = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    var targetColIndex = -1;
+    // Hitung jumlah site murni (default 61 site Mitratel)
+    var numSites = (sites && sites.length > 0) ? sites.length : 61;
 
-    // Normalisasi hourStr ke format "HH:00"
+    // 3. Bersihkan kolom kosong/duplikat terlebih dahulu sebelum memproses jam ini
+    cleanupSheetColumns(sheet, numSites);
+
+    // 4. Cari atau Sisipkan Kolom untuk Jam Ini (misal: "18:00")
     var cleanHour = hourStr.indexOf(":") > -1 ? hourStr.split(":")[0] + ":00" : hourStr;
+    var targetColIndex = -1;
+    var lastCol = sheet.getLastColumn();
 
-    for (var c = 0; c < headerValues.length; c++) {
-      if (String(headerValues[c]).trim() === cleanHour) {
-        targetColIndex = c + 1;
-        break;
+    // A. Cari apakah kolom jam ini sudah ada sebelumnya (Gunakan getDisplayValues agar akurat)
+    if (lastCol >= 6) {
+      var headerDisplays = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+      for (var c = 5; c < headerDisplays.length; c++) {
+        var colHeader = String(headerDisplays[c]).trim();
+        if (colHeader === cleanHour) {
+          targetColIndex = c + 1;
+          break;
+        }
       }
     }
 
-    // Jika kolom jam belum ada di header, tambahkan di akhir
+    // B. Jika kolom jam ini belum ada, sisipkan secara terurut kronologis (00:00 s.d 23:00)
     if (targetColIndex === -1) {
-      targetColIndex = sheet.getLastColumn() + 1;
-      sheet.getRange(1, targetColIndex).setValue(cleanHour)
+      var inserted = false;
+      if (lastCol >= 6) {
+        var headerDisplays = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+        for (var c = 5; c < headerDisplays.length; c++) {
+          var colHeader = String(headerDisplays[c]).trim();
+          // Jika kolom berisi format jam dan nilainya lebih besar, sisipkan sebelum kolom tersebut
+          if (colHeader.indexOf(":") > -1 && colHeader > cleanHour) {
+            sheet.insertColumnBefore(c + 1);
+            targetColIndex = c + 1;
+            inserted = true;
+            break;
+          }
+        }
+      }
+
+      // Jika tidak ada kolom jam yang lebih besar, tambahkan di paling kanan
+      if (!inserted) {
+        targetColIndex = sheet.getLastColumn() + 1;
+      }
+
+      // Format header kolom jam baru sebagai plain text (@) agar tidak dikonversi ke Date
+      sheet.getRange(1, targetColIndex)
+        .setNumberFormat("@")
+        .setValue(cleanHour)
         .setBackground("#2C5E8A")
         .setFontColor("#FFFFFF")
         .setFontWeight("bold")
-        .setHorizontalAlignment("center");
+        .setHorizontalAlignment("center")
+        .setVerticalAlignment("middle");
+      sheet.setColumnWidth(targetColIndex, 90);
     }
 
-    // 4. Hitung jumlah site murni (default 61 site Mitratel)
-    var numSites = (sites && sites.length > 0) ? sites.length : 61;
-
-    // Baca metadata site yang sudah ada di Sheet (hanya baris site, 2 s.d numSites + 1)
-    var existingMeta = sheet.getRange(2, 2, numSites, 4).getValues(); // Col 2 (Site ID) to Col 5 (Client ID)
+    // 5. Baca Mapping Site ID & Client ID yang Ada di Sheet
+    var existingMeta = sheet.getRange(2, 2, numSites, 4).getValues(); // Col 2 (Site ID) s.d Col 5 (Client ID)
     var rowLookup = {};
     for (var r = 0; r < existingMeta.length; r++) {
       var sId = String(existingMeta[r][0]).trim().toUpperCase();
@@ -144,12 +163,11 @@ function doPost(e) {
       if (cId) rowLookup[cId] = r + 2;
     }
 
-    // 5. Update Status Setiap Site pada Kolom Jam Tersebut
+    // 6. Update Status Setiap Site pada Kolom Jam Tersebut
     var statusUpdates = [];
     var bgColors = [];
     var fontColors = [];
 
-    // Buat template matriks kosong untuk kolom target (hanya sebanyak jumlah site)
     for (var i = 0; i < numSites; i++) {
       statusUpdates.push(["-"]);
       bgColors.push(["#FFFFFF"]);
@@ -181,7 +199,7 @@ function doPost(e) {
       }
     }
 
-    // Tulis sekaligus status site ke kolom jam target (HANYA rentang site baris 2 s.d numSites + 1)
+    // Tulis status site HANYA pada rentang baris 2 s.d (numSites + 1)
     var targetCellRange = sheet.getRange(2, targetColIndex, numSites, 1);
     targetCellRange.setValues(statusUpdates);
     targetCellRange.setBackgrounds(bgColors);
@@ -192,26 +210,26 @@ function doPost(e) {
     targetCellRange.setHorizontalAlignment("center");
     targetCellRange.setVerticalAlignment("middle");
 
-    // 6. Summary: HANYA SATU BLOK RINGKASAN & SELALU DI-UPDATE DI BARIS INI
-    var summaryRow = numSites + 3; // Baris 64 untuk 61 site (tepat 2 baris setelah site terakhir)
+    // 7. Summary: HANYA 1 BLOK TETAP DI BAWAH TABEL (Row 64 s.d 66)
+    var summaryRow = numSites + 3; // Baris 64 untuk 61 site
 
-    // A. Bersihkan seluruh baris sisa di bawahnya jika ada tumpukan dari jam-jam sebelumnya
+    // Bersihkan baris-baris berlebih di bawahnya jika ada sisa duplikasi
     var maxSheetRows = sheet.getLastRow();
     if (maxSheetRows > (summaryRow + 2)) {
       sheet.getRange(summaryRow + 3, 1, maxSheetRows - (summaryRow + 2), sheet.getLastColumn()).clear();
     }
 
-    // B. Bersihkan area kolom jam (kolom 6 ke kanan) di baris summary agar tetap bersih
+    // Bersihkan kolom jam di samping summary agar area bawah tetap bersih
     if (sheet.getLastColumn() >= 6) {
       sheet.getRange(summaryRow, 6, 3, sheet.getLastColumn() - 5).clear();
     }
 
-    // C. Pastikan lebar kolom Nama Site (Col 3) cukup agar label summary tidak terpotong
+    // Pastikan lebar kolom Nama Site cukup
     if (sheet.getColumnWidth(3) < 210) {
       sheet.setColumnWidth(3, 210);
     }
 
-    // D. Update nilai summary jam terkini (hanya satu blok ini saja yang selalu diperbarui)
+    // Tulis nilai summary jam terkini di baris yang sama persis
     sheet.getRange(summaryRow, 3).setValue("Total Online (" + cleanHour + "):").setFontWeight("bold");
     sheet.getRange(summaryRow, 4).setValue(summary.online != null ? summary.online : 0)
       .setFontWeight("bold").setFontColor("#2E7D32").setHorizontalAlignment("center");
@@ -241,6 +259,130 @@ function doPost(e) {
   }
 }
 
+// ==============================================================================
+// 2. FUNGSI PEMBERSIH KOLOM KOSONG & DUPLIKAT PADA SATU SHEET
+// ==============================================================================
+function cleanupSheetColumns(sheet, numSites) {
+  if (!sheet) return 0;
+  numSites = numSites || 61;
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 6) return 0;
+
+  var deletedCount = 0;
+  var seenHours = {};
+
+  // Periksa dari kolom paling kanan ke kiri agar index kolom stabil saat dihapus
+  for (var c = lastCol; c >= 6; c--) {
+    var rawHeader = sheet.getRange(1, c).getDisplayValue().trim();
+    var cleanHeader = rawHeader.indexOf(":") > -1 ? rawHeader.split(":")[0] + ":00" : rawHeader;
+
+    // Periksa isi data status site pada baris 2 s.d (numSites + 1)
+    var vals = sheet.getRange(2, c, numSites, 1).getValues();
+    var hasValidData = false;
+
+    for (var r = 0; r < vals.length; r++) {
+      var cellVal = String(vals[r][0]).trim().toUpperCase();
+      if (cellVal === "ONLINE" || cellVal === "OFFLINE") {
+        hasValidData = true;
+        break;
+      }
+    }
+
+    // Kasus 1: Kolom jam ini KOSONG (tidak ada data status ONLINE/OFFLINE)
+    if (!hasValidData) {
+      sheet.deleteColumn(c);
+      deletedCount++;
+      continue;
+    }
+
+    // Kasus 2: Kolom jam DUPLIKAT (jam sama yang pernah tercatat di kolom lebih kanan)
+    if (cleanHeader && cleanHeader.indexOf(":") > -1) {
+      if (seenHours[cleanHeader]) {
+        sheet.deleteColumn(c);
+        deletedCount++;
+        continue;
+      } else {
+        seenHours[cleanHeader] = true;
+      }
+    }
+  }
+
+  return deletedCount;
+}
+
+// ==============================================================================
+// 3. FUNGSI PEMBERSIH UNTUK SELURUH SHEET (HARI SEBELUMNYA DAN HARI INI)
+// ==============================================================================
+function cleanupAllSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var totalDeleted = 0;
+  var details = [];
+
+  for (var i = 0; i < sheets.length; i++) {
+    var sh = sheets[i];
+    if (sh.getLastRow() >= 2 && sh.getLastColumn() >= 6) {
+      var del = cleanupSheetColumns(sh, 61);
+      if (del > 0) {
+        totalDeleted += del;
+        details.push(sh.getName() + " (" + del + " kolom)");
+      }
+    }
+  }
+
+  return {
+    totalDeleted: totalDeleted,
+    details: details
+  };
+}
+
+// ==============================================================================
+// 4. MENU TOOLBAR SPREADSHEET (1-Klik Bersihkan Semua Sheet)
+// ==============================================================================
+function onOpen() {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu("⚡ NMS Mitratel")
+      .addItem("🧹 Bersihkan Kolom Kosong & Duplikat (Semua Sheet)", "menuCleanupAll")
+      .addToUi();
+  } catch (e) {}
+}
+
+function menuCleanupAll() {
+  var res = cleanupAllSheets();
+  var ui = SpreadsheetApp.getUi();
+  if (res.totalDeleted > 0) {
+    ui.alert(
+      "Pembersihan Sukses",
+      "Berhasil menghapus total " + res.totalDeleted + " kolom kosong/duplikat dari sheet:\n\n" + res.details.join("\n"),
+      ui.ButtonSet.OK
+    );
+  } else {
+    ui.alert(
+      "Sudah Bersih",
+      "Seluruh sheet (hari ini dan hari sebelumnya) sudah rapi! Tidak ditemukan kolom kosong atau duplikat.",
+      ui.ButtonSet.OK
+    );
+  }
+}
+
+// ==============================================================================
+// 5. WEBHOOK GET (Bisa Dibuka di Browser untuk Otomatis Bersihkan Semua Sheet)
+// ==============================================================================
 function doGet(e) {
-  return ContentService.createTextOutput("NMS Mitratel Monitoring Webhook is active and running! Send POST request with JSON payload to sync data.");
+  var cleanRes = cleanupAllSheets();
+
+  return ContentService.createTextOutput(
+    "=====================================================\n" +
+    "  NMS MITRATEL WEBHOOK & CLEANUP SERVICE ACTIVE\n" +
+    "=====================================================\n\n" +
+    "Hasil Pembersihan Otomatis Seluruh Sheet:\n" +
+    "- Total kolom kosong/duplikat dihapus : " + cleanRes.totalDeleted + "\n" +
+    (cleanRes.details.length > 0
+      ? "- Rincian per Sheet : " + cleanRes.details.join(", ") + "\n\n"
+      : "- Seluruh sheet tanggal sebelumnya & hari ini sudah bersih!\n\n") +
+    "Keterangan:\n" +
+    "- Ke depannya kolom jam kosong 24 jam tidak akan pernah dibuat lagi.\n" +
+    "- Kolom jam hanya akan ditambahkan saat jam tersebut menerima data."
+  );
 }
