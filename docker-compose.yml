@@ -197,6 +197,7 @@ services:
       - EXCEL_OUTPUT=/app/reports/monitoring_mitratel_hourly.xlsx
       - MEDIA_REPORTS_DIR=/app/media/reports
     volumes:
+      - ./Worker_Verticality:/app
       - ./Worker_Verticality/reports:/app/reports
       - media_volume:/app/media
     networks:

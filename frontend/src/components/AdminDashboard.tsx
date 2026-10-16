@@ -2048,7 +2048,7 @@ const AdminDashboard: React.FC = () => {
             <section className="grid-card">
               <div className="card-header">
                 <div>
-                  <h2>7 Site Tambahan Khusus di Luar Branch Default</h2>
+                  <h2>8 Site Tambahan Khusus di Luar Branch Default</h2>
                   <p>Site berikut secara otomatis di-include dalam penarikan data hourly matrix bersama branch Mitratel Default.</p>
                 </div>
               </div>
@@ -2103,6 +2103,12 @@ const AdminDashboard: React.FC = () => {
                       <td><strong>JALANMUSTIKASARI</strong></td>
                       <td><code>JALANMUSTIKASARI</code></td>
                       <td><code>661cc75b-37ec-539d-9197-853f91dd7f16</code></td>
+                      <td><span className="badge badge-active">Site Khusus</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>NAYAKA WS</strong></td>
+                      <td><code>nayakaws</code></td>
+                      <td><code>ee11245f-deb1-43fe-abc1-d5d52d399053</code></td>
                       <td><span className="badge badge-active">Site Khusus</span></td>
                     </tr>
                   </tbody>
