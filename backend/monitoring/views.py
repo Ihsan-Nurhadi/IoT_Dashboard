@@ -32,32 +32,16 @@ class SensorDataListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
-def resolve_device_ids(device_id):
-    """
-    Menangani alias device (misal E32_VER_WS, E32_VER_WEES, 20TS10B1529 merujuk ke site fisik yang sama).
-    """
-    if not device_id:
-        return None
-    cleaned = str(device_id).strip()
-    if cleaned in ['E32_VER_WS', 'E32_VER_WEES', '20TS10B1529']:
-        return ['E32_VER_WS', 'E32_VER_WEES', '20TS10B1529']
-    return [cleaned]
-
 
 @api_view(['GET'])
 def sensor_data_latest(request):
     """
-    GET /api/sensor-data/latest/ → Ambil data sensor terbaru
-    GET /api/sensor-data/latest/?device_id=CKG-04-031-MM → Terbaru untuk device tertentu
+    GET /api/sensor-data/latest/ → Ambil data sensor terbaru E32_VER_WEES
     """
-    queryset = SensorData.objects.all()
+    latest = SensorData.objects.filter(device_id='E32_VER_WEES').first()
+    if latest is None:
+        latest = SensorData.objects.first()
 
-    device_id = request.query_params.get('device_id')
-    dev_ids = resolve_device_ids(device_id)
-    if dev_ids:
-        queryset = queryset.filter(device_id__in=dev_ids)
-
-    latest = queryset.first()  # Ordering sudah -timestamp dari model Meta
     if latest is None:
         return Response(
             {'detail': 'Belum ada data sensor.'},
@@ -70,20 +54,12 @@ def sensor_data_latest(request):
 @api_view(['GET'])
 def sensor_data_history(request):
     """
-    GET /api/sensor-data/history/?limit=100 → Ambil N data terakhir (default: 100)
-    GET /api/sensor-data/history/?device_id=CKG-04-031-MM → Filter by device
-    GET /api/sensor-data/history/?start_date=2026-03-01&end_date=2026-03-04 → Filter by date range
+    GET /api/sensor-data/history/?limit=100 → Ambil history sensor data E32_VER_WEES
     """
     from django.utils.dateparse import parse_date
     from datetime import datetime, time
 
-    data = SensorData.objects.all()
-
-    # Filter by device_id (mendukung alias E32_VER_WS <-> E32_VER_WEES)
-    device_id = request.query_params.get('device_id')
-    dev_ids = resolve_device_ids(device_id)
-    if dev_ids:
-        data = data.filter(device_id__in=dev_ids)
+    data = SensorData.objects.filter(device_id='E32_VER_WEES')
 
     # Filter by date range
     start_date_str = request.query_params.get('start_date')
@@ -102,7 +78,7 @@ def sensor_data_history(request):
             data = data.filter(timestamp__lte=end_datetime)
 
     limit = int(request.query_params.get('limit', 100))
-    limit = min(limit, 5000)  # Max 5000 data for report exports
+    limit = min(limit, 5000)
     data = data[:limit]
     serializer = SensorDataSerializer(data, many=True)
     return Response(serializer.data)
@@ -112,58 +88,21 @@ def sensor_data_history(request):
 def sensor_data_sites_status(request):
     """
     GET /api/sensor-data/sites-status/ → Get latest reading per device_id with live status.
-    Returns one entry per device with status: online (< 2min), warning (< 5min), offline (> 5min).
+    Menyisakan HANYA site E32_VER_WEES.
     """
     from datetime import timedelta
 
     now = timezone.now()
-    threshold_online = now - timedelta(minutes=2)
-    threshold_warning = now - timedelta(minutes=5)
+    threshold_online = now - timedelta(minutes=5)
 
-    # Get latest timestamp per device_id
-    latest_ids = (
-        SensorData.objects
-        .values('device_id')
-        .annotate(latest_id=Max('id'))
-        .values_list('latest_id', flat=True)
-    )
-
-    latest_records = SensorData.objects.filter(id__in=latest_ids).order_by('device_id')
+    latest_record = SensorData.objects.filter(device_id='E32_VER_WEES').order_by('-timestamp').first()
 
     results = []
-    has_ws = False
-    has_wees = False
-    ws_record_data = None
-    wees_record_data = None
-
-    for record in latest_records:
-        if record.timestamp >= threshold_online:
-            live_status = 'online'
-        elif record.timestamp >= threshold_warning:
-            live_status = 'warning'
-        else:
-            live_status = 'offline'
-
-        data = SensorDataSerializer(record).data
+    if latest_record:
+        live_status = 'online' if latest_record.timestamp >= threshold_online else 'offline'
+        data = SensorDataSerializer(latest_record).data
         data['live_status'] = live_status
         results.append(data)
-
-        if record.device_id == 'E32_VER_WS':
-            has_ws = True
-            ws_record_data = data
-        elif record.device_id == 'E32_VER_WEES':
-            has_wees = True
-            wees_record_data = data
-
-    # Cross-populate alias so both E32_VER_WS and E32_VER_WEES report status consistently
-    if has_wees and not has_ws:
-        alias_data = dict(wees_record_data)
-        alias_data['device_id'] = 'E32_VER_WS'
-        results.append(alias_data)
-    elif has_ws and not has_wees:
-        alias_data = dict(ws_record_data)
-        alias_data['device_id'] = 'E32_VER_WEES'
-        results.append(alias_data)
 
     return Response(results)
 
@@ -201,27 +140,21 @@ class SiteVisibilityView(APIView):
 
 
 DEFAULT_21_SITES = [
-    {"id": "site-swadaya", "name": "Swadaya", "siteId": "20TS-SWADAYA", "code": "E32_VER_SWADAYA", "mac_address": "3A:0E:4C:1E:80:6E", "lat": -6.2201, "lng": 106.8501, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Selatan", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-pedurenan", "name": "Pedurenan", "siteId": "20TS-PEDURENAN", "code": "E32_VER_PEDURENAN", "mac_address": "D9:DA:D9:08:94:FF", "lat": -6.2305, "lng": 106.8321, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Selatan", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-smu84", "name": "SMU 84", "siteId": "20TS-SMU84", "code": "E32_VER_SMU84", "mac_address": "71:0D:4E:CA:62:6A", "lat": -6.1500, "lng": 106.7100, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Barat", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-jlnmustika", "name": "Jalan Mustika", "siteId": "20TS-JLNMUSTIKA", "code": "E32_VER_JLNMUSTIKA", "mac_address": "12:B7:3C:F5:82:0C", "lat": -6.2800, "lng": 106.9000, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Bekasi", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-cikondang", "name": "Cikondang", "siteId": "20TS-CIKONDANG", "code": "E32_VER_CIKONDANG", "mac_address": "10:B7:C8:81:F0:18", "lat": -6.9200, "lng": 107.6000, "area": "AREA 3", "region": "Jawa Barat", "kabupaten": "Bandung", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-prmanen", "name": "Permanen", "siteId": "20TS-PRMANEN", "code": "ESP32_VER_PRMANEN", "mac_address": "C0:A4:DA:C9:7F:E2", "lat": -6.2100, "lng": 106.8400, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Pusat", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-gangam", "name": "Gang Am", "siteId": "20TS-GANGAM", "code": "E32_VER_GANGAM", "mac_address": "28:05:A5:24:D5:10", "lat": -6.2500, "lng": 106.8700, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Timur", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-siitu", "name": "Siitu", "siteId": "20TS-SIITU", "code": "E32_VER_SIITU", "mac_address": "68:09:47:74:B6:54", "lat": -6.3200, "lng": 106.8100, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Depok", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-bantarsari", "name": "Bantarsari", "siteId": "20TS-BANTARSARI", "code": "E32_VER_BANTARSARI", "mac_address": "58:2A:BD:80:F6:34", "lat": -7.5000, "lng": 108.9000, "area": "AREA 3", "region": "Jawa Tengah", "kabupaten": "Cilacap", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-jlabdulsaleh", "name": "Jl. Abdul Saleh", "siteId": "20TS-JLABDULSALEH", "code": "E32_VER_JLABDULSALEH", "mac_address": "20:50:0D:29:B6:70", "lat": -6.9100, "lng": 107.5900, "area": "AREA 3", "region": "Jawa Barat", "kabupaten": "Bandung", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-podosugih", "name": "Podosugih", "siteId": "20TS-PODOSUGIH", "code": "E32_VER_PODOSUGIH", "mac_address": "68:09:47:6F:A9:FC", "lat": -6.8900, "lng": 109.6700, "area": "AREA 3", "region": "Jawa Tengah", "kabupaten": "Pekalongan", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-pelebon", "name": "Pelebon", "siteId": "20TS-PELEBON", "code": "E32_VER_PELEBON", "mac_address": "68:09:47:5F:69:60", "lat": -7.0000, "lng": 110.4600, "area": "AREA 3", "region": "Jawa Tengah", "kabupaten": "Semarang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-ganggang", "name": "Ganggang", "siteId": "20TS-GANGGANG", "code": "E32_VER_GANGGANG", "mac_address": "20:50:0D:2B:00:C4", "lat": -7.4200, "lng": 112.4400, "area": "AREA 4", "region": "Jawa Timur", "kabupaten": "Mojokerto", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-gayungsari", "name": "Gayungsari", "siteId": "20TS-GAYUNGSARI", "code": "E32_VER_GAYUNGSARI", "mac_address": "58:2A:BD:80:8A:34", "lat": -7.3300, "lng": 112.7200, "area": "AREA 4", "region": "Jawa Timur", "kabupaten": "Surabaya", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-karmul", "name": "Karmul", "siteId": "20TS-KARMUL", "code": "E32_VER_KARMUL", "mac_address": "68:09:47:71:4A:D0", "lat": -6.2100, "lng": 106.8200, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Selatan", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-lubukawah", "name": "Lubukawah", "siteId": "20TS-LUBUKAWAH", "code": "E32_VER_LUBUKAWAH", "mac_address": "20:9B:A9:73:F0:9C", "lat": -0.9200, "lng": 100.3700, "area": "AREA 1", "region": "Sumatera Barat", "kabupaten": "Padang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-kadubereum", "name": "Kadubereum", "siteId": "20TS-KADUBEREUM", "code": "E32_VER_KADUBEREUM", "mac_address": "E0:6F:11:4E:1D:74", "lat": -6.3200, "lng": 106.0500, "area": "AREA 2", "region": "Banten", "kabupaten": "Pandeglang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-jlnjpnplg", "name": "Jalan JPN Palembang", "siteId": "20TS-JLNJPNPLG", "code": "E32_VER_JLNJPNPLG", "mac_address": "C8:85:41:C6:25:00", "lat": -2.9900, "lng": 104.7500, "area": "AREA 1", "region": "Sumatera Selatan", "kabupaten": "Palembang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-sukamulya", "name": "Sukamulya", "siteId": "20TS-SUKAMULYA", "code": "E32_VER_SUKAMULYA", "mac_address": "20:9B:A9:74:18:20", "lat": -6.9500, "lng": 107.5700, "area": "AREA 3", "region": "Jawa Barat", "kabupaten": "Bandung", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-16uluplg", "name": "16 Ulu Palembang", "siteId": "20TS-16ULUPLG", "code": "E32_VER_16ULUPLG", "mac_address": "20:50:0D:2B:3A:4C", "lat": -3.0000, "lng": 104.7700, "area": "AREA 1", "region": "Sumatera Selatan", "kabupaten": "Palembang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-nayakaws", "name": "Nayaka WS", "siteId": "20TS10B1529", "code": "E32_VER_WEES", "mac_address": "3A:0E:4C:1E:80:6E", "lat": -6.237318, "lng": 106.919108, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Timur", "towerType": "SST", "towerHeight": 42.0, "is_simulated": False}
+    {
+        "id": "site-nayakawees",
+        "name": "Nayaka WEES",
+        "siteId": "20TS10B1529",
+        "code": "E32_VER_WEES",
+        "mac_address": "3A:0E:4C:1E:80:6E",
+        "lat": -6.237318,
+        "lng": 106.919108,
+        "area": "AREA 2",
+        "region": "Jabodetabek",
+        "kabupaten": "Jakarta Timur",
+        "towerType": "SST",
+        "towerHeight": 42.0,
+        "is_simulated": False
+    }
 ]
 
 
@@ -257,12 +190,9 @@ def purge_verticality_retained_info(chip_ids: list[str]):
     threading.Thread(target=_do_purge, daemon=True).start()
 
 
-_DEFAULT_SITES_INITIALIZED = False
-
-
 class SiteListCreateView(generics.ListCreateAPIView):
     """
-    GET  /api/sensor-data/sites/     → List semua site
+    GET  /api/sensor-data/sites/     → List semua site (Hanya E32_VER_WEES)
     POST /api/sensor-data/sites/     → Tambah site baru
     """
     queryset = Site.objects.all()
@@ -272,50 +202,32 @@ class SiteListCreateView(generics.ListCreateAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        global _DEFAULT_SITES_INITIALIZED
-        # Auto-seeding HANYA jika tabel Site masih 0 (pertama kali inisialisasi)
-        if not _DEFAULT_SITES_INITIALIZED:
-            _DEFAULT_SITES_INITIALIZED = True
-            if Site.objects.count() == 0:
-                self.seed_default_sites()
-            else:
-                # Pastikan E32_VER_WEES juga tersedia jika E32_VER_WS ada di database
-                ws_site = Site.objects.filter(code='E32_VER_WS').first()
-                if ws_site and not Site.objects.filter(code='E32_VER_WEES').exists():
-                    Site.objects.create(
-                        id='site-nayakawees',
-                        name=ws_site.name,
-                        siteId=ws_site.siteId,
-                        code='E32_VER_WEES',
-                        mac_address=ws_site.mac_address,
-                        lat=ws_site.lat,
-                        lng=ws_site.lng,
-                        area=ws_site.area,
-                        region=ws_site.region,
-                        kabupaten=ws_site.kabupaten,
-                        towerType=ws_site.towerType,
-                        towerHeight=ws_site.towerHeight,
-                        is_simulated=False
-                    )
-        return Site.objects.all().order_by('name')
+        # Bersihkan site lain yang bukan E32_VER_WEES
+        Site.objects.exclude(code='E32_VER_WEES').delete()
+        if not Site.objects.filter(code='E32_VER_WEES').exists():
+            Site.objects.create(
+                id='site-nayakawees',
+                name='Nayaka WEES',
+                siteId='20TS10B1529',
+                code='E32_VER_WEES',
+                mac_address='3A:0E:4C:1E:80:6E',
+                lat=-6.237318,
+                lng=106.919108,
+                area='AREA 2',
+                region='Jabodetabek',
+                kabupaten='Jakarta Timur',
+                towerType='SST',
+                towerHeight=42.0,
+                is_simulated=False
+            )
+        return Site.objects.filter(code='E32_VER_WEES')
 
     def seed_default_sites(self):
-        for s in DEFAULT_21_SITES:
-            site_obj, created = Site.objects.get_or_create(
-                code=s['code'],
-                defaults=s
-            )
-            # Pastikan mac_address & is_simulated terisi
-            if not created:
-                updated = False
-                if not site_obj.mac_address and s.get('mac_address'):
-                    site_obj.mac_address = s['mac_address']
-                    updated = True
-                if site_obj.is_simulated is None:
-                    site_obj.is_simulated = True
-                    updated = True
-                if updated:
-                    site_obj.save()
+        Site.objects.exclude(code='E32_VER_WEES').delete()
+        Site.objects.get_or_create(
+            code='E32_VER_WEES',
+            defaults=DEFAULT_21_SITES[0]
+        )
 
 
 @csrf_exempt

@@ -42,55 +42,31 @@ def get_seconds_until_next_30min() -> float:
 
 def get_fatigue_sites_with_status() -> list[dict]:
     """
-    Mengambil seluruh site Verticality dari database dan mengecek status ONLINE / OFFLINE.
-    Sebuah site dianggap ONLINE jika menerima data SensorData dalam 5 menit terakhir,
-    atau jika simulator aktif.
+    Mengambil site Verticality E32_VER_WEES dan mengecek status ONLINE / OFFLINE.
+    Sebuah site dianggap ONLINE jika menerima data SensorData dalam 5 menit terakhir.
     """
-    from monitoring.models import Site, SensorData
-    from monitoring.views import DEFAULT_21_SITES
-
-    sites = list(Site.objects.all().order_by('name'))
-    if not sites:
-        # Auto-seed jika tabel site kosong
-        for s in DEFAULT_21_SITES:
-            site_obj, _ = Site.objects.get_or_create(code=s['code'], defaults=s)
-            sites.append(site_obj)
-        sites.sort(key=lambda x: x.name)
+    from monitoring.models import SensorData
 
     now = dj_timezone.now()
     threshold_online = now - timedelta(minutes=5)
 
-    # Ambil reading terakhir untuk setiap device_id
-    latest_readings = {}
-    for r in SensorData.objects.filter(timestamp__gte=now - timedelta(hours=1)).order_by('timestamp'):
-        latest_readings[r.device_id] = r.timestamp
+    latest_reading = (
+        SensorData.objects
+        .filter(device_id='E32_VER_WEES')
+        .order_by('-timestamp')
+        .first()
+    )
 
-    results = []
-    for s in sites:
-        # Cek apakah device memiliki data dalam 5 menit terakhir
-        last_ts = latest_readings.get(s.code)
-        # Fallback juga cek variasi alias code jika ada
-        if not last_ts and s.code == 'E32_VER_WS':
-            last_ts = latest_readings.get('E32_VER_WEES') or latest_readings.get('20TS10B1529')
+    last_ts = latest_reading.timestamp if latest_reading else None
+    is_online = (last_ts is not None and last_ts >= threshold_online)
 
-        is_online = (last_ts is not None and last_ts >= threshold_online)
-
-        # Jika site dikonfigurasi is_simulated dan sistem simulator sedang aktif
-        if not is_online and getattr(s, 'is_simulated', False):
-            # Cek apakah ada data terbaru dalam 10 menit
-            if last_ts and last_ts >= now - timedelta(minutes=10):
-                is_online = True
-
-        status_str = "ONLINE" if is_online else "OFFLINE"
-        results.append({
-            "name": s.name,
-            "siteId": s.siteId or "-",
-            "code": s.code or "-",
-            "status": status_str,
-            "last_seen": last_ts
-        })
-
-    return results
+    return [{
+        "name": "Nayaka WEES",
+        "siteId": "20TS10B1529",
+        "code": "E32_VER_WEES",
+        "status": "ONLINE" if is_online else "OFFLINE",
+        "last_seen": last_ts
+    }]
 
 
 def update_fatigue_excel_matrix(
@@ -203,33 +179,14 @@ def update_fatigue_excel_matrix(
 
         target_col = 4
     else:
-        # Periksa apakah ada site baru yang belum terdaftar di sheet
-        existing_codes = set()
-        for r in range(2, ws.max_row + 1):
-            val = str(ws.cell(row=r, column=3).value or "").strip().lower()
-            if val:
-                existing_codes.add(val)
+        # Pastikan sheet hanya berisi baris untuk site E32_VER_WEES
+        while ws.max_row > 2:
+            ws.delete_rows(ws.max_row)
 
-        for s in sites_data:
-            s_code = str(s.get("code", "")).strip().lower()
-            if s_code not in existing_codes:
-                new_row = ws.max_row + 1
-                c_name = ws.cell(row=new_row, column=1, value=s.get("name", "-"))
-                c_sid = ws.cell(row=new_row, column=2, value=s.get("siteId", "-"))
-                c_code = ws.cell(row=new_row, column=3, value=s.get("code", "-"))
-
-                c_name.font = font_bold
-                c_name.border = thin_border
-                c_sid.font = font_regular
-                c_sid.border = thin_border
-                c_code.font = font_regular
-                c_code.border = thin_border
-
-                if new_row % 2 == 0:
-                    c_name.fill = fill_zebra
-                    c_sid.fill = fill_zebra
-                    c_code.fill = fill_zebra
-                existing_codes.add(s_code)
+        # Pastikan baris 2 adalah E32_VER_WEES
+        ws.cell(row=2, column=1, value="Nayaka WEES")
+        ws.cell(row=2, column=2, value="20TS10B1529")
+        ws.cell(row=2, column=3, value="E32_VER_WEES")
 
         # Cari kolom slot yang sesuai jika sudah ada (timpa nilai)
         target_col = None
