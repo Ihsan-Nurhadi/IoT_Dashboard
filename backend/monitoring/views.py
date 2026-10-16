@@ -32,6 +32,18 @@ class SensorDataListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+def resolve_device_ids(device_id):
+    """
+    Menangani alias device (misal E32_VER_WS, E32_VER_WEES, 20TS10B1529 merujuk ke site fisik yang sama).
+    """
+    if not device_id:
+        return None
+    cleaned = str(device_id).strip()
+    if cleaned in ['E32_VER_WS', 'E32_VER_WEES', '20TS10B1529']:
+        return ['E32_VER_WS', 'E32_VER_WEES', '20TS10B1529']
+    return [cleaned]
+
+
 @api_view(['GET'])
 def sensor_data_latest(request):
     """
@@ -41,8 +53,9 @@ def sensor_data_latest(request):
     queryset = SensorData.objects.all()
 
     device_id = request.query_params.get('device_id')
-    if device_id:
-        queryset = queryset.filter(device_id=device_id)
+    dev_ids = resolve_device_ids(device_id)
+    if dev_ids:
+        queryset = queryset.filter(device_id__in=dev_ids)
 
     latest = queryset.first()  # Ordering sudah -timestamp dari model Meta
     if latest is None:
@@ -66,10 +79,11 @@ def sensor_data_history(request):
 
     data = SensorData.objects.all()
 
-    # Filter by device_id
+    # Filter by device_id (mendukung alias E32_VER_WS <-> E32_VER_WEES)
     device_id = request.query_params.get('device_id')
-    if device_id:
-        data = data.filter(device_id=device_id)
+    dev_ids = resolve_device_ids(device_id)
+    if dev_ids:
+        data = data.filter(device_id__in=dev_ids)
 
     # Filter by date range
     start_date_str = request.query_params.get('start_date')
@@ -117,6 +131,11 @@ def sensor_data_sites_status(request):
     latest_records = SensorData.objects.filter(id__in=latest_ids).order_by('device_id')
 
     results = []
+    has_ws = False
+    has_wees = False
+    ws_record_data = None
+    wees_record_data = None
+
     for record in latest_records:
         if record.timestamp >= threshold_online:
             live_status = 'online'
@@ -128,6 +147,23 @@ def sensor_data_sites_status(request):
         data = SensorDataSerializer(record).data
         data['live_status'] = live_status
         results.append(data)
+
+        if record.device_id == 'E32_VER_WS':
+            has_ws = True
+            ws_record_data = data
+        elif record.device_id == 'E32_VER_WEES':
+            has_wees = True
+            wees_record_data = data
+
+    # Cross-populate alias so both E32_VER_WS and E32_VER_WEES report status consistently
+    if has_wees and not has_ws:
+        alias_data = dict(wees_record_data)
+        alias_data['device_id'] = 'E32_VER_WS'
+        results.append(alias_data)
+    elif has_ws and not has_wees:
+        alias_data = dict(ws_record_data)
+        alias_data['device_id'] = 'E32_VER_WEES'
+        results.append(alias_data)
 
     return Response(results)
 
@@ -185,7 +221,7 @@ DEFAULT_21_SITES = [
     {"id": "site-jlnjpnplg", "name": "Jalan JPN Palembang", "siteId": "20TS-JLNJPNPLG", "code": "E32_VER_JLNJPNPLG", "mac_address": "C8:85:41:C6:25:00", "lat": -2.9900, "lng": 104.7500, "area": "AREA 1", "region": "Sumatera Selatan", "kabupaten": "Palembang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
     {"id": "site-sukamulya", "name": "Sukamulya", "siteId": "20TS-SUKAMULYA", "code": "E32_VER_SUKAMULYA", "mac_address": "20:9B:A9:74:18:20", "lat": -6.9500, "lng": 107.5700, "area": "AREA 3", "region": "Jawa Barat", "kabupaten": "Bandung", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
     {"id": "site-16uluplg", "name": "16 Ulu Palembang", "siteId": "20TS-16ULUPLG", "code": "E32_VER_16ULUPLG", "mac_address": "20:50:0D:2B:3A:4C", "lat": -3.0000, "lng": 104.7700, "area": "AREA 1", "region": "Sumatera Selatan", "kabupaten": "Palembang", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True},
-    {"id": "site-nayakaws", "name": "Nayaka WS", "siteId": "20TS10B1529", "code": "E32_VER_WS", "mac_address": "3A:0E:4C:1E:80:6E", "lat": -6.237318, "lng": 106.919108, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Timur", "towerType": "SST", "towerHeight": 42.0, "is_simulated": True}
+    {"id": "site-nayakaws", "name": "Nayaka WS", "siteId": "20TS10B1529", "code": "E32_VER_WEES", "mac_address": "3A:0E:4C:1E:80:6E", "lat": -6.237318, "lng": 106.919108, "area": "AREA 2", "region": "Jabodetabek", "kabupaten": "Jakarta Timur", "towerType": "SST", "towerHeight": 42.0, "is_simulated": False}
 ]
 
 
@@ -238,11 +274,29 @@ class SiteListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         global _DEFAULT_SITES_INITIALIZED
         # Auto-seeding HANYA jika tabel Site masih 0 (pertama kali inisialisasi)
-        # JANGAN PERNAH re-seed jika site sengaja dihapus oleh admin!
         if not _DEFAULT_SITES_INITIALIZED:
             _DEFAULT_SITES_INITIALIZED = True
             if Site.objects.count() == 0:
                 self.seed_default_sites()
+            else:
+                # Pastikan E32_VER_WEES juga tersedia jika E32_VER_WS ada di database
+                ws_site = Site.objects.filter(code='E32_VER_WS').first()
+                if ws_site and not Site.objects.filter(code='E32_VER_WEES').exists():
+                    Site.objects.create(
+                        id='site-nayakawees',
+                        name=ws_site.name,
+                        siteId=ws_site.siteId,
+                        code='E32_VER_WEES',
+                        mac_address=ws_site.mac_address,
+                        lat=ws_site.lat,
+                        lng=ws_site.lng,
+                        area=ws_site.area,
+                        region=ws_site.region,
+                        kabupaten=ws_site.kabupaten,
+                        towerType=ws_site.towerType,
+                        towerHeight=ws_site.towerHeight,
+                        is_simulated=False
+                    )
         return Site.objects.all().order_by('name')
 
     def seed_default_sites(self):

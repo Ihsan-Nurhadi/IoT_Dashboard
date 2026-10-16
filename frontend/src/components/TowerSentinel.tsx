@@ -277,7 +277,7 @@ const TowerSentinel: React.FC = () => {
   useEffect(() => {
     const fetchVertiStatus = async () => {
       try {
-        const res = await fetch('/api/verticality/sensor-data/latest/?device_id=E32_VER_WS');
+        const res = await fetch('/api/verticality/sensor-data/latest/?device_id=E32_VER_WEES');
         if (res.ok) {
           const data = await res.json();
           if (data) {
@@ -2489,7 +2489,7 @@ const TowerSentinel: React.FC = () => {
                     onClick={() => {
                       setActiveModal(null);
                       if (resetViewRef.current) resetViewRef.current();
-                      navigate('/verticality/E32_VER_WS');
+                      navigate('/verticality/E32_VER_WEES');
                     }}
                   >
                     Lihat Detail

@@ -138,7 +138,7 @@ const Header: React.FC = () => {
       <div className="header-nav-links">
         <Link to="/" className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}><FaHome /> Portal</Link>
         <Link to="/site-detail" className={`nav-link ${location.pathname === '/site-detail' ? 'active' : ''}`}>🖥️ NMS</Link>
-        <Link to="/verticality/E32_VER_WS" className={`nav-link ${location.pathname.startsWith('/verticality') ? 'active' : ''}`}>📐 Verticality</Link>
+        <Link to="/verticality/E32_VER_WEES" className={`nav-link ${location.pathname.startsWith('/verticality') ? 'active' : ''}`}>📐 Verticality</Link>
         <Link to="/aqms" className={`nav-link ${location.pathname === '/aqms' ? 'active' : ''}`}>🌤️ AQMS</Link>
         <Link to="/asset-monitoring" className={`nav-link ${location.pathname === '/asset-monitoring' ? 'active' : ''}`}>📦 Asset</Link>
         <Link to="/rfid-monitoring" className={`nav-link ${location.pathname === '/rfid-monitoring' ? 'active' : ''}`}>🏷️ RFID</Link>

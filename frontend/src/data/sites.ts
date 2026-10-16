@@ -19,7 +19,7 @@ export const sites: Site[] = [
         id: 'ckg-04-031',
         name: 'Nayaka WS',
         siteId: '20TS10B1529',
-        code: 'E32_VER_WS',
+        code: 'E32_VER_WEES',
         lat: -6.237318,
         lng: 106.919108,
         area: 'AREA 2',

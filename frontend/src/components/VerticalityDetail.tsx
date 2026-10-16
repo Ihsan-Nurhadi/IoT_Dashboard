@@ -13,14 +13,15 @@ import './VerticalityDetail.css';
 
 const VerticalityDetail: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
-  const activeDeviceId = deviceId || 'E32_VER_WS';
+  const activeDeviceId = deviceId || 'E32_VER_WEES';
 
   const { sites: dbSites, loading: sitesLoading } = useSites();
-  const site = dbSites.find(s => s.code === activeDeviceId);
+  const isWeesOrWs = (c?: string) => c === 'E32_VER_WS' || c === 'E32_VER_WEES' || c === '20TS10B1529';
+  const site = dbSites.find(s => s.code === activeDeviceId || (isWeesOrWs(activeDeviceId) && isWeesOrWs(s.code)));
 
   const { latest, history } = useSensorData(5000, activeDeviceId);
   const liveStatuses = useSitesStatus(15000);
-  const deviceStatus = liveStatuses.find(s => s.device_id === activeDeviceId);
+  const deviceStatus = liveStatuses.find(s => s.device_id === activeDeviceId || (isWeesOrWs(activeDeviceId) && isWeesOrWs(s.device_id)));
   const isConnected = deviceStatus ? deviceStatus.live_status === 'online' : false;
 
   if (sitesLoading) {
