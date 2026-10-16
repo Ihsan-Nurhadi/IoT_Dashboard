@@ -39,13 +39,14 @@ import requests
 # ==============================================================================
 # KONFIGURASI DEFAULT & ENVIRONMENT VARIABLES
 # ==============================================================================
-MQTT_BROKER = os.getenv("MQTT_BROKER", "emqx.nayakanms.com")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
-MQTT_USER = os.getenv("MQTT_USER", "dmtver_jabo")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "jabo123")
+# Menggunakan prefix MITRATEL_MQTT_* agar TIDAK BENTROK dengan konfigurasi MQTT utama NMS
+MQTT_BROKER = os.getenv("MITRATEL_MQTT_BROKER", os.getenv("MQTT_BROKER", "emqx.nayakanms.com"))
+MQTT_PORT = int(os.getenv("MITRATEL_MQTT_PORT", os.getenv("MQTT_PORT", "1884")))
+MQTT_USER = os.getenv("MITRATEL_MQTT_USER", os.getenv("MQTT_USER", "dmtver_jabo"))
+MQTT_PASSWORD = os.getenv("MITRATEL_MQTT_PASSWORD", os.getenv("MQTT_PASSWORD", "jabo123"))
 
 # Window durasi listening (default 300 detik = 5 menit)
-DEFAULT_WINDOW_SECONDS = int(os.getenv("LISTEN_WINDOW_SECONDS", "300"))
+DEFAULT_WINDOW_SECONDS = int(os.getenv("MITRATEL_LISTEN_WINDOW_SECONDS", os.getenv("LISTEN_WINDOW_SECONDS", "300")))
 # Durasi saat manual trigger dari web (default 20 detik agar HTTP request tidak timeout)
 MANUAL_WINDOW_SECONDS = int(os.getenv("MANUAL_WINDOW_SECONDS", "20"))
 

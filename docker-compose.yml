@@ -193,11 +193,11 @@ services:
     environment:
       - TZ=Asia/Jakarta
       - PYTHONUNBUFFERED=1
-      - MQTT_BROKER=${MQTT_BROKER:-emqx.nayakanms.com}
-      - MQTT_PORT=${MQTT_PORT:-1884}
-      - MQTT_USER=${MQTT_USER:-dmtver_jabo}
-      - MQTT_PASSWORD=${MQTT_PASSWORD:-jabo123}
-      - LISTEN_WINDOW_SECONDS=${LISTEN_WINDOW_SECONDS:-300}
+      - MITRATEL_MQTT_BROKER=${MITRATEL_MQTT_BROKER:-emqx.nayakanms.com}
+      - MITRATEL_MQTT_PORT=${MITRATEL_MQTT_PORT:-1884}
+      - MITRATEL_MQTT_USER=${MITRATEL_MQTT_USER:-dmtver_jabo}
+      - MITRATEL_MQTT_PASSWORD=${MITRATEL_MQTT_PASSWORD:-jabo123}
+      - MITRATEL_LISTEN_WINDOW_SECONDS=${MITRATEL_LISTEN_WINDOW_SECONDS:-300}
       - GSHEET_WEBHOOK_URL=${GSHEET_WEBHOOK_URL:-}
       - EXCEL_OUTPUT=/app/reports/monitoring_mitratel_hourly.xlsx
       - MEDIA_REPORTS_DIR=/app/media/reports

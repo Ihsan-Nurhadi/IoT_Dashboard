@@ -36,14 +36,14 @@ Metode polling API lama (MaiView HTTP API) sudah sepenuhnya digantikan dengan **
 Tambahkan atau sesuaikan baris berikut di file `.env` direktori project VPS Anda:
 
 ```bash
-# Konfigurasi MQTT Listener Mitratel
-MQTT_BROKER=emqx.nayakanms.com
-MQTT_PORT=1884
-MQTT_USER=dmtver_jabo
-MQTT_PASSWORD=jabo123
+# Konfigurasi MQTT Listener Mitratel Baru (Gunakan prefix MITRATEL_ agar tidak bentrok dengan MQTT NMS)
+MITRATEL_MQTT_BROKER=emqx.nayakanms.com
+MITRATEL_MQTT_PORT=1884
+MITRATEL_MQTT_USER=dmtver_jabo
+MITRATEL_MQTT_PASSWORD=jabo123
 
 # Window mendengarkan MQTT: 300 detik (5 menit) tiap jam
-LISTEN_WINDOW_SECONDS=300
+MITRATEL_LISTEN_WINDOW_SECONDS=300
 
 # URL Webhook Google Apps Script yang didapat dari Bagian 1
 GSHEET_WEBHOOK_URL="https://script.google.com/macros/s/AKfycb.../exec"
