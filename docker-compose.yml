@@ -164,7 +164,7 @@ services:
   # 2i. CCTV RTSP & ONVIF API Gateway Worker
   cctv_gateway:
     build: ./Worker_CCTV
-    container_name: nms_cctv_gateway
+    container_name: nms_gateway
     restart: always
     ports:
       - "3001:3001"
