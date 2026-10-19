@@ -623,5 +623,15 @@
     "mac_address": "20:50:0D:2A:34:9C",
     "aliases": [],
     "uuid": "e8873709-55d0-4929-a808-c0921a5f0878"
+  },
+  {
+    "no": 62,
+    "site_id": "TJP-04-319",
+    "name": "JALANIRIAN",
+    "regional": "JABODETABEK",
+    "client_id": "E32_VER_JALANIRIAN",
+    "mac_address": "58:2A:BD:71:92:FC",
+    "aliases": [],
+    "uuid": "131b21a0-845c-4c35-a7a2-8d233558aba2"
   }
 ]
