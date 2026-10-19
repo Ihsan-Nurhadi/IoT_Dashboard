@@ -6,7 +6,8 @@
     "regional": "JABODETABEK",
     "client_id": "E32_VER_PEDURENAN",
     "mac_address": "",
-    "aliases": []
+    "aliases": [],
+    "uuid": "31e1943e-0cb8-4c49-bf31-64351986792b"
   },
   {
     "no": 2,
@@ -17,7 +18,8 @@
     "mac_address": "",
     "aliases": [
       "E32_VER_JLNMUSTIKA"
-    ]
+    ],
+    "uuid": ""
   },
   {
     "no": 3,
@@ -26,7 +28,8 @@
     "regional": "JABODETABEK",
     "client_id": "E32_VER_SMU84",
     "mac_address": "",
-    "aliases": []
+    "aliases": [],
+    "uuid": ""
   },
   {
     "no": 4,
@@ -35,7 +38,8 @@
     "regional": "JABODETABEK",
     "client_id": "E32_VER_SWADAYA",
     "mac_address": "",
-    "aliases": []
+    "aliases": [],
+    "uuid": ""
   },
   {
     "no": 5,
@@ -44,7 +48,8 @@
     "regional": "JABODETABEK",
     "client_id": "E32_VER_BEKASIKOTA",
     "mac_address": "E0:8C:FE:34:84:D4",
-    "aliases": []
+    "aliases": [],
+    "uuid": "278e6842-95f5-458a-bbfa-197c296cecc5"
   },
   {
     "no": 6,
@@ -53,7 +58,8 @@
     "regional": "JABODETABEK",
     "client_id": "E32_VER_GANGAM",
     "mac_address": "28:05:A5:24:D5:10",
-    "aliases": []
+    "aliases": [],
+    "uuid": "4b9c80af-91ca-4541-9102-4d8a4e662944"
   },
   {
     "no": 7,
@@ -65,7 +71,8 @@
     "aliases": [
       "ESP32_VER_PRMANEN",
       "E32_VER_PRMANEN"
-    ]
+    ],
+    "uuid": "ea5ae5e7-a752-501a-99db-b0738bf9daa2"
   },
   {
     "no": 8,
@@ -76,7 +83,8 @@
     "mac_address": "",
     "aliases": [
       "E32_VER_CIKONDANG"
-    ]
+    ],
+    "uuid": "0ec78ea0-f2d4-41da-ba66-371e798827fa"
   },
   {
     "no": 9,
@@ -85,7 +93,8 @@
     "regional": "JABAR",
     "client_id": "E32_VER_JLABDULSALEH",
     "mac_address": "20:50:0D:29:B6:70",
-    "aliases": []
+    "aliases": [],
+    "uuid": "5ed66ee0-b723-4c5b-820d-2c40dcb39e4f"
   },
   {
     "no": 10,
@@ -94,7 +103,8 @@
     "regional": "JABAR",
     "client_id": "E32_VER_BANTARSARI",
     "mac_address": "58:2A:BD:80:F6:34",
-    "aliases": []
+    "aliases": [],
+    "uuid": "cd9017e3-3596-4a2c-becd-cf6dbe8982ae"
   },
   {
     "no": 11,
@@ -103,7 +113,8 @@
     "regional": "JABAR",
     "client_id": "E32_VER_SIITU",
     "mac_address": "68:09:47:74:B6:54",
-    "aliases": []
+    "aliases": [],
+    "uuid": "2ca85d09-4dba-4efa-8050-52e8612982b2"
   },
   {
     "no": 12,
@@ -112,7 +123,8 @@
     "regional": "JABAR",
     "client_id": "E32_VER_KARMUL",
     "mac_address": "68:09:47:71:4A:D0",
-    "aliases": []
+    "aliases": [],
+    "uuid": "4234f7f3-a877-40db-9134-e722e9034b3c"
   },
   {
     "no": 13,
@@ -121,7 +133,8 @@
     "regional": "JATENG",
     "client_id": "E32_VER_KARANGBOYO",
     "mac_address": "20:50:0D:2A:A4:34",
-    "aliases": []
+    "aliases": [],
+    "uuid": "640821c5-91c9-4508-9c72-58ce0588682a"
   },
   {
     "no": 14,
@@ -130,7 +143,8 @@
     "regional": "JATENG",
     "client_id": "E32_VER_KARANGJATI",
     "mac_address": "68:09:47:5F:D9:38",
-    "aliases": []
+    "aliases": [],
+    "uuid": "92e9a600-72b6-4c4f-a31c-d1c09a38d799"
   },
   {
     "no": 15,
@@ -139,7 +153,8 @@
     "regional": "JATENG",
     "client_id": "E32_VER_PASIRKIDUL",
     "mac_address": "20:50:0D:2A:42:60",
-    "aliases": []
+    "aliases": [],
+    "uuid": "a3811e02-e2c7-4a7d-9dc6-4fd02efc4a8d"
   },
   {
     "no": 16,
@@ -148,7 +163,8 @@
     "regional": "JATENG",
     "client_id": "E32_VER_PODOSUGIH",
     "mac_address": "68:09:47:6F:A9:FC",
-    "aliases": []
+    "aliases": [],
+    "uuid": "f1c78189-fcb0-4afc-9f9a-b0df26bf751e"
   },
   {
     "no": 17,
@@ -157,7 +173,8 @@
     "regional": "JATENG",
     "client_id": "E32_VER_PEDALANGAN",
     "mac_address": "58:2A:BD:81:01:60",
-    "aliases": []
+    "aliases": [],
+    "uuid": "e7959c05-7551-4675-a1ab-7c1f5c701dc8"
   },
   {
     "no": 18,
@@ -166,7 +183,8 @@
     "regional": "JATENG",
     "client_id": "E32_VER_UNGARAN",
     "mac_address": "20:50:0D:2A:B5:34",
-    "aliases": []
+    "aliases": [],
+    "uuid": "302f8ab6-5cec-4863-a725-dc9db5539295"
   },
   {
     "no": 19,
@@ -175,7 +193,8 @@
     "regional": "JATENG",
     "client_id": "E32_VER_PELEBON",
     "mac_address": "68:09:47:5F:69:60",
-    "aliases": []
+    "aliases": [],
+    "uuid": "03dbaf4e-f5b0-471b-9ef2-ac823756feb0"
   },
   {
     "no": 20,
@@ -184,7 +203,8 @@
     "regional": "JATENG",
     "client_id": "E32_VER_MARGODADI",
     "mac_address": "68:09:47:74:CA:64",
-    "aliases": []
+    "aliases": [],
+    "uuid": "347e50b4-eabb-46f0-a96d-a9da03934119"
   },
   {
     "no": 21,
@@ -193,7 +213,8 @@
     "regional": "JATIM",
     "client_id": "E32_VER_GANGGANG",
     "mac_address": "20:50:0D:2B:00:C4",
-    "aliases": []
+    "aliases": [],
+    "uuid": "a8497f34-e197-4d97-aed4-4f39cd9f79b3"
   },
   {
     "no": 22,
@@ -202,7 +223,8 @@
     "regional": "JATIM",
     "client_id": "E32_VER_GAYUNGSARI",
     "mac_address": "58:2A:BD:80:8A:34",
-    "aliases": []
+    "aliases": [],
+    "uuid": "36edf3b6-f589-49b4-a132-798b7ea44964"
   },
   {
     "no": 23,
@@ -211,7 +233,8 @@
     "regional": "JATIM",
     "client_id": "E32_VER_GAYUNG",
     "mac_address": "20:50:0D:2B:1E:58",
-    "aliases": []
+    "aliases": [],
+    "uuid": "6419caa1-5cdf-4eee-a16b-fe1145d5ef39"
   },
   {
     "no": 24,
@@ -220,7 +243,8 @@
     "regional": "JATIM",
     "client_id": "E32_VER_SEPANDE",
     "mac_address": "E0:8C:FE:33:30:C8",
-    "aliases": []
+    "aliases": [],
+    "uuid": "534f4e2a-91c7-4265-a994-9f4008c3a503"
   },
   {
     "no": 25,
@@ -232,7 +256,8 @@
     "aliases": [
       "E32_Ver_BUKITRAYASEPAKU",
       "E32_VER_SEPAKU"
-    ]
+    ],
+    "uuid": "877ff3eb-1ec8-49e7-a036-0ec4b7702028"
   },
   {
     "no": 26,
@@ -244,7 +269,8 @@
     "aliases": [
       "E32_VER_IKN",
       "E32_VER_DMT_NEW_IKN"
-    ]
+    ],
+    "uuid": "bd3deb2d-6e81-5540-9eed-04fd397d5ca6"
   },
   {
     "no": 27,
@@ -255,7 +281,8 @@
     "mac_address": "",
     "aliases": [
       "E32_VER_TAMANGAPA"
-    ]
+    ],
+    "uuid": "83a838ed-698f-414a-a37c-5669f5a1e4b6"
   },
   {
     "no": 28,
@@ -264,7 +291,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_ALYUSRO",
     "mac_address": "28:05:A5:23:A0:AC",
-    "aliases": []
+    "aliases": [],
+    "uuid": "f6fb29d4-a80a-408b-8f38-1603582850e7"
   },
   {
     "no": 29,
@@ -273,7 +301,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_PERUMSALEM",
     "mac_address": "20:50:0D:2A:C7:08",
-    "aliases": []
+    "aliases": [],
+    "uuid": "bc422425-bbc3-407c-b3a3-6b1240504b6f"
   },
   {
     "no": 30,
@@ -282,7 +311,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_GIRIMAYA",
     "mac_address": "20:50:0D:2A:A4:8C",
-    "aliases": []
+    "aliases": [],
+    "uuid": "27a8e8f3-13ba-4148-b8ba-739c7de8826c"
   },
   {
     "no": 31,
@@ -291,7 +321,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_SUAKPERMAI",
     "mac_address": "20:50:0D:2A:B2:D0",
-    "aliases": []
+    "aliases": [],
+    "uuid": "494f1ff0-4cb9-4cac-82bd-41a46638554b"
   },
   {
     "no": 32,
@@ -300,7 +331,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_SUKAMULYA",
     "mac_address": "20:9B:A9:74:18:20",
-    "aliases": []
+    "aliases": [],
+    "uuid": "39f2119b-f29e-4240-8b7d-eb08951aec1a"
   },
   {
     "no": 33,
@@ -309,7 +341,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_KELUARGAPLG",
     "mac_address": "20:50:0D:2B:00:10",
-    "aliases": []
+    "aliases": [],
+    "uuid": "f8e18232-de5b-4718-8e5b-78a516838be8"
   },
   {
     "no": 34,
@@ -318,7 +351,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_LUBUKAWAH",
     "mac_address": "20:9B:A9:73:F0:9C",
-    "aliases": []
+    "aliases": [],
+    "uuid": "fa8b6602-30f9-4b50-bd7f-32392e26b4d0"
   },
   {
     "no": 35,
@@ -327,7 +361,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_ARIMBI",
     "mac_address": "EC:C9:FF:FE:E4:D8",
-    "aliases": []
+    "aliases": [],
+    "uuid": "259beb22-37c9-4805-abc8-7be5723b06e8"
   },
   {
     "no": 36,
@@ -336,7 +371,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_JLNBSDPLG",
     "mac_address": "20:50:0D:2A:22:50",
-    "aliases": []
+    "aliases": [],
+    "uuid": "e51d3554-3302-45a7-9f85-43960699ac69"
   },
   {
     "no": 37,
@@ -345,7 +381,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_JLNJPNPLG",
     "mac_address": "C8:85:41:C6:25:00",
-    "aliases": []
+    "aliases": [],
+    "uuid": "dfb327f1-ab05-4285-9d3f-29753e3ff107"
   },
   {
     "no": 38,
@@ -354,7 +391,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_GAYABARUPLG",
     "mac_address": "20:50:0D:2B:15:A0",
-    "aliases": []
+    "aliases": [],
+    "uuid": "d165eabb-c424-4eeb-9335-2d5fdd417ee9"
   },
   {
     "no": 39,
@@ -363,7 +401,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_LOPANCAPLG",
     "mac_address": "20:50:0D:2B:07:64",
-    "aliases": []
+    "aliases": [],
+    "uuid": "21a0cee7-445e-4fcd-99e3-5eaf1f1824b3"
   },
   {
     "no": 40,
@@ -372,7 +411,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_SANTOSA2PLG",
     "mac_address": "20:50:0D:29:9C:64",
-    "aliases": []
+    "aliases": [],
+    "uuid": "f27b5df1-1c7e-45cb-b054-87174ba7f2c0"
   },
   {
     "no": 41,
@@ -381,7 +421,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_16ULUPLG",
     "mac_address": "20:50:0D:2B:3A:4C",
-    "aliases": []
+    "aliases": [],
+    "uuid": "8c54f2e5-0898-4333-addd-62a8c80a8704"
   },
   {
     "no": 42,
@@ -390,7 +431,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_LODEPOKPLG",
     "mac_address": "20:50:0D:2A:B5:98",
-    "aliases": []
+    "aliases": [],
+    "uuid": "44159171-7bec-445f-a7e3-3d8b3138f512"
   },
   {
     "no": 43,
@@ -399,7 +441,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_MATARAM",
     "mac_address": "C8:85:41:C5:C1:90",
-    "aliases": []
+    "aliases": [],
+    "uuid": "f9a4605a-5965-44ec-a7de-1feb7838cd3f"
   },
   {
     "no": 44,
@@ -408,7 +451,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_SEDUDUK",
     "mac_address": "68:09:47:74:7B:58",
-    "aliases": []
+    "aliases": [],
+    "uuid": "5dda0ee0-f2a6-4eee-8e2a-7212fe6a6dbe"
   },
   {
     "no": 45,
@@ -417,7 +461,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_SUKABANGUN",
     "mac_address": "C8:85:41:C4:07:80",
-    "aliases": []
+    "aliases": [],
+    "uuid": "05b5e1b3-a2cd-4cde-aa73-8604df478723"
   },
   {
     "no": 46,
@@ -426,7 +471,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_KETUANJAYA",
     "mac_address": "20:50:0D:2A:B1:28",
-    "aliases": []
+    "aliases": [],
+    "uuid": "e71ab6cf-43d8-424e-a475-57a24ab68761"
   },
   {
     "no": 47,
@@ -435,7 +481,8 @@
     "regional": "SUMBAGSEL",
     "client_id": "E32_VER_PEMBANGUNAN",
     "mac_address": "68:09:47:5F:DA:3C",
-    "aliases": []
+    "aliases": [],
+    "uuid": "fccc7e28-0a19-4a99-97f6-2c4dba5e9bb3"
   },
   {
     "no": 48,
@@ -444,7 +491,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_TALUAK",
     "mac_address": "68:09:47:77:00:BC",
-    "aliases": []
+    "aliases": [],
+    "uuid": "fbd74cf2-407f-4a76-b612-08a2cb035075"
   },
   {
     "no": 49,
@@ -453,7 +501,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_PARIAMAN6",
     "mac_address": "68:09:47:5F:6E:B0",
-    "aliases": []
+    "aliases": [],
+    "uuid": "3aefa1e4-41b6-4366-befb-3f757a93d406"
   },
   {
     "no": 50,
@@ -462,7 +511,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_DESAHARAPAN",
     "mac_address": "C8:85:41:C2:BA:CC",
-    "aliases": []
+    "aliases": [],
+    "uuid": "42c2c01e-e486-4132-87e4-0a4c51388fc3"
   },
   {
     "no": 51,
@@ -471,7 +521,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_DUMAI9",
     "mac_address": "20:50:0D:2A:A4:B8",
-    "aliases": []
+    "aliases": [],
+    "uuid": "c809c394-cdf4-47e0-93da-e37e93ee2995"
   },
   {
     "no": 52,
@@ -480,7 +531,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_BSK3",
     "mac_address": "C8:85:41:C3:A1:C4",
-    "aliases": []
+    "aliases": [],
+    "uuid": "2f176e35-ba5f-4bf5-a32b-4a6414258f87"
   },
   {
     "no": 53,
@@ -489,7 +541,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_LENGGINI3",
     "mac_address": "68:09:47:74:A2:04",
-    "aliases": []
+    "aliases": [],
+    "uuid": "1537a2eb-be4d-4464-998c-41b2bab156db"
   },
   {
     "no": 54,
@@ -498,7 +551,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_SMASCENDANA",
     "mac_address": "C8:85:41:C3:B6:04",
-    "aliases": []
+    "aliases": [],
+    "uuid": "2492e0b8-26f0-488e-a3a1-7652ed6c65a8"
   },
   {
     "no": 55,
@@ -507,7 +561,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_BENGKALIS",
     "mac_address": "E0:8C:FE:E6:40:98",
-    "aliases": []
+    "aliases": [],
+    "uuid": "c479d00d-f2cc-4949-9df3-c21991d142ed"
   },
   {
     "no": 56,
@@ -516,7 +571,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_RADENPATAH",
     "mac_address": "68:09:47:70:91:58",
-    "aliases": []
+    "aliases": [],
+    "uuid": "e10cc4f1-389d-4440-b60e-4fb0121d1be8"
   },
   {
     "no": 57,
@@ -525,7 +581,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_PASIRPOI",
     "mac_address": "30:76:F5:06:41:70",
-    "aliases": []
+    "aliases": [],
+    "uuid": "0e4a687b-04dd-45fc-9f70-7dee25c1de78"
   },
   {
     "no": 58,
@@ -534,7 +591,8 @@
     "regional": "SUMBAGTENG",
     "client_id": "E32_VER_PARAK",
     "mac_address": "C8:85:41:C3:8D:04",
-    "aliases": []
+    "aliases": [],
+    "uuid": "0975a5d0-7053-4c73-9a49-ec1e365509d8"
   },
   {
     "no": 59,
@@ -543,7 +601,8 @@
     "regional": "SUMBAGUT",
     "client_id": "E32_VER_DAKELAMBIR",
     "mac_address": "20:50:0D:2B:3C:14",
-    "aliases": []
+    "aliases": [],
+    "uuid": "c6dc7fe4-8d26-5587-9101-1ead5d9faf65"
   },
   {
     "no": 60,
@@ -552,7 +611,8 @@
     "regional": "SUMBAGUT",
     "client_id": "E32_VER_PELABAJIBATA",
     "mac_address": "",
-    "aliases": []
+    "aliases": [],
+    "uuid": "575e8551-5e53-5c3d-abb2-39984e5cd8db"
   },
   {
     "no": 61,
@@ -561,6 +621,7 @@
     "regional": "SUMBAGUT",
     "client_id": "E32_VER_KOSEJAHTERA",
     "mac_address": "20:50:0D:2A:34:9C",
-    "aliases": []
+    "aliases": [],
+    "uuid": "e8873709-55d0-4929-a808-c0921a5f0878"
   }
 ]

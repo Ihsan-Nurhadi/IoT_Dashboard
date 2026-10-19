@@ -34,3 +34,18 @@ services:
     volumes:
       - .:/app
       - ./reports:/app/reports
+
+  auto_degrade:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    container_name: nms_auto_degrade_watcher
+    restart: always
+    command: ["python", "auto_degrade_watcher.py"]
+    environment:
+      - TZ=Asia/Jakarta
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    volumes:
+      - .:/app

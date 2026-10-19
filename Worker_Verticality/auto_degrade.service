@@ -1,0 +1,18 @@
+[Unit]
+Description=MaiView / Nayaka Auto Degrade Watcher Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+# Sesuaikan WorkingDirectory dan path python ke path di VPS Anda
+WorkingDirectory=/root/Dashboard_Ultimate_Nayaka/Worker_Verticality
+ExecStart=/usr/bin/python3 auto_degrade_watcher.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

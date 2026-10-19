@@ -80,7 +80,7 @@ class Command(BaseCommand):
         PASSWORD = settings.MQTT_PASSWORD
 
         TOPIC_BLACKBOX = getattr(settings, 'MQTT_TOPIC_PUB2', 'nms/E32_WB_26/whitebox/#')
-        TOPIC_SPEAKER = "nms/esp32-speaker-003734fe8ce0/speaker/#"
+        TOPIC_SPEAKER = "nms/E32_IPS_21/speaker/#"
         # TOPIC_PIR = "nms/E32_PIR_WS/pir/#"  # [DISABLED] Standalone ESP32 PIR dinonaktifkan
 
         def on_connect(client, userdata, flags, rc):
