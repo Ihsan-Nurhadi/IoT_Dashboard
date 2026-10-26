@@ -209,12 +209,43 @@ def run_mqtt_window_listener(
     print(f"  Waktu Mulai: {datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S WIB')}")
     print("=" * 70)
 
-    try:
-        client.connect(broker, port, keepalive=60)
-        client.loop_start()
+    start_time = time.time()
+    connected = False
+    max_retries = 6
+    retry_delay_sec = 5.0
+    attempt = 1
 
-        # Hitung mundur waktu window
-        start_time = time.time()
+    # Auto-retry koneksi ke MQTT broker
+    while not connected and attempt <= max_retries:
+        # Pastikan masih ada sisa waktu window
+        if (time.time() - start_time) >= duration_sec:
+            print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [!] Waktu window habis sebelum berhasil terhubung ke MQTT broker.")
+            break
+
+        try:
+            print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] Menghubungkan ke MQTT Broker {broker}:{port} (Percobaan {attempt}/{max_retries})...")
+            client.connect(broker, port, keepalive=60)
+            client.loop_start()
+            connected = True
+            break
+        except Exception as e:
+            print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [!] Gagal koneksi MQTT ({e}).")
+            if attempt < max_retries and (time.time() - start_time + retry_delay_sec < duration_sec):
+                print(f"  Mencoba kembali dalam {int(retry_delay_sec)} detik...")
+                time.sleep(retry_delay_sec)
+                attempt += 1
+            else:
+                break
+
+    if not connected:
+        print("=" * 70)
+        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [!] FATAL: Gagal terhubung ke MQTT broker setelah {attempt} percobaan.")
+        print(f"  Broker: {broker}:{port} tidak merespons atau sedang down.")
+        print("=" * 70)
+        return received_telemetry
+
+    try:
+        # Hitung mundur sisa waktu window listener
         while time.time() - start_time < duration_sec:
             elapsed = int(time.time() - start_time)
             remaining = duration_sec - elapsed
@@ -553,6 +584,9 @@ def run_single_monitoring(
 
     # 1. Dengarkan MQTT
     telemetry_data = run_mqtt_window_listener(duration_sec=window_sec)
+
+    if not telemetry_data:
+        print("[!] PERINGATAN: Tidak ada data telemetri yang berhasil ditangkap selama window listening.")
 
     # 2. Evaluasi
     evaluated_sites, summary = evaluate_sites(sites, telemetry_data)
