@@ -149,6 +149,16 @@ MQTT_TOPIC_WIND = os.environ.get("MQTT_TOPIC_WIND", "nms/E32_VER_WEES/vertical/w
 # AQMS MQTT settings
 MQTT_TOPIC_AQMS = os.environ.get("MQTT_TOPIC_AQMS", "wqx/E32_WS/data")
 
+# Testing Device Speaker Audit & Health Settings (30-Minute Check)
+SPEAKER_TEST_DEVICE_ID = os.environ.get("SPEAKER_TEST_DEVICE_ID", "E32_IPS_7")
+SPEAKER_TEST_BROKER = os.environ.get("SPEAKER_TEST_BROKER", "emqx.nayakanms.com")
+SPEAKER_TEST_PORT = int(os.environ.get("SPEAKER_TEST_PORT", 1884))
+SPEAKER_TEST_USER = os.environ.get("SPEAKER_TEST_USER", "nyk_ws")
+SPEAKER_TEST_PASSWORD = os.environ.get("SPEAKER_TEST_PASSWORD", "ws")
+SPEAKER_TEST_TOPIC = os.environ.get("SPEAKER_TEST_TOPIC", "nms/E32_IPS_7/speaker/audit")
+SPEAKER_TEST_PAYLOAD = os.environ.get("SPEAKER_TEST_PAYLOAD", '{"heartbeat": {}}')
+SPEAKER_GSHEET_WEBHOOK_URL = os.environ.get("SPEAKER_GSHEET_WEBHOOK_URL", "")
+
 
 
 # client = mqtt.Client()

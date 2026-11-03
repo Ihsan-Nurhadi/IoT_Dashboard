@@ -20,5 +20,8 @@ urlpatterns = [
     path('fatigue-report/status/', views.fatigue_report_status, name='fatigue-report-status'),
     path('fatigue-report/download/', views.fatigue_report_download, name='fatigue-report-download'),
     path('fatigue-report/trigger/', views.fatigue_report_trigger, name='fatigue-report-trigger'),
+    path('speaker-audit/status/', views.speaker_audit_status, name='speaker-audit-status'),
+    path('speaker-audit/download/', views.speaker_audit_download, name='speaker-audit-download'),
+    path('speaker-audit/trigger/', views.speaker_audit_trigger, name='speaker-audit-trigger'),
 ]
 

@@ -258,33 +258,6 @@ def update_fatigue_excel_matrix(
 _SCHEDULER_STARTED = False
 
 def start_fatigue_matrix_background_scheduler():
-    """Menjalankan background scheduler loop yang otomatis mencatat data setiap 30 menit."""
-    global _SCHEDULER_STARTED
-    if _SCHEDULER_STARTED:
-        return
-    _SCHEDULER_STARTED = True
-
-    def _loop():
-        # Berikan jeda 5 detik saat inisialisasi awal server
-        time.sleep(5)
-        # Jalankan pencatatan awal saat server start
-        try:
-            update_fatigue_excel_matrix(align_30min=True)
-            print("[FATIGUE MONITOR 30-MIN] Inisialisasi data awal berhasil.")
-        except Exception as e:
-            print(f"[FATIGUE MONITOR 30-MIN ERROR] Inisialisasi awal gagal: {e}")
-
-        while True:
-            sleep_sec = get_seconds_until_next_30min()
-            menit = int(sleep_sec // 60)
-            detik = int(sleep_sec % 60)
-            print(f"[FATIGUE MONITOR 30-MIN] Menunggu interval 30 menit berikutnya ({menit}m {detik}s)...")
-            time.sleep(sleep_sec)
-            try:
-                res = update_fatigue_excel_matrix(align_30min=True)
-                print(f"[FATIGUE MONITOR 30-MIN] Sukses mencatat slot '{res.get('slot')} WIB': {res.get('online_count')} Online, {res.get('offline_count')} Offline.")
-            except Exception as ex:
-                print(f"[FATIGUE MONITOR 30-MIN ERROR] Gagal update siklus 30 menit: {ex}")
-
-    t = threading.Thread(target=_loop, daemon=True, name="FatigueMatrixScheduler")
-    t.start()
+    """[NONAKTIF] Monitoring 30 menit site verticality E32_VER_WEES dinonaktifkan."""
+    print("[FATIGUE MONITOR 30-MIN] Scheduler 30-menit untuk site E32_VER_WEES telah dinonaktifkan.")
+    return

@@ -10,8 +10,10 @@ class MonitoringConfig(AppConfig):
         import os
         from django.conf import settings
         if os.environ.get('RUN_MAIN') == 'true' or not settings.DEBUG:
+            # Monitoring 30-menit site verticality E32_VER_WEES dinonaktifkan.
+            # Digantikan dengan background audit scheduler untuk perangkat testing (E32_IPS_7) tiap 30 menit.
             try:
-                from .fatigue_monitor import start_fatigue_matrix_background_scheduler
-                start_fatigue_matrix_background_scheduler()
+                from .speaker_audit_monitor import start_speaker_audit_scheduler
+                start_speaker_audit_scheduler()
             except Exception as e:
-                print(f"[FATIGUE SCHEDULER START ERROR] {e}")
+                print(f"[SPEAKER AUDIT SCHEDULER START ERROR] {e}")

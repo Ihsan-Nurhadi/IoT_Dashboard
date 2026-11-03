@@ -1856,3 +1856,85 @@ def fatigue_report_trigger(request):
             'success': False,
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ==============================================================================
+# TESTING DEVICE SPEAKER (E32_IPS_7) HEALTH AUDIT VIEWS
+# ==============================================================================
+@api_view(['GET'])
+def speaker_audit_status(request):
+    """
+    GET /api/verticality/speaker-audit/status/
+    Mengembalikan status audit terakhir perangkat testing speaker E32_IPS_7.
+    """
+    from .speaker_audit_monitor import LAST_AUDIT_RESULT, get_audit_excel_path
+    from devicestatusapp.models import DeviceState
+    import os
+
+    # Cek status database
+    db_state = DeviceState.objects.filter(device_name=LAST_AUDIT_RESULT.get('device_id', 'E32_IPS_7')).first()
+    db_status = db_state.status if db_state else "UNKNOWN"
+    last_updated_db = db_state.last_updated.strftime("%Y-%m-%d %H:%M:%S WIB") if db_state and db_state.last_updated else None
+
+    excel_path = get_audit_excel_path()
+    file_exists = os.path.exists(excel_path)
+    file_size_kb = round(os.path.getsize(excel_path) / 1024, 1) if file_exists else 0
+
+    return Response({
+        'device_id': LAST_AUDIT_RESULT.get('device_id', 'E32_IPS_7'),
+        'status': LAST_AUDIT_RESULT.get('status', db_status),
+        'db_status': db_status,
+        'last_updated_db': last_updated_db,
+        'is_alive': LAST_AUDIT_RESULT.get('is_alive', False),
+        'latency_seconds': LAST_AUDIT_RESULT.get('latency_seconds'),
+        'timestamp': LAST_AUDIT_RESULT.get('timestamp'),
+        'response_topic': LAST_AUDIT_RESULT.get('response_topic'),
+        'response_payload': LAST_AUDIT_RESULT.get('response_payload'),
+        'gsheet_synced': LAST_AUDIT_RESULT.get('gsheet_synced', False),
+        'excel_file_exists': file_exists,
+        'excel_size_kb': file_size_kb,
+        'download_url': '/api/verticality/speaker-audit/download/'
+    })
+
+
+@api_view(['POST'])
+def speaker_audit_trigger(request):
+    """
+    POST /api/verticality/speaker-audit/trigger/
+    Memicu manual audit pengecekan perangkat speaker sekarang juga.
+    """
+    from .speaker_audit_monitor import run_speaker_health_audit
+    try:
+        res = run_speaker_health_audit()
+        return Response({
+            'success': True,
+            'message': f"Audit selesai. Status: {res.get('status')} (Alive: {res.get('is_alive')})",
+            'data': res
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def speaker_audit_download(request):
+    """
+    GET /api/verticality/speaker-audit/download/
+    Mengunduh file Excel monitoring matriks 30 menit perangkat testing speaker.
+    """
+    from .speaker_audit_monitor import get_audit_excel_path
+    from django.http import HttpResponse, Http404
+    import os
+
+    file_path = get_audit_excel_path()
+    if not os.path.exists(file_path):
+        raise Http404("File excel monitoring audit speaker belum tersedia di server.")
+
+    with open(file_path, 'rb') as fh:
+        response = HttpResponse(
+            fh.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response['Content-Disposition'] = 'attachment; filename="monitoring_speaker_audit_30min.xlsx"'
+        return response
