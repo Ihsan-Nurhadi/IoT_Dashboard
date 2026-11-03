@@ -97,7 +97,7 @@ def sync_audit_to_google_sheet(audit_data: dict, webhook_url: str = "") -> bool:
     """
     url = webhook_url or os.getenv("SPEAKER_GSHEET_WEBHOOK_URL", "") or SPEAKER_GSHEET_WEBHOOK_URL
     if not url:
-        print("[i] [SPEAKER AUDIT] SPEAKER_GSHEET_WEBHOOK_URL belum diset (terpisah dari verticality). Melewati sinkronisasi Google Spreadsheet.")
+        print("[i] [SPEAKER AUDIT] SPEAKER_GSHEET_WEBHOOK_URL belum diset (terpisah dari verticality). Melewati sinkronisasi Google Spreadsheet.", flush=True)
         return False
 
     waktu_tarik = audit_data.get("timestamp_dt", datetime.now(WIB))
@@ -133,7 +133,7 @@ def sync_audit_to_google_sheet(audit_data: dict, webhook_url: str = "") -> bool:
         ]
     }
 
-    print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] Mengirim data audit ke Google Spreadsheet ({url[:45]}...)...")
+    print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] Mengirim data audit ke Google Spreadsheet ({url[:45]}...)...", flush=True)
 
     max_retries = 3
     for attempt in range(1, max_retries + 1):
@@ -145,14 +145,14 @@ def sync_audit_to_google_sheet(audit_data: dict, webhook_url: str = "") -> bool:
                 timeout=25
             )
             if res.status_code in (200, 201):
-                print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [OK] Sukses update Google Spreadsheet: {res.text[:120]}")
+                print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [OK] Sukses update Google Spreadsheet: {res.text[:120]}", flush=True)
                 return True
             else:
-                print(f"[!] Gagal update Google Sheet: HTTP {res.status_code} (Percobaan {attempt}/{max_retries})")
+                print(f"[!] Gagal update Google Sheet: HTTP {res.status_code} (Percobaan {attempt}/{max_retries})", flush=True)
                 if attempt < max_retries:
                     time.sleep(3 * attempt)
         except Exception as e:
-            print(f"[!] Error koneksi ke Google Apps Script: {e} (Percobaan {attempt}/{max_retries})")
+            print(f"[!] Error koneksi ke Google Apps Script: {e} (Percobaan {attempt}/{max_retries})", flush=True)
             if attempt < max_retries:
                 time.sleep(3 * attempt)
 
@@ -210,10 +210,8 @@ def update_speaker_audit_excel_matrix(audit_data: dict, file_path: str = None) -
         else:
             ws = wb.create_sheet(title=sheet_name)
 
+        # Header awal: hanya kolom identitas perangkat (tanpa kolom kosong 00:00-23:30)
         headers = ["No", "Device Name", "Device ID", "Topic Audit"]
-        for h in range(24):
-            headers.append(f"{h:02d}:00")
-            headers.append(f"{h:02d}:30")
 
         ws.row_dimensions[1].height = 26
         for col_idx, h_text in enumerate(headers, start=1):
@@ -223,13 +221,21 @@ def update_speaker_audit_excel_matrix(audit_data: dict, file_path: str = None) -
             cell.alignment = align_center
             cell.border = thin_border
 
-    # Cari kolom slot
+        # Isi row 2 untuk identitas perangkat
+        ws.cell(row=2, column=1, value=1).alignment = align_center
+        ws.cell(row=2, column=2, value="Testing ESP32 Speaker").alignment = align_left
+        ws.cell(row=2, column=3, value=audit_data.get("device_id", DEVICE_ID)).alignment = align_left
+        ws.cell(row=2, column=4, value=AUDIT_TOPIC).alignment = align_left
+
+    # Cari apakah kolom slot waktu ini sudah ada
     target_col = None
     for col in range(5, ws.max_column + 1):
-        if ws.cell(row=1, column=col).value == slot_header:
+        if str(ws.cell(row=1, column=col).value).strip() == slot_header:
             target_col = col
             break
 
+    # Jika belum ada, tambahkan kolom baru di sebelah kanan secara kronologis (D -> E -> F...)
+    # tanpa membuat kolom-kolom kosong 00:00 - 15:00
     if not target_col:
         target_col = ws.max_column + 1
         h_cell = ws.cell(row=1, column=target_col, value=slot_header)
@@ -237,12 +243,6 @@ def update_speaker_audit_excel_matrix(audit_data: dict, file_path: str = None) -
         h_cell.fill = fill_header
         h_cell.alignment = align_center
         h_cell.border = thin_border
-
-    # Isi row 2 untuk perangkat ini
-    ws.cell(row=2, column=1, value=1).alignment = align_center
-    ws.cell(row=2, column=2, value="Testing ESP32 Speaker").alignment = align_left
-    ws.cell(row=2, column=3, value=audit_data.get("device_id", DEVICE_ID)).alignment = align_left
-    ws.cell(row=2, column=4, value=AUDIT_TOPIC).alignment = align_left
 
     status_val = audit_data.get("status", "OFFLINE")
     cell = ws.cell(row=2, column=target_col, value=status_val)
@@ -344,9 +344,9 @@ def run_speaker_health_audit(
     client.on_connect = on_connect
     client.on_message = on_message
 
-    print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Memulai pengecekan perangkat '{device_id}'...")
-    print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Broker: {broker}:{port} | User: {user}")
-    print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Target Topic: {audit_topic} | Payload: {payload_str}")
+    print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Memulai pengecekan perangkat '{device_id}'...", flush=True)
+    print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Broker: {broker}:{port} | User: {user}", flush=True)
+    print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Target Topic: {audit_topic} | Payload: {payload_str}", flush=True)
 
     connected = False
     try:
@@ -357,12 +357,12 @@ def run_speaker_health_audit(
 
         # Kirim payload audit ke perangkat
         client.publish(audit_topic, payload=payload_str, qos=0)
-        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Payload terkirim. Menunggu balasan (timeout {timeout_sec}s)...")
+        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Payload terkirim. Menunggu balasan (timeout {timeout_sec}s)...", flush=True)
 
         # Tunggu respon dari perangkat
         replied = response_event.wait(timeout=timeout_sec)
     except Exception as e:
-        print(f"[!] [SPEAKER AUDIT ERROR] Gagal koneksi/audit ke broker: {e}")
+        print(f"[!] [SPEAKER AUDIT ERROR] Gagal koneksi/audit ke broker: {e}", flush=True)
         replied = False
     finally:
         if connected:
@@ -376,12 +376,12 @@ def run_speaker_health_audit(
     latency = audit_context["latency"]
 
     if replied:
-        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] [ALIVE/ONLINE] Perangkat {device_id} MERESPONS!")
-        print(f"   -> Latensi: {latency:.2f} detik")
-        print(f"   -> Topik Balasan: {audit_context['response_topic']}")
-        print(f"   -> Payload Balasan: {audit_context['response_payload'][:200]}")
+        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] [ALIVE/ONLINE] Perangkat {device_id} MERESPONS!", flush=True)
+        print(f"   -> Latensi: {latency:.2f} detik", flush=True)
+        print(f"   -> Topik Balasan: {audit_context['response_topic']}", flush=True)
+        print(f"   -> Payload Balasan: {audit_context['response_payload'][:200]}", flush=True)
     else:
-        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] [DEAD/OFFLINE] Perangkat {device_id} TIDAK MERESPONS (Timeout {timeout_sec}s)")
+        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] [DEAD/OFFLINE] Perangkat {device_id} TIDAK MERESPONS (Timeout {timeout_sec}s)", flush=True)
 
     # 1. Update Database Django (DeviceState)
     try:
@@ -394,7 +394,7 @@ def run_speaker_health_audit(
                 "last_updated": dj_tz.now()
             }
         )
-        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] DeviceState di database diperbarui: {device_id} -> {status}")
+        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] DeviceState di database diperbarui: {device_id} -> {status}", flush=True)
     except Exception as e:
         # Jika dipanggil di luar konteks Django
         pass
@@ -419,7 +419,7 @@ def run_speaker_health_audit(
             synced = sync_audit_to_google_sheet(result, webhook_url=gsheet_url)
             result["gsheet_synced"] = synced
         except Exception as e:
-            print(f"[!] [SPEAKER AUDIT] Gagal sinkronisasi Google Sheet: {e}")
+            print(f"[!] [SPEAKER AUDIT] Gagal sinkronisasi Google Sheet: {e}", flush=True)
 
     # 3. Simpan ke File Excel Lokal
     if update_excel:
@@ -427,7 +427,7 @@ def run_speaker_health_audit(
             excel_path = update_speaker_audit_excel_matrix(result)
             result["excel_path"] = excel_path
         except Exception as e:
-            print(f"[!] [SPEAKER AUDIT] Gagal simpan Excel lokal: {e}")
+            print(f"[!] [SPEAKER AUDIT] Gagal simpan Excel lokal: {e}", flush=True)
 
     LAST_AUDIT_RESULT = result
     return result
@@ -451,26 +451,26 @@ def start_speaker_audit_scheduler():
     def _loop():
         # Jeda 5 detik saat inisialisasi awal server
         time.sleep(5)
-        print("[SPEAKER AUDIT 30-MIN] Inisialisasi scheduler audit perangkat testing berhasil.")
+        print("[SPEAKER AUDIT 30-MIN] Inisialisasi scheduler audit perangkat testing berhasil.", flush=True)
         
         # Eksekusi audit awal saat startup
         try:
             run_speaker_health_audit()
         except Exception as e:
-            print(f"[SPEAKER AUDIT ERROR] Eksekusi awal gagal: {e}")
+            print(f"[SPEAKER AUDIT ERROR] Eksekusi awal gagal: {e}", flush=True)
 
         while True:
             sleep_sec = get_seconds_until_next_30min()
             menit = int(sleep_sec // 60)
             detik = int(sleep_sec % 60)
-            print(f"[SPEAKER AUDIT 30-MIN] Menunggu interval 30 menit berikutnya ({menit}m {detik}s)...")
+            print(f"[SPEAKER AUDIT 30-MIN] Menunggu interval 30 menit berikutnya ({menit}m {detik}s)...", flush=True)
             time.sleep(sleep_sec)
             try:
                 run_speaker_health_audit()
             except Exception as ex:
-                print(f"[SPEAKER AUDIT ERROR] Gagal menjalankan audit 30 menit: {ex}")
+                print(f"[SPEAKER AUDIT ERROR] Gagal menjalankan audit 30 menit: {ex}", flush=True)
 
     t = threading.Thread(target=_loop, daemon=True, name="SpeakerAuditScheduler")
     t.start()
-    print("[SPEAKER AUDIT 30-MIN] Background thread 'SpeakerAuditScheduler' telah aktif.")
+    print("[SPEAKER AUDIT 30-MIN] Background thread 'SpeakerAuditScheduler' telah aktif.", flush=True)
 
