@@ -40,7 +40,7 @@ DEFAULT_PAYLOAD = os.getenv("SPEAKER_TEST_PAYLOAD", '{"heartbeat": {}}')
 SPEAKER_GSHEET_WEBHOOK_URL = os.getenv("SPEAKER_GSHEET_WEBHOOK_URL", "")
 
 # Timeout menunggu balasan perangkat dalam detik (default: 10 detik)
-AUDIT_TIMEOUT_SECONDS = float(os.getenv("SPEAKER_AUDIT_TIMEOUT_SECONDS", "10.0"))
+AUDIT_TIMEOUT_SECONDS = float(os.getenv("SPEAKER_AUDIT_TIMEOUT_SECONDS", "30.0"))
 
 # Cache hasil audit terakhir di memori
 LAST_AUDIT_RESULT = {
