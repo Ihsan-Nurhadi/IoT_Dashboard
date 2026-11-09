@@ -298,10 +298,12 @@ def run_speaker_health_audit(
         "response_topic": None,
         "response_payload": None,
         "latency": None,
+        "publish_time": None,
     }
 
     response_topics = [
         f"nms/{device_id}/speaker/audit/response",
+        f"nms/{device_id}/speaker/heartbeat",
         f"nms/{device_id}/speaker/#",
     ]
 
@@ -324,8 +326,21 @@ def run_speaker_health_audit(
                 c.subscribe(top, qos=0)
 
     def on_message(c, userdata, msg):
-        # Abaikan pesan yang kita publish sendiri ke topic audit
+        # 1. ABAIKAN pesan RETAIN (pesan lama yang disimpan broker saat perangkat offline/connect)
+        if getattr(msg, "retain", False):
+            return
+
+        # 2. ABAIKAN pesan yang masuk sebelum request audit resmi di-publish
+        publish_time = audit_context.get("publish_time")
+        if publish_time is None:
+            return
+
+        # 3. ABAIKAN pesan yang kita publish sendiri ke topic audit
         if msg.topic == audit_topic:
+            return
+
+        # 4. ABAIKAN pesan info (retained atau info spek, bukan balasan heartbeat)
+        if msg.topic.endswith("/info"):
             return
 
         try:
@@ -333,12 +348,32 @@ def run_speaker_health_audit(
         except Exception:
             payload_text = str(msg.payload)
 
-        # Jika topik adalah response atau berada di bawah namespace speaker device ini
-        if f"nms/{device_id}/speaker" in msg.topic:
+        # Abaikan jika isi payload adalah metadata info
+        if '"info"' in payload_text and '"heartbeat"' not in payload_text:
+            return
+
+        # 5. VALIDASI: Balasan resmi audit speaker HARUS berisi {"heartbeat": {...}}
+        # Contoh balasan valid: {"heartbeat":{"IP":"192.168.8.159","Uptime":"0d 1h 19m 16s","fw":"0.1.3"}}
+        is_valid_heartbeat = False
+        try:
+            parsed = json.loads(payload_text)
+            if isinstance(parsed, dict) and "heartbeat" in parsed:
+                hb = parsed["heartbeat"]
+                # Pastikan heartbeat bukan objek kosong {} (yang kita kirim sendiri)
+                if isinstance(hb, dict) and len(hb) > 0:
+                    is_valid_heartbeat = True
+                elif isinstance(hb, dict):
+                    # Jika objek heartbeat dikirim dari perangkat
+                    is_valid_heartbeat = True
+        except Exception:
+            if '"heartbeat"' in payload_text and ('"IP"' in payload_text or '"Uptime"' in payload_text or '"fw"' in payload_text):
+                is_valid_heartbeat = True
+
+        if is_valid_heartbeat and f"nms/{device_id}/speaker" in msg.topic:
             audit_context["received"] = True
             audit_context["response_topic"] = msg.topic
             audit_context["response_payload"] = payload_text
-            audit_context["latency"] = time.time() - start_time
+            audit_context["latency"] = max(0.001, time.time() - publish_time)
             response_event.set()
 
     client.on_connect = on_connect
@@ -352,12 +387,13 @@ def run_speaker_health_audit(
     try:
         rc = client.connect(broker, port, keepalive=30)
         client.loop_start()
-        time.sleep(1.0)  # Berikan jeda sejenak untuk koneksi & subscribe
+        time.sleep(1.0)  # Berikan jeda sejenak untuk koneksi & subscribe broker selesai
         connected = True
 
-        # Kirim payload audit ke perangkat
+        # Catat waktu publish dan kirim payload audit ke perangkat
+        audit_context["publish_time"] = time.time()
         client.publish(audit_topic, payload=payload_str, qos=0)
-        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Payload terkirim. Menunggu balasan (timeout {timeout_sec}s)...", flush=True)
+        print(f"[{datetime.now(WIB).strftime('%H:%M:%S')}] [SPEAKER AUDIT] Payload terkirim. Menunggu balasan heartbeat (timeout {timeout_sec}s)...", flush=True)
 
         # Tunggu respon dari perangkat
         replied = response_event.wait(timeout=timeout_sec)
