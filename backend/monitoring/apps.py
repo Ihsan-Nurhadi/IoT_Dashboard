@@ -10,14 +10,16 @@ class MonitoringConfig(AppConfig):
         import os
         import sys
 
-        # Cegah double execution saat django development runserver
-        is_runserver = any('runserver' in arg for arg in sys.argv)
-        if is_runserver and os.environ.get('RUN_MAIN') != 'true':
+        # Cegah eksekusi ganda jika dipanggil via management command CLI (misal: python manage.py speaker_audit_listener --once)
+        is_manage_py = any('manage.py' in str(arg).lower() for arg in sys.argv)
+        is_runserver = any('runserver' in str(arg).lower() for arg in sys.argv)
+
+        # Jika dipanggil via CLI manage.py selain runserver, jangan jalankan background thread otomatis
+        if is_manage_py and not is_runserver:
             return
 
-        # Lewati eksekusi saat perintah migration / command build
-        cmd = sys.argv[1] if len(sys.argv) > 1 else ''
-        if cmd in ('migrate', 'makemigrations', 'collectstatic', 'check', 'shell'):
+        # Jika runserver development, pastikan hanya jalan di child worker utama (RUN_MAIN == 'true')
+        if is_runserver and os.environ.get('RUN_MAIN') != 'true':
             return
 
         # Monitoring 30-menit site verticality E32_VER_WEES dinonaktifkan.
