@@ -1938,3 +1938,43 @@ def speaker_audit_download(request):
         )
         response['Content-Disposition'] = 'attachment; filename="monitoring_speaker_audit_30min.xlsx"'
         return response
+
+# ==============================================================================
+# RFID EXPORT CSV VIEW
+# ==============================================================================
+@api_view(['GET'])
+def rfid_export_csv(request):
+    """
+    GET /api/rfid/export-csv/?start_date=2026-10-01&end_date=2026-10-31
+    Download data log scan RFID dalam format CSV langsung lewat browser.
+    """
+    import csv
+    from django.http import HttpResponse
+    from zoneinfo import ZoneInfo
+    from .models import RFIDScan
+
+    start_date = request.query_params.get('start_date')
+    end_date = request.query_params.get('end_date')
+    tag_epc = request.query_params.get('tag_epc')
+
+    wib = ZoneInfo('Asia/Jakarta')
+    qs = RFIDScan.objects.all().order_by('timestamp')
+
+    if start_date:
+        qs = qs.filter(timestamp__date__gte=start_date)
+    if end_date:
+        qs = qs.filter(timestamp__date__lte=end_date)
+    if tag_epc:
+        qs = qs.filter(tag_epc__icontains=tag_epc)
+
+    filename = f"rfid_logs_{start_date or 'awal'}_sd_{end_date or 'akhir'}.csv"
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+    writer.writerow(['ID', 'Waktu (WIB)', 'Reader ID', 'Tag EPC'])
+    for s in qs:
+        waktu_str = s.timestamp.astimezone(wib).strftime('%Y-%m-%d %H:%M:%S')
+        writer.writerow([s.id, waktu_str, s.reader_id, s.tag_epc])
+
+    return response
